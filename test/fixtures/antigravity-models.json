@@ -1,0 +1,9 @@
+{
+  "models": {
+    "gemini-3-pro-high": { "displayName": "Gemini 3 Pro (High)", "quotaInfo": { "remainingFraction": 0.8, "resetTime": "2026-11-30T00:00:00Z" } },
+    "gemini-3-flash": { "displayName": "Gemini 3 Flash", "quotaInfo": { "remainingFraction": 0.95, "resetTime": "2026-11-30T00:00:00Z" } },
+    "claude-sonnet-4-5": { "displayName": "Claude Sonnet 4.5", "quotaInfo": { "remainingFraction": 0.4, "resetTime": "2026-11-29T00:00:00Z" } },
+    "gpt-oss-120b": { "displayName": "GPT-OSS 120B", "quotaInfo": { "resetTime": "2026-11-28T00:00:00Z" } },
+    "chat_20706": { "displayName": "internal" }
+  }
+}

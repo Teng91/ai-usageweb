@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>AI 用量</title>
+  <meta name="description" content="Claude、Codex、Antigravity、Copilot 額度與 OpenRouter 餘額">
+  <meta name="theme-color" content="#f6f5f1" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#161614" media="(prefers-color-scheme: dark)">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="AI 用量">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1>AI 用量</h1>
+    <div class="conn" id="conn" aria-live="polite">
+      <span class="dot" id="conn-dot" aria-hidden="true"></span>
+      <span id="conn-text">連線中…</span>
+    </div>
+    <button class="install" id="install-btn" type="button" hidden>安裝</button>
+  </header>
+
+  <div class="banner" id="update-banner" hidden>
+    <span>有新版本</span>
+    <button type="button" id="update-btn">點此重新載入</button>
+  </div>
+  <div class="banner warn" id="offline-banner" hidden>離線：顯示的是上次的數字</div>
+
+  <main id="cards" class="cards" aria-live="polite">
+    <p class="empty" id="empty">載入中…</p>
+  </main>
+
+  <footer class="foot">
+    <span id="last-updated">—</span>
+  </footer>
+
+  <template id="card-tpl">
+    <article class="card">
+      <header class="card-head">
+        <h2 class="card-name"></h2>
+        <span class="plan"></span>
+      </header>
+      <div class="card-body"></div>
+      <p class="card-status"></p>
+      <p class="card-meta"></p>
+    </article>
+  </template>
+
+  <script src="/app.js" type="module"></script>
+</body>
+</html>

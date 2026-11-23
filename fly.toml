@@ -1,0 +1,37 @@
+app = "ai-usageweb"
+primary_region = "sin"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  DATA_DIR = "/data"
+  POLL_INTERVAL_SEC = "60"
+  IDLE_GRACE_SEC = "90"
+
+[mounts]
+  source = "usage_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"     # 可實測 "suspend"：喚醒更快，但要確認跟 volume 相容
+  auto_start_machines = true
+  min_machines_running = 0         # 沒人看就全部停掉
+
+  [http_service.concurrency]
+    type = "connections"            # SSE 是長連線，用連線數計算比較準
+    soft_limit = 50
+    hard_limit = 100
+
+  [[http_service.checks]]
+    grace_period = "10s"
+    interval = "30s"
+    timeout = "5s"
+    method = "GET"
+    path = "/healthz"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"
