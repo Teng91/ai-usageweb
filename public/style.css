@@ -216,6 +216,8 @@ button {
   margin: 0;
 }
 
+.balance-big.negative { color: var(--danger); }
+
 .balance-sub {
   font-size: 0.9rem;
   color: var(--muted);

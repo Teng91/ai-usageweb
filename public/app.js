@@ -211,7 +211,7 @@ function renderCard(p) {
 function renderBalance(b) {
   const frag = document.createDocumentFragment();
   const big = document.createElement('p');
-  big.className = 'balance-big';
+  big.className = Number(b.remaining) < 0 ? 'balance-big negative' : 'balance-big';
   big.textContent = b.remaining === null || b.remaining === undefined ? '—' : money(b.remaining, b.currency);
   frag.append(big);
   const sub = document.createElement('p');
@@ -315,7 +315,8 @@ setInterval(() => {
 function money(n, currency = 'USD') {
   if (n === null || n === undefined) return '—';
   const sym = currency === 'USD' ? '$' : `${currency} `;
-  return `${sym}${Number(n).toFixed(2)}`;
+  const v = Number(n);
+  return `${v < 0 ? '-' : ''}${sym}${Math.abs(v).toFixed(2)}`;
 }
 
 function ago(iso, now = Date.now()) {
