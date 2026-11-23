@@ -29,6 +29,8 @@ export function parseCopilot(data) {
       const q = data.quota_snapshots[key];
       if (!q || q.unlimited) continue;
       const limit = Number(q.entitlement);
+      // 額度 0 代表這個方案沒有這項（例如 Free 的 premium），不顯示
+      if (q.entitlement !== undefined && !(limit > 0)) continue;
       const remaining = Number(q.remaining);
       let usedPct = null;
       if (Number.isFinite(Number(q.percent_remaining))) usedPct = clampPct(100 - Number(q.percent_remaining));
@@ -42,8 +44,10 @@ export function parseCopilot(data) {
       windows.push(w);
     }
     const allUnlimited = ORDER.every((k) => !data.quota_snapshots[k] || data.quota_snapshots[k].unlimited);
+    // access_type_sku 比 copilot_plan（常是籠統的 individual）準
+    const sku = String(data.access_type_sku || '');
     return {
-      plan: planName(data.copilot_plan || data.access_type_sku),
+      plan: planName(sku.includes('free') ? sku : (data.copilot_plan || sku)),
       windows,
       balance: null,
       note: windows.length === 0 && allUnlimited ? '無使用上限' : null,

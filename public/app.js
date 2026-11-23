@@ -284,7 +284,7 @@ function tickCard(el, p, now = Date.now()) {
   } else {
     status.textContent = '';
   }
-  el.querySelector('.card-meta').textContent = p.fetchedAt ? `資料時間 ${ago(p.fetchedAt, now)}` : '';
+  el.querySelector('.card-meta').textContent = p.fetchedAt ? `資料時間 ${ago(p.fetchedAt, now)} · 每 ${Math.round((p.intervalSec || state.pollIntervalSec) / 60 * 10) / 10} 分鐘更新` : '';
 }
 
 function renderChrome(now = Date.now()) {
@@ -320,8 +320,9 @@ function money(n, currency = 'USD') {
 }
 
 function ago(iso, now = Date.now()) {
+  // 只到分鐘，不讓秒數一直跳
   const s = Math.max(0, Math.round((now - Date.parse(iso)) / 1000));
-  if (s < 60) return `${s} 秒前`;
+  if (s < 60) return '剛剛';
   const m = Math.floor(s / 60);
   if (m < 60) return `${m} 分鐘前`;
   const h = Math.floor(m / 60);
@@ -338,12 +339,11 @@ function resetText(iso, now = Date.now()) {
   const d = Math.floor(diff / 86400);
   const h = Math.floor((diff % 86400) / 3600);
   const m = Math.floor((diff % 3600) / 60);
-  const s = diff % 60;
   let left;
   if (d > 0) left = `${d} 天 ${h} 小時`;
   else if (h > 0) left = `${h} 小時 ${m} 分`;
-  else if (m > 0) left = `${m} 分 ${s} 秒`;
-  else left = `${s} 秒`;
+  else if (m > 0) left = `${m} 分鐘`;
+  else left = '不到 1 分鐘';
   return `${left}後重置（${localWhen(t, now)}）`;
 }
 

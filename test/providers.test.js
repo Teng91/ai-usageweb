@@ -49,6 +49,20 @@ test('copilot: 新版回傳', () => {
   assert.equal(r.windows[1].limit, 2000);
 });
 
+test('copilot: individual + free sku 算 Free；額度 0 的項目不顯示', () => {
+  const r = parseCopilot({
+    copilot_plan: 'individual',
+    access_type_sku: 'free_limited_copilot',
+    quota_reset_date: '2026-12-01',
+    quota_snapshots: {
+      chat: { entitlement: 200, remaining: 198, percent_remaining: 99, unlimited: false },
+      premium_interactions: { entitlement: 0, remaining: 0, percent_remaining: 0, unlimited: false },
+    },
+  });
+  assert.equal(r.plan, 'Free');
+  assert.deepEqual(r.windows.map((w) => w.id), ['chat']);
+});
+
 test('copilot: 舊版 Free 回傳', () => {
   const r = parseCopilot(fixture('copilot-old.json'));
   assert.equal(r.plan, 'Free');
