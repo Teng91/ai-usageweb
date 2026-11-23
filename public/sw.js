@@ -1,5 +1,5 @@
 // 快取名稱帶版本號；改了前端檔案就把版本 +1
-const CACHE = 'app-v4';
+const CACHE = 'app-v5';
 const SHELL = [
   '/',
   '/index.html',
@@ -14,7 +14,8 @@ const SHELL = [
 const API_CACHE = 'api-last';
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)));
+  // cache: 'reload' 跳過瀏覽器的 HTTP 快取，確保新版本拿到的是新檔案
+  event.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL.map((u) => new Request(u, { cache: 'reload' })))));
 });
 
 self.addEventListener('activate', (event) => {

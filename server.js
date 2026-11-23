@@ -174,11 +174,9 @@ async function serveStatic(req, res, pathname) {
     return sendJson(res, 404, { error: 'not found' });
   }
   const ext = path.extname(file);
-  const base = path.basename(file);
-  // sw.js、HTML、manifest 不能長期快取，否則新版本出不來；其他交給 service worker 的版本號
-  const cache = ['sw.js', 'index.html', 'manifest.webmanifest'].includes(base)
-    ? 'no-cache'
-    : 'public, max-age=3600';
+  // HTML／JS／CSS／manifest 一律 no-cache（每次跟伺服器確認），否則新版本最多要等快取過期才出得來；
+  // 離線與速度交給 service worker。只有圖示可以長期快取。
+  const cache = rel.startsWith('/icons/') ? 'public, max-age=86400' : 'no-cache';
   res.writeHead(200, {
     'Content-Type': MIME[ext] || 'application/octet-stream',
     'Cache-Control': cache,
