@@ -69,7 +69,7 @@ npm test
 | Copilot | `gh auth login` 後 `gh auth token`；不行就跑 Copilot 的 OAuth device flow 另拿一個 `gho_` token | `GITHUB_COPILOT_TOKEN` |
 | Claude | 先試 `claude setup-token` 的長效 token 能不能打 usage 端點（填 `CLAUDE_OAUTH_TOKEN`）；不行就用獨立設定目錄登入（見下） | `CLAUDE_REFRESH_TOKEN` 等 |
 | Codex | 獨立 `CODEX_HOME` 登入（見下） | `CODEX_REFRESH_TOKEN`、`CODEX_ACCOUNT_ID` 等 |
-| Antigravity | 找出 Antigravity 用的 OAuth client id／secret，跑 `npm run antigravity-login` | `ANTIGRAVITY_*` |
+| Antigravity | 先用官方 `agy`（`winget install Google.AntigravityCLI`）以 Google 帳號登入一次，再跑 `scripts\setup-antigravity.ps1`（見下） | `ANTIGRAVITY_*` |
 
 Claude 獨立登入（PowerShell），開起來後在 Claude Code 裡輸入 `/login`：
 
@@ -81,6 +81,18 @@ Codex 獨立登入：
 
 ```powershell
 $env:CODEX_HOME="$PWD\server-codex"; codex login
+```
+
+Antigravity 比較特別，不用獨立資料夾，而是用官方 CLI 登入後直接讀它存的憑證：
+
+```powershell
+winget install Google.AntigravityCLI
+```
+
+裝好後執行 `agy`（不帶參數），選「Google OAuth」用你的 Google 帳號登入一次。接著在專案資料夾跑這個腳本，它會從認證管理員讀出 refresh token、比對出對應的 OAuth client，並直接設到 fly（token 不會印出來）：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\setup-antigravity.ps1
 ```
 
 全部登入完，產生 `fly secrets set` 指令（含新的 `CREDENTIALS_KEY` 與 `ADMIN_TOKEN`）：
