@@ -18,17 +18,9 @@
   <link rel="stylesheet" href="/skin-adventure.css">
 </head>
 <body>
-  <!-- 冒險風格的像素場景（純裝飾）；簡約風格時隱藏 -->
-  <div class="scene" aria-hidden="true">
-    <div class="sc-mountains"></div>
-    <div class="sc-cloud c1"></div><div class="sc-cloud c2"></div><div class="sc-cloud c3"></div><div class="sc-cloud c4"></div>
-    <div class="sc-ground"></div>
-    <div class="sc-house"></div>
-    <div class="sc-tree t1"></div><div class="sc-tree t2"></div><div class="sc-tree t3"></div>
-    <div class="sc-slime s1"></div><div class="sc-slime s2"></div><div class="sc-slime s3"></div>
-    <div class="sc-hero"></div>
-    <div class="sc-fly f1"></div><div class="sc-fly f2"></div><div class="sc-fly f3"></div><div class="sc-fly f4"></div><div class="sc-fly f5"></div><div class="sc-fly f6"></div>
-  </div>
+  <!-- 冒險風格的像素場景（scene.js 建立三張地圖、勇者與傳送點）；簡約風格時隱藏 -->
+  <div class="scene" id="scene" aria-hidden="true"></div>
+  <button class="bg-exit" id="bg-exit" type="button" hidden>顯示用量（Esc）</button>
 
   <header class="topbar">
     <h1>AI 用量</h1>
@@ -36,11 +28,14 @@
       <span class="dot" id="conn-dot" aria-hidden="true"></span>
       <span id="conn-text">連線中…</span>
     </div>
-    <button class="skin-btn" id="skin-btn" type="button">
+    <button class="bg-btn" id="bg-btn" type="button" data-key="B" title="只看風景（B）" aria-label="只看風景">
+      <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M3 19l6-9 4 6 3-4 5 7z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="17" cy="6" r="2" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
+    </button>
+    <button class="skin-btn" id="skin-btn" type="button" data-key="S">
       <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M5 21V4m0 0h11l-2 4 2 4H5" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
       <span id="skin-label">冒險風</span>
     </button>
-    <button class="theme-btn" id="theme-btn" type="button" aria-label="切換亮色／暗色" title="切換亮色／暗色">
+    <button class="theme-btn" id="theme-btn" type="button" data-key="T" aria-label="切換亮色／暗色" title="切換亮色／暗色">
       <svg class="icon-sun" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
       <svg class="icon-moon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
     </button>
@@ -73,6 +68,13 @@
     <span id="last-updated">—</span>
   </footer>
 
+  <!-- 冒險風格的經驗值條：Claude 每週已用量換算成等級 -->
+  <div class="expbar" id="expbar" hidden>
+    <span class="exp-lv" id="exp-lv">Lv.1</span>
+    <span class="exp-track"><span class="exp-fill" id="exp-fill"></span></span>
+    <span class="exp-text" id="exp-text"></span>
+  </div>
+
   <template id="card-tpl">
     <article class="card">
       <header class="card-head">
@@ -87,5 +89,6 @@
   </template>
 
   <script src="/app.js" type="module"></script>
+  <script src="/scene.js" type="module"></script>
 </body>
 </html>

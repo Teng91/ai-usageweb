@@ -21,6 +21,12 @@ const P = {
   c: '#fff3d6', C: '#e8d2a6', // 牆
   n: '#ffd23f', // 黃
   m: '#8fb3e6', M: '#7aa0d8', // 遠山的藍
+  a: '#f4d993', A: '#dcb867', // 沙灘
+  e: '#4fb6f7', E: '#2b8be0', // 海
+  v: '#c49bff', V: '#8a4fe8', // 傳送點
+  q: '#fff1a8', // 傳送點中心
+  z: '#3f8f5a', Z: '#2a6b41', // 松樹
+  f: '#a8743f', F: '#7a4f26', // 木板
 };
 
 function svg(name, frames) {
@@ -206,3 +212,267 @@ svg('grass', [[
   }
   svg('mountains', [rows]);
 }
+
+// ---------- 第二批：原創怪物、地形、三張地圖的道具 ----------
+
+// 葉子精靈（兩格：眨眼＋換腳）
+const leafTop = [
+  '........kk......',
+  '.......kGGk.....',
+  '......kGk.......',
+  '....kkkGkkkk....',
+  '...kggggGggggk..',
+  '..kgwggggGgggggk',
+  '.kggggggGggggggk',
+];
+const leafBottom = [
+  '.kgpggggggggpggk',
+  '.kgggggkkgggggk.',
+  '..kgggggggggGk..',
+  '...kGgggggGGk...',
+  '....kkGGGGkk....',
+];
+svg('leafling', [
+  [...leafTop, '.kggkggggggkgggk', '.kggkggggggkgggk', ...leafBottom, '....kk....kk....', '................'],
+  [...leafTop, '.kgggggggggggggk', '.kggkggggggkgggk', ...leafBottom, '.....kk..kk.....', '................'],
+]);
+
+// 蛋殼小雞（兩格：閉嘴／張嘴）
+const chick = (eyes, beak) => [
+  '................',
+  '................',
+  '......kkkk......',
+  '.....knnnnk.....',
+  '....knnnnnnk....',
+  '...' + eyes + '...',
+  '...knnnnnnnnk...',
+  '...' + beak + '...',
+  '..kknnnnnnnnkk..',
+  '..kwwkwwwkwwwk..',
+  '..kwwwwwwwwwWk..',
+  '..kwwWwwwwwWWk..',
+  '...kwwwwwwWWk...',
+  '....kkkkkkkk....',
+  '................',
+  '................',
+];
+svg('chick', [chick('knnknnknnk', 'knnnoonnnk'), chick('knnknnknnk', 'knnokkonnk')]);
+
+// 嘟嘴雲朵怪（兩格：嘟嘴／張嘴）
+const cloudling = (mouth) => [
+  '................',
+  '....kkk..kkk....',
+  '...kwwwkkwwwk...',
+  '..kwwwwwwwwwwk..',
+  '.kwwwkwwwwkwwwk.',
+  '.kwwwkwwwwkwwwk.',
+  '.kwpwwwwwwwwpwk.',
+  '.' + mouth + '.',
+  '.kWwwwwwwwwwwWk.',
+  '..kWWwwwwwwWWk..',
+  '...kkkkkkkkkk...',
+  '................',
+];
+svg('cloudling', [cloudling('kwwwwwkkwwwwwk'), cloudling('kwwwwkwwkwwwwk')]);
+
+// 小螃蟹（兩格：鉗子張合）
+const crabBody = [
+  '.kk.kk....kk.kk.',
+  '....kwk..kwk....',
+  '...kkkkkkkkkk...',
+  '..krrrrrrrrrrk..',
+  '.krrrrrrrrrrrrk.',
+  '.krRrrrkkrrrRrk.',
+  '..kRRRRRRRRRRk..',
+  '.k.k.k....k.k.k.',
+  '................',
+];
+svg('crab', [
+  ['.kk..........kk.', 'krrk........krrk', 'krRk........kRrk', ...crabBody],
+  ['kk............kk', 'krk..........krk', '.kk..........kk.', ...crabBody],
+]);
+
+// 傳送點（橢圓漩渦，程式算出來）
+{
+  const W = 16, H = 24, cx = 7.5, cy = 11.5, rx = 7.5, ry = 11.5;
+  const rows = [];
+  for (let y = 0; y < H; y++) {
+    let r = '';
+    for (let x = 0; x < W; x++) {
+      const d = Math.hypot((x - cx) / rx, (y - cy) / ry);
+      if (d > 1) r += '.';
+      else if (d > 0.88) r += 'k';
+      else if (d > 0.7) r += 'V';
+      else if (d > 0.48) r += ((x + y) % 4 === 0 ? 'w' : 'v');
+      else if (d > 0.25) r += 'W';
+      else r += 'q';
+    }
+    rows.push(r);
+  }
+  svg('portal', [rows]);
+}
+
+// 浮空平台圖塊（16x8，橫向重複）：草地、雪地、木板
+svg('platform-grass', [[
+  'gggggggggggggggg',
+  'GgGGgGGgGGGgGgGG',
+  'tttttttttttttttt',
+  'ttTttttTtttTtttt',
+  'tttTtttttTtttttT',
+  'TtttttTttttttTtt',
+  'tTTttTttTTttTttT',
+  'kkkkkkkkkkkkkkkk',
+]]);
+svg('platform-snow', [[
+  'wwwwwwwwwwwwwwww',
+  'WwWWwwWwwWWwwWwW',
+  'tttWttttTtttWttt',
+  'ttTttttTtttTtttt',
+  'tttTtttttTtttttT',
+  'TtttttTttttttTtt',
+  'tTTttTttTTttTttT',
+  'kkkkkkkkkkkkkkkk',
+]]);
+svg('platform-wood', [[
+  'kkkkkkkkkkkkkkkk',
+  'ffffkffffffkffff',
+  'fFffkfffFffkffFf',
+  'FFFFkFFFFFFkFFFF',
+  'kkkkkkkkkkkkkkkk',
+  '..kFk......kFk..',
+  '..kFk......kFk..',
+  '..kkk......kkk..',
+]]);
+
+// 梯子（8x8，直向重複）
+svg('ladder', [[
+  'ktk..ktk',
+  'ktk..ktk',
+  'kttttttk',
+  'kTTTTTTk',
+  'ktk..ktk',
+  'ktk..ktk',
+  'ktk..ktk',
+  'ktk..ktk',
+]]);
+
+// 椰子樹
+svg('palm', [[
+  '...kkk....kkk...',
+  '..kgggk..kgggk..',
+  '.kgggGgkkgGgggk.',
+  'kggGkkgggggkkGgk',
+  'kgGk.kgGGGgk.kGk',
+  '.kk..kgkkgk..kk.',
+  '......ktTk......',
+  '......ktTk......',
+  '.......ktTk.....',
+  '.......ktTk.....',
+  '.......kTtk.....',
+  '......ktTk......',
+  '......ktTk......',
+  '......kTtk......',
+  '.....ktTtTk.....',
+  '.....kkkkkk.....',
+]]);
+
+// 小帆船
+svg('boat', [[
+  '...........k............',
+  '..........kwk...........',
+  '.........kwwk...........',
+  '........kwwwk...........',
+  '.......kwwwwk...........',
+  '......kwwwwWk...........',
+  '.....kkkkkkkk...........',
+  '...........k............',
+  'kkkkkkkkkkkkkkkkkkkkkkkk',
+  '.krrrrrrrrrrrrrrrrrrrrk.',
+  '..kRRRRRRRRRRRRRRRRRRk..',
+  '...kkkkkkkkkkkkkkkkkk...',
+]]);
+
+// 碼頭木板（16x8，橫向重複）
+svg('dock', [[
+  'kkkkkkkkkkkkkkkk',
+  'ffffkffffffkffff',
+  'FFFFkFFFFFFkFFFF',
+  'kkkkkkkkkkkkkkkk',
+  '..kFk......kFk..',
+  '..kFk......kFk..',
+  '..kFk......kFk..',
+  '..kFk......kFk..',
+]]);
+
+// 海浪（32x8，橫向重複）
+{
+  const pat = ['...ww...', '..weew..', 'eweeeewe', 'eeeeeeee', 'eeEeeeEe', 'EeeeEeee', 'EEEEEEEE', 'EEEEEEEE'];
+  svg('sea', [pat.map((r) => r.repeat(4))]);
+}
+
+// 沙灘與雪地（32x10，橫向重複）
+svg('sand', [[
+  '................................',
+  '......p.................w.......',
+  '.....ppp..............wwk.......',
+  'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+  'aAaaaaaaaaAaaaaaaaaaaaAaaaaaaaaa',
+  'aaaaaAaaaaaaaaaAaaaaaaaaaaaAaaaa',
+  'AaaaaaaaAaaaaaaaaaaAaaaaaaaaaaaA',
+  'aaaAaaaaaaaaAaaaaaaaaaAaaaaaAaaa',
+  'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+  'AaaaaaAaaaaaaaaAaaaaaaAaaaaaaaaa',
+]]);
+svg('snow', [[
+  '................................',
+  '................................',
+  '................................',
+  'wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww',
+  'wwWwwwwwwwwwWwwwwwwwwwwwWwwwwwww',
+  'wwwwwWwwwwwwwwwwwWwwwwwwwwwwwWww',
+  'WwwwwwwwWwwwwwwwwwwwWwwwwwwwwwwW',
+  'wwwWwwwwwwwwwWwwwwwwwwwWwwwwwwww',
+  'wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww',
+  'WWwwwwWwwwwwwwwWWwwwwwWwwwwwwwWW',
+]]);
+
+// 雪松
+svg('pine', [[
+  '.......kk.......',
+  '......kwwk......',
+  '.....kwzzwk.....',
+  '....kwzzzzwk....',
+  '...kzzzZzzzzk...',
+  '....kkwwwwkk....',
+  '...kwwzzzzwwk...',
+  '..kwzzzzZzzzwk..',
+  '.kzzzZzzzzzZzzk.',
+  '..kkkwwwwwwkkk..',
+  '.kwwzzzzzzzzwwk.',
+  'kwzzzzZzzzzZzzwk',
+  'kzzZzzzzzzZzzzzk',
+  '.kkkkkkkkkkkkkk.',
+  '......ktTk......',
+  '......kTtk......',
+  '.....kkkkkk.....',
+]]);
+
+// 雪人
+svg('snowman', [[
+  '....kkkk....',
+  '...kkkkkk...',
+  '...kkkkkk...',
+  '..kkkkkkkk..',
+  '..kwwwwwwk..',
+  '..kwkwwkwk..',
+  '..kwwOOwwk..',
+  '...kwwwwk...',
+  '..krrrrrrk..',
+  '.kwwwRwwwwk.',
+  'kwwwwkwwwwwk',
+  'kwwwwwwwwwWk',
+  'kwwwwkwwwwWk',
+  'kWwwwwwwwWWk',
+  '.kWWwwwwWWk.',
+  '..kkkkkkkk..',
+]]);

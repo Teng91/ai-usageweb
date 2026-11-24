@@ -1,5 +1,5 @@
 // 快取名稱帶版本號；改了前端檔案就把版本 +1
-const CACHE = 'app-v17';
+const CACHE = 'app-v18';
 const SHELL = [
   '/',
   '/index.html',
@@ -7,6 +7,7 @@ const SHELL = [
   '/theme.js',
   '/skin-adventure.css',
   '/app.js',
+  '/scene.js',
   '/manifest.webmanifest',
   '/icons/icon.svg',
   '/pixel/cat.svg',
@@ -18,6 +19,23 @@ const SHELL = [
   '/pixel/slime.svg',
   '/pixel/slime-pink.svg',
   '/pixel/tree.svg',
+  '/pixel/leafling.svg',
+  '/pixel/chick.svg',
+  '/pixel/cloudling.svg',
+  '/pixel/crab.svg',
+  '/pixel/portal.svg',
+  '/pixel/platform-grass.svg',
+  '/pixel/platform-snow.svg',
+  '/pixel/platform-wood.svg',
+  '/pixel/ladder.svg',
+  '/pixel/palm.svg',
+  '/pixel/boat.svg',
+  '/pixel/dock.svg',
+  '/pixel/sea.svg',
+  '/pixel/sand.svg',
+  '/pixel/snow.svg',
+  '/pixel/pine.svg',
+  '/pixel/snowman.svg',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
   '/icons/apple-touch-icon.png',

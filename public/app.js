@@ -297,7 +297,57 @@ function renderCard(p) {
     body.append(n);
   }
   if (p.id === 'openrouter') body.append(rankingsEl());
+  gameEffects(el, p);
   tickCard(el, p);
+}
+
+// ---------- 冒險風格的小遊戲效果（簡約風格時 CSS 會把它們藏起來） ----------
+const lastPct = new Map(); // `${provider}:${window}` → 上次的已用 %
+
+/** 用量上升時從卡片跳出「+3%」；快用完時頭上冒「快用完了！」泡泡；Claude 每週用量更新經驗值條 */
+function gameEffects(el, p) {
+  let rise = 0;
+  let low = false;
+  for (const w of p.windows || []) {
+    const key = `${p.id}:${w.id}`;
+    const prev = lastPct.get(key);
+    if (prev !== undefined && w.usedPct > prev) rise = Math.max(rise, w.usedPct - prev);
+    lastPct.set(key, w.usedPct);
+    if (w.usedPct >= 90) low = true;
+  }
+  if (p.balance && Number(p.balance.remaining) < 0) low = true;
+
+  let bubble = el.querySelector('.alert-bubble');
+  if (low && !bubble) {
+    bubble = document.createElement('span');
+    bubble.className = 'alert-bubble';
+    el.querySelector('.card-head').append(bubble);
+  }
+  if (bubble) {
+    bubble.hidden = !low;
+    bubble.textContent = p.balance ? '餘額不足！' : '快用完了！';
+  }
+
+  if (rise >= 0.5 && document.documentElement.dataset.skin === 'adventure') {
+    const n = document.createElement('span');
+    n.className = 'dmg';
+    n.textContent = `+${Math.round(rise)}%`;
+    el.append(n);
+    n.addEventListener('animationend', () => n.remove());
+  }
+
+  if (p.id === 'claude') renderExp(p.windows?.find((w) => w.id === '7d'));
+}
+
+function renderExp(w) {
+  const bar = $('expbar');
+  if (!w) { bar.hidden = true; return; }
+  const pct = Math.max(0, Math.min(100, Number(w.usedPct) || 0));
+  bar.hidden = false;
+  $('exp-lv').textContent = `Lv.${Math.floor(pct / 10) + 1}`;
+  $('exp-fill').style.width = `${pct}%`;
+  $('exp-text').textContent = `經驗值 ${pct.toFixed(1)}%`;
+  bar.title = `Claude 每週已用 ${pct.toFixed(1)}%（每 10% 升一級）`;
 }
 
 // ---------- OpenRouter 模型排行 ----------
