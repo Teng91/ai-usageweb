@@ -13,6 +13,8 @@ const TOP_N = 10;
 const REFRESH_MS = 60 * 60 * 1000;
 const RETRY_MS = 10 * 60 * 1000;
 const MODELS_REFRESH_MS = 6 * 60 * 60 * 1000;
+// rankings.json 的格式版本；改了輸出欄位就 +1
+const FORMAT_VERSION = 2;
 
 /** 「openai/gpt-6-luna-20260922」→ 找不到名稱時的備用顯示「gpt-6-luna」 */
 function fallbackName(slug) {
@@ -96,7 +98,8 @@ export class RankingsService {
     if (!raw) return this;
     try {
       const d = JSON.parse(raw.toString('utf8'));
-      if (d?.views) this.data = d;
+      // 存檔格式改過（例如加了價格）就丟掉舊檔重抓，不必等一小時過期
+      if (d?.views && d.version === FORMAT_VERSION) this.data = d;
     } catch {
       logWarn('rankings.json 壞了，重新抓');
     }
@@ -133,7 +136,7 @@ export class RankingsService {
         const { data } = await requestJson(`${RANKINGS_URL}?view=${view}`, { label: 'OpenRouter 排行榜' });
         views[view] = parseRankings(data, this.catalog);
       }
-      this.data = { updatedAt: new Date(this.now()).toISOString(), views };
+      this.data = { version: FORMAT_VERSION, updatedAt: new Date(this.now()).toISOString(), views };
       await writeFileAtomic(this.file, JSON.stringify(this.data)).catch(() => {});
     } catch (err) {
       logWarn('排行榜更新失敗', { err: err?.message || 'error' });

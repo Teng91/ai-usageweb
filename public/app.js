@@ -384,45 +384,40 @@ function renderRankings() {
     foot.textContent = '';
     return;
   }
-  for (const [key, label] of [['free', '免費'], ['paid', '付費']]) {
+  const span = (cls, text) => {
+    const el = document.createElement('span');
+    el.className = cls;
+    if (text !== undefined) el.textContent = text;
+    return el;
+  };
+  for (const [key, label] of [['free', '免費模型'], ['paid', '付費模型']]) {
+    const paid = key === 'paid';
     const col = document.createElement('div');
-    col.className = 'rank-col';
-    const h = document.createElement('h4');
-    h.textContent = label;
-    if (key === 'paid') {
-      const hint = document.createElement('span');
-      hint.className = 'rank-hint';
-      hint.textContent = '價格：每百萬 token 輸入 / 輸出';
-      h.append(hint);
-    }
+    col.className = paid ? 'rank-col paid' : 'rank-col';
+    // 表頭：欄位名稱對齊下面每一列
+    const h = document.createElement('div');
+    h.className = 'rt-row rt-head';
+    h.append(span('rk', '#'), span('nm', label), span('viz'), span('tk', 'Tokens'));
+    if (paid) h.append(span('pr', '輸入 / 輸出 每 1M'));
     const ol = document.createElement('ol');
     ol.className = 'rank-list';
     const list = view[key] || [];
     const max = list[0]?.tokens || 1;
     for (const m of list) {
       const li = document.createElement('li');
-      li.style.setProperty('--share', `${Math.max(2, Math.round((m.tokens / max) * 100))}%`);
-      const rk = document.createElement('span');
-      rk.className = 'rk';
-      rk.textContent = String(m.rank);
-      const nm = document.createElement('span');
-      nm.className = 'nm';
-      const nmText = document.createElement('span');
-      nmText.className = 'nm-text';
-      nmText.textContent = m.name;
-      nmText.title = m.slug;
-      nm.append(nmText);
-      if (m.price) {
-        const pr = document.createElement('span');
-        pr.className = 'pr';
-        pr.textContent = `${usd(m.price.input)} / ${usd(m.price.output)}`;
-        pr.title = `每百萬 token：輸入 ${usd(m.price.input)}、輸出 ${usd(m.price.output)}`;
-        nm.append(pr);
-      }
-      const tk = document.createElement('span');
-      tk.className = 'tk';
-      tk.textContent = tokens(m.tokens);
-      li.append(rk, nm, tk);
+      li.className = 'rt-row';
+      const price = m.price ? `${usd(m.price.input)} / ${usd(m.price.output)}` : '—';
+      li.title = `${m.name}（${m.slug}）\n${tokens(m.tokens)} tokens${paid ? `\n每百萬 token：輸入 ${m.price ? usd(m.price.input) : '—'}、輸出 ${m.price ? usd(m.price.output) : '—'}` : ''}`;
+      // 單一系列的長條：長度＝跟第一名比的相對用量
+      const viz = span('viz');
+      const fill = span('viz-fill');
+      fill.style.width = `${Math.max(2, (m.tokens / max) * 100)}%`;
+      viz.append(fill);
+      const nm = span('nm');
+      nm.append(span('nm-text', m.name));
+      if (paid) nm.append(span('pr-inline', price));
+      li.append(span('rk', String(m.rank).padStart(2, '0')), nm, viz, span('tk', tokens(m.tokens)));
+      if (paid) li.append(span('pr', price));
       ol.append(li);
     }
     if (!list.length) {
@@ -434,7 +429,7 @@ function renderRankings() {
     col.append(h, ol);
     cols.append(col);
   }
-  foot.textContent = `依 OpenRouter 全站 token 用量排名 · ${ago(state.rankings.updatedAt)}更新`;
+  foot.textContent = `依 OpenRouter 全站 token 用量（輸入＋輸出）排名 · 資料 ${ago(state.rankings.updatedAt)}更新`;
 }
 
 /** 每百萬 token 的價格：$10、$2.5、$0.14、$0.035 */

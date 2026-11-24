@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import { test, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { fixture, mockFetch, ctxFor, tmpDir } from './helpers.js';
@@ -88,6 +90,15 @@ test('openrouter 排行榜: 一小時內只抓一次，三個時間範圍都抓'
   await svc.get();
   await svc.inflight;
   assert.equal(views.length, 6, '超過一小時重抓');
+});
+
+test('openrouter 排行榜: 舊格式的存檔丟掉重抓，新格式沿用', async () => {
+  const dir = tmpDir();
+  const file = path.join(dir, 'rankings.json');
+  fs.writeFileSync(file, JSON.stringify({ updatedAt: new Date().toISOString(), views: { week: { free: [], paid: [] } } }));
+  assert.equal((await new RankingsService({ dataDir: dir }).load()).data, null, '沒有 version 的舊檔不用');
+  fs.writeFileSync(file, JSON.stringify({ version: 2, updatedAt: new Date().toISOString(), views: { week: { free: [], paid: [] } } }));
+  assert.ok((await new RankingsService({ dataDir: dir }).load()).data, '目前版本的檔案照用');
 });
 
 // ---------- Copilot ----------
