@@ -2,10 +2,15 @@
 const ORDER = ['claude', 'codex', 'antigravity', 'copilot', 'openrouter'];
 const STALE_INTERVALS = 3;
 const FALLBACK_POLL_MS = 60_000;
+// 打開頁面後這段時間內，舊資料視為「更新中」而不是「過期」（伺服器剛喚醒正在抓）
+const WAKE_WINDOW_MS = 90_000;
+// 喚醒超過這麼久才在右上角顯示「喚醒伺服器…」，避免熱機時閃一下
+const SLOW_WAKE_MS = 800;
 
 const $ = (id) => document.getElementById(id);
 const cardsEl = $('cards');
 const tpl = $('card-tpl');
+const loadingTpl = $('empty').cloneNode(true);
 
 const state = {
   providers: new Map(),
@@ -14,7 +19,9 @@ const state = {
   live: false,
   sseFailures: 0,
   fallbackTimer: null,
-  refreshing: true,
+  waking: false,
+  slowWake: false,
+  sessionStart: 0,
   offline: !navigator.onLine,
 };
 
@@ -34,6 +41,16 @@ async function loadSnapshot() {
   renderChrome();
 }
 
+/** 先畫出上次存下的數字，伺服器還在喚醒時畫面就不會是空的 */
+async function paintCached() {
+  try {
+    const res = await (await caches.open('api-last')).match('/api/usage');
+    if (res) applySnapshot(await res.json());
+  } catch {
+    // 沒有快取或瀏覽器不支援：維持骨架畫面
+  }
+}
+
 function applySnapshot(snap) {
   state.pollIntervalSec = snap.pollIntervalSec || 60;
   state.providers.clear();
@@ -43,7 +60,6 @@ function applySnapshot(snap) {
 
 function applyProvider(p) {
   state.providers.set(p.id, p);
-  state.refreshing = false;
   renderCard(p);
   renderEmpty();
 }
@@ -110,8 +126,21 @@ function stopFallback() {
 }
 
 async function start() {
-  state.refreshing = true;
-  await loadSnapshot();
+  state.sessionStart = Date.now();
+  state.waking = true;
+  const slowTimer = setTimeout(() => { state.slowWake = true; renderChrome(); }, SLOW_WAKE_MS);
+  renderChrome();
+  if (!state.providers.size) await paintCached();
+  renderEmpty();
+  try {
+    await loadSnapshot();
+  } finally {
+    clearTimeout(slowTimer);
+    state.waking = false;
+    state.slowWake = false;
+    renderEmpty();
+    renderChrome();
+  }
   if (document.visibilityState === 'visible') openStream();
 }
 
@@ -148,15 +177,25 @@ function renderEmpty() {
   let empty = $('empty');
   if (any) {
     empty?.remove();
-  } else {
-    if (!empty) {
-      empty = document.createElement('p');
-      empty.id = 'empty';
-      empty.className = 'empty';
-      cardsEl.append(empty);
-    }
-    empty.textContent = state.offline ? '離線中，還沒有任何資料' : '尚未設定任何服務的憑證';
+    return;
   }
+  const isLoading = empty?.classList.contains('loading');
+  if (state.waking) {
+    // 還在等伺服器：顯示骨架卡片
+    if (!isLoading) {
+      empty?.remove();
+      cardsEl.append(loadingTpl.cloneNode(true));
+    }
+    return;
+  }
+  if (!empty || isLoading) {
+    empty?.remove();
+    empty = document.createElement('p');
+    empty.id = 'empty';
+    empty.className = 'empty';
+    cardsEl.append(empty);
+  }
+  empty.textContent = state.offline ? '離線中，還沒有任何資料' : '尚未設定任何服務的憑證';
 }
 
 function cardFor(id) {
@@ -177,6 +216,17 @@ function effectiveStatus(p, now = Date.now()) {
   const interval = (p.intervalSec || state.pollIntervalSec) * 1000;
   if (p.fetchedAt && now - Date.parse(p.fetchedAt) > STALE_INTERVALS * interval) return 'stale';
   return 'ok';
+}
+
+/** 剛打開頁面、這家的資料比這次打開還舊、而且已經排到要重抓 → 視為更新中 */
+function isUpdating(p, now = Date.now()) {
+  if (p.status === 'error' || p.status === 'auth') return false;
+  if (!state.sessionStart || now - state.sessionStart > WAKE_WINDOW_MS) return false;
+  if (state.offline) return false;
+  const fetched = p.fetchedAt ? Date.parse(p.fetchedAt) : 0;
+  if (fetched >= state.sessionStart - 15_000) return false;
+  const next = p.nextFetchAt ? Date.parse(p.nextFetchAt) : 0;
+  return !next || next <= now + 5_000;
 }
 
 function renderCard(p) {
@@ -263,10 +313,15 @@ function tickCard(el, p, now = Date.now()) {
     sub.textContent = resetText(sub.dataset.resetsAt, now);
   }
   const st = effectiveStatus(p, now);
-  el.classList.toggle('stale', st === 'stale');
+  const updating = isUpdating(p, now);
+  el.classList.toggle('stale', st === 'stale' && !updating);
+  el.classList.toggle('updating', updating);
   const status = el.querySelector('.card-status');
   status.className = 'card-status';
-  if (st === 'stale') {
+  if (updating) {
+    status.classList.add('updating');
+    status.textContent = p.fetchedAt ? `更新中…（目前是 ${ago(p.fetchedAt, now)}的數字）` : '更新中…';
+  } else if (st === 'stale') {
     status.classList.add('info');
     status.textContent = `資料已過期（${ago(p.fetchedAt, now)}）`;
   } else if (st === 'error') {
@@ -278,9 +333,6 @@ function tickCard(el, p, now = Date.now()) {
   } else if (p.slowed) {
     status.classList.add('info');
     status.textContent = '被限流，更新放慢';
-  } else if (state.refreshing && !state.live) {
-    status.classList.add('info');
-    status.textContent = '更新中…';
   } else {
     status.textContent = '';
   }
@@ -292,8 +344,17 @@ function renderChrome(now = Date.now()) {
   dot.classList.toggle('live', state.live);
   $('conn-text').textContent = state.live
     ? '即時'
-    : state.offline ? '離線' : document.visibilityState === 'hidden' ? '暫停' : state.fallbackTimer ? '輪詢中' : '連線中…';
+    : state.offline ? '離線'
+      : document.visibilityState === 'hidden' ? '暫停'
+        : state.slowWake ? '喚醒伺服器…'
+          : state.fallbackTimer ? '輪詢中' : '連線中…';
   $('offline-banner').hidden = !state.offline;
+
+  let anyUpdating = false;
+  for (const p of state.providers.values()) {
+    if (visible(p) && isUpdating(p, now)) { anyUpdating = true; break; }
+  }
+  $('progress').classList.toggle('on', state.waking || anyUpdating);
 
   let latest = 0;
   for (const p of state.providers.values()) {

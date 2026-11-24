@@ -30,10 +30,18 @@
     <span>有新版本</span>
     <button type="button" id="update-btn">點此重新載入</button>
   </div>
+  <div class="progress" id="progress" aria-hidden="true"></div>
+
   <div class="banner warn" id="offline-banner" hidden>離線：顯示的是上次的數字</div>
 
   <main id="cards" class="cards" aria-live="polite">
-    <p class="empty" id="empty">載入中…</p>
+    <div class="loading" id="empty" role="status">
+      <div class="sk-card" aria-hidden="true"><span class="sk sk-title"></span><span class="sk sk-line"></span><span class="sk sk-bar"></span><span class="sk sk-line short"></span></div>
+      <div class="sk-card" aria-hidden="true"><span class="sk sk-title"></span><span class="sk sk-line"></span><span class="sk sk-bar"></span><span class="sk sk-line short"></span></div>
+      <div class="sk-card" aria-hidden="true"><span class="sk sk-title"></span><span class="sk sk-line"></span><span class="sk sk-bar"></span><span class="sk sk-line short"></span></div>
+      <div class="sk-card" aria-hidden="true"><span class="sk sk-title"></span><span class="sk sk-line"></span><span class="sk sk-bar"></span><span class="sk sk-line short"></span></div>
+      <p class="loading-text">正在喚醒伺服器，通常幾秒內完成…</p>
+    </div>
   </main>
 
   <footer class="foot">
