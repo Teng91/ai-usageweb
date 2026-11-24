@@ -1,4 +1,4 @@
-# 一鍵把 Antigravity 憑證設到 fly（在你自己的電腦跑，token 不會外流）。
+﻿# 一鍵把 Antigravity 憑證設到 fly（在你自己的電腦跑，token 不會外流）。
 #
 # 前提：已用官方 Antigravity CLI（agy）以 Google 帳號登入過一次。
 # 用法（在專案資料夾）：
@@ -94,7 +94,11 @@ if ($Print) {
   "ANTIGRAVITY_CLIENT_SECRET=$clientSecret"
   return
 }
-$fly = (Get-Command fly -ErrorAction SilentlyContinue).Source
-if (-not $fly) { $fly = "$env:USERPROFILE\.fly\bin\fly.exe" }
+$fly = (Get-Command fly, flyctl -ErrorAction SilentlyContinue | Select-Object -First 1).Source
+if (-not $fly) {
+  $fly = @("$env:USERPROFILE\.fly\bin\fly.exe", "$env:USERPROFILE\.fly\bin\flyctl.exe") |
+    Where-Object { Test-Path $_ } | Select-Object -First 1
+}
+if (-not $fly) { throw "找不到 fly CLI，請先安裝並 fly auth login。" }
 & $fly secrets set --app $App "ANTIGRAVITY_REFRESH_TOKEN=$refresh" "ANTIGRAVITY_CLIENT_ID=$clientId" "ANTIGRAVITY_CLIENT_SECRET=$clientSecret"
 Write-Host "已設定到 fly app '$App'，部署後 Antigravity 卡片就會出現。"
