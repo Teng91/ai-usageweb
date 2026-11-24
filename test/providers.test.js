@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import { fixture, mockFetch, ctxFor } from './helpers.js';
 import openrouter from '../src/providers/openrouter.js';
 import copilot, { parseCopilot } from '../src/providers/copilot.js';
-import claude, { parseClaude } from '../src/providers/claude.js';
+import claude, { parseClaude, parsePlanExpiry } from '../src/providers/claude.js';
 import codex, { parseCodex } from '../src/providers/codex.js';
-import antigravity, { parseModels, _resetCache } from '../src/providers/antigravity.js';
+import antigravity, { parseModels, tierName, _resetCache } from '../src/providers/antigravity.js';
 import { ProviderError } from '../src/errors.js';
 
 let mock;
@@ -120,6 +120,29 @@ test('claude: token 快過期先續期，先存再用', async () => {
   assert.equal(ctx.saved[0].refreshToken, 'r2');
 });
 
+test('claude: 訂閱到期日只接受合法日期，統一成 YYYY-MM-DD', () => {
+  assert.equal(parsePlanExpiry('2027-11-04'), '2027-11-04');
+  assert.equal(parsePlanExpiry('2027/11/4'), '2027-11-04');
+  assert.equal(parsePlanExpiry(' 2027-1-9 '), '2027-01-09');
+  assert.equal(parsePlanExpiry('2027-02-30'), null);
+  assert.equal(parsePlanExpiry('明年'), null);
+  assert.equal(parsePlanExpiry(''), null);
+  assert.equal(parsePlanExpiry(undefined), null);
+});
+
+test('claude: 設了 CLAUDE_PLAN_EXPIRES_AT 會帶出 planExpiresAt', async () => {
+  mock = mockFetch([['/oauth/usage', () => ({ json: fixture('claude-usage.json') })]]);
+  const old = process.env.CLAUDE_PLAN_EXPIRES_AT;
+  process.env.CLAUDE_PLAN_EXPIRES_AT = '2027/11/4';
+  try {
+    const r = await claude.fetch(ctxFor({ claude: { accessToken: 'a1' } }));
+    assert.equal(r.planExpiresAt, '2027-11-04');
+  } finally {
+    if (old === undefined) delete process.env.CLAUDE_PLAN_EXPIRES_AT;
+    else process.env.CLAUDE_PLAN_EXPIRES_AT = old;
+  }
+});
+
 test('claude: 401 → 續期一次再重試', async () => {
   let n = 0;
   mock = mockFetch([
@@ -231,6 +254,38 @@ test('antigravity: 續期 → loadCodeAssist → fetchAvailableModels', async ()
   const r = await antigravity.fetch(ctxFor({ antigravity: { refreshToken: 'rt', clientId: 'cid', clientSecret: 'cs' } }));
   assert.equal(r.plan, 'Free');
   assert.equal(r.windows.length, 2);
+});
+
+test('antigravity: 方案名稱整理成 Free／Pro／Ultra，付費方案優先', () => {
+  assert.equal(tierName({ currentTier: { id: 'free-tier', name: 'Antigravity Starter Quota' } }), 'Free');
+  assert.equal(tierName({ currentTier: { name: 'Antigravity Free' } }), 'Free');
+  assert.equal(tierName({ currentTier: { name: 'Free' }, paidTier: { id: 'g1-pro-tier', name: 'Google AI Pro' } }), 'Pro');
+  assert.equal(tierName({ paidTier: { name: 'Google AI Ultra' } }), 'Ultra');
+  assert.equal(tierName({ currentTier: { name: 'Enterprise Plus' } }), 'Enterprise Plus');
+  assert.equal(tierName({}), null);
+});
+
+test('antigravity: 方案超過 6 小時會重查 loadCodeAssist', async () => {
+  _resetCache();
+  let loads = 0;
+  let tier = { id: 'free-tier', name: 'Antigravity Starter Quota' };
+  mock = mockFetch([
+    ['oauth2.googleapis.com', () => ({ json: { access_token: 'g1', expires_in: 3599 } })],
+    [':loadCodeAssist', () => { loads += 1; return { json: { cloudaicompanionProject: 'p1', currentTier: tier } }; }],
+    [':fetchAvailableModels', () => ({ json: fixture('antigravity-models.json') })],
+  ]);
+  const ctx = ctxFor({ antigravity: { refreshToken: 'rt', clientId: 'cid', clientSecret: 'cs' } });
+  assert.equal((await antigravity.fetch(ctx)).plan, 'Free');
+  tier = { id: 'g1-pro-tier', name: 'Google AI Pro' };
+  assert.equal((await antigravity.fetch(ctx)).plan, 'Free', '6 小時內沿用快取');
+  const realNow = Date.now;
+  Date.now = () => realNow() + 6 * 3600 * 1000 + 1000;
+  try {
+    assert.equal((await antigravity.fetch(ctx)).plan, 'Pro');
+  } finally {
+    Date.now = realNow;
+  }
+  assert.equal(loads, 2);
 });
 
 test('antigravity: 沒有 client id/secret 視為未設定', () => {

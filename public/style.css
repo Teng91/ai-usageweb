@@ -167,6 +167,18 @@ button {
 
 .plan:empty { display: none; }
 
+.card-head { flex-wrap: wrap; }
+
+.plan-exp {
+  font-size: 0.75rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.plan-exp:empty { display: none; }
+.plan-exp.warn { color: var(--warn); font-weight: 600; }
+.plan-exp.danger { color: var(--danger); font-weight: 600; }
+
 .win + .win { margin-top: 14px; }
 
 .win-row {

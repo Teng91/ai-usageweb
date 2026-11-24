@@ -196,6 +196,7 @@ export class Poller {
       this.#publish(p.id, {
         status: 'ok',
         plan: result.plan ?? this.snapshot.entry(p.id).plan,
+        planExpiresAt: result.planExpiresAt ?? null,
         windows: result.windows || [],
         balance: result.balance || null,
         note: result.note || null,

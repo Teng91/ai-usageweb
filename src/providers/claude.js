@@ -14,6 +14,20 @@ const WINDOWS = [
   ['seven_day_sonnet', '7d_sonnet', '每週 Sonnet'],
 ];
 
+/**
+ * 訂閱到期日（API 沒有提供，手動設定 CLAUDE_PLAN_EXPIRES_AT=YYYY-MM-DD）。
+ * 直接讀環境變數而不是憑證：憑證存在 volume 後會蓋過環境變數。
+ * 回傳 'YYYY-MM-DD'（只有日期，避免時區把日子算錯）；格式不對就當沒設定。
+ */
+export function parsePlanExpiry(raw) {
+  const m = /^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/.exec(String(raw ?? '').trim());
+  if (!m) return null;
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const dt = new Date(Date.UTC(y, mo - 1, d));
+  if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== mo - 1 || dt.getUTCDate() !== d) return null;
+  return `${m[1]}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+}
+
 export function parseClaude(data) {
   if (!data || typeof data !== 'object') throw new ProviderError('parse', '回傳不是物件');
   const windows = [];
@@ -77,6 +91,7 @@ export default {
   async fetch(ctx) {
     const c0 = ctx.creds.claude;
     const plan = c0.plan || 'Pro';
+    const planExpiresAt = parsePlanExpiry(process.env.CLAUDE_PLAN_EXPIRES_AT);
     let c = c0;
     const canRefresh = Boolean(c.refreshToken);
     const expiresAt = Number(c.expiresAt) || 0;
@@ -87,13 +102,13 @@ export default {
 
     try {
       const { data } = await callUsage(c.accessToken, ctx.signal);
-      return { plan, windows: parseClaude(data), balance: null };
+      return { plan, planExpiresAt, windows: parseClaude(data), balance: null };
     } catch (err) {
       if (!(err instanceof ProviderError) || err.kind !== 'auth' || !canRefresh) throw err;
       // 401：續期一次再重試一次
       c = await doRefresh(ctx, c);
       const { data } = await callUsage(c.accessToken, ctx.signal);
-      return { plan, windows: parseClaude(data), balance: null };
+      return { plan, planExpiresAt, windows: parseClaude(data), balance: null };
     }
   },
 };

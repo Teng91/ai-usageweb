@@ -51,6 +51,7 @@ export class SnapshotStore {
       id: e.id,
       name: e.name,
       plan: e.plan,
+      planExpiresAt: e.planExpiresAt || null,
       status,
       fetchedAt: e.fetchedAt,
       nextFetchAt: e.nextFetchAt,
@@ -103,7 +104,7 @@ function blank(p) {
 
 function pickStored(p) {
   const out = {};
-  for (const k of ['plan', 'status', 'fetchedAt', 'nextFetchAt', 'error', 'note', 'windows', 'balance', 'slowed']) {
+  for (const k of ['plan', 'planExpiresAt', 'status', 'fetchedAt', 'nextFetchAt', 'error', 'note', 'windows', 'balance', 'slowed']) {
     if (p[k] !== undefined) out[k] = p[k];
   }
   // 存檔時被判成 stale 的，載回來當 ok，再由 view() 依時間重新判斷

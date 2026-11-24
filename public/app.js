@@ -265,6 +265,7 @@ function renderCard(p) {
   const el = cardFor(p.id);
   el.querySelector('.card-name').textContent = p.name;
   el.querySelector('.plan').textContent = p.plan || '';
+  renderPlanExpiry(el.querySelector('.plan-exp'), p.planExpiresAt);
   const body = el.querySelector('.card-body');
   body.replaceChildren();
 
@@ -284,6 +285,25 @@ function renderCard(p) {
     body.append(n);
   }
   tickCard(el, p);
+}
+
+/** 訂閱到期日：剩 30 天內變橘色，過期變紅色 */
+function renderPlanExpiry(span, ymd, now = new Date()) {
+  span.className = 'plan-exp';
+  span.textContent = '';
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd || '');
+  if (!m) return;
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  // 用本地日曆的「天」來算，不受時區與時分影響
+  const days = Math.round((Date.UTC(y, mo - 1, d) - Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())) / 86400_000);
+  const date = `${y}/${mo}/${d}`;
+  if (days < 0) {
+    span.textContent = `已於 ${date} 到期`;
+    span.classList.add('danger');
+  } else {
+    span.textContent = days === 0 ? `今天到期（${date}）` : `${date} 到期・剩 ${days} 天`;
+    if (days <= 30) span.classList.add('warn');
+  }
 }
 
 function renderBalance(b) {

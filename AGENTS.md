@@ -8,7 +8,7 @@ ai-usageweb：顯示 Claude、Codex、Antigravity、Copilot 額度與 OpenRouter
 - **絕不在 log、錯誤訊息、API 回應裡出現 token、完整 header 或原始回應。** 錯誤只留服務名、狀態碼、簡短中文說明。
 - 公開 API 只回傳百分比、剩餘量、重置時間；不回傳 email、帳號 ID、組織名。
 - repo 是公開的：不要提交 `.env*`、`server-*`、`*.enc`、`data/`。
-- 每家 adapter 輸出統一格式 `{ plan, windows: [{ id, label, usedPct, resetsAt, used?, limit? }], balance, note }`；`usedPct` 一律是「已用」0–100。前端只認這個格式。
+- 每家 adapter 輸出統一格式 `{ plan, planExpiresAt?, windows: [{ id, label, usedPct, resetsAt, used?, limit? }], balance, note }`；`usedPct` 一律是「已用」0–100。前端只認這個格式。
 - 續期拿到新 refresh token 時：**先 `await saveCreds()` 成功才使用**；續期包在 `withLock` 裡。
 - 對各家的請求不論幾個人在看都不超過每家每 `minIntervalSec` 一次；不要新增公開的「立刻重抓」。
 - `/healthz` 不能算「有人在看」。

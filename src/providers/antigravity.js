@@ -8,13 +8,16 @@ const TOKEN_URL = process.env.ANTIGRAVITY_TOKEN_URL || 'https://oauth2.googleapi
 const USER_AGENT = process.env.ANTIGRAVITY_USER_AGENT || 'antigravity';
 
 // Google 的 access token 只放記憶體（1 小時），refresh token 不輪換
-const cache = { accessToken: null, expiresAt: 0, projectId: null, plan: null };
+const cache = { accessToken: null, expiresAt: 0, projectId: null, plan: null, planAt: 0 };
+// 方案（訂閱）會變，定期重查；機器 suspend 時記憶體不會清掉，不能只在啟動時查一次
+const PLAN_TTL_MS = 6 * 3600 * 1000;
 
 export function _resetCache() {
   cache.accessToken = null;
   cache.expiresAt = 0;
   cache.projectId = null;
   cache.plan = null;
+  cache.planAt = 0;
 }
 
 function family(name) {
@@ -58,11 +61,14 @@ function toWindow(id, label, g) {
   return { id, label, usedPct, resetsAt: toIso(g.resetTime) };
 }
 
-function tierName(load) {
+/** 方案名稱整理成 Free／Pro／Ultra；認不得的照原樣顯示 */
+export function tierName(load) {
   const t = load?.paidTier || load?.currentTier;
   const name = t?.name || t?.id;
   if (!name) return null;
-  if (/free|standard-tier|legacy/i.test(name) && !/pro|ultra/i.test(name)) return 'Free';
+  if (/ultra/i.test(name)) return 'Ultra';
+  if (/\bpro\b/i.test(name)) return 'Pro';
+  if (/free|starter|standard-tier|legacy/i.test(name)) return 'Free';
   return String(name);
 }
 
@@ -111,7 +117,7 @@ function post(path, token, body, signal) {
 async function fetchOnce(ctx, token) {
   const c = ctx.creds.antigravity;
   let projectId = c.projectId || cache.projectId;
-  if (!projectId || !cache.plan) {
+  if (!projectId || !cache.plan || Date.now() - cache.planAt > PLAN_TTL_MS) {
     const { data } = await post('loadCodeAssist', token, {
       metadata: { ideType: 'ANTIGRAVITY', platform: 'PLATFORM_UNSPECIFIED', pluginType: 'GEMINI' },
     }, ctx.signal);
@@ -119,6 +125,7 @@ async function fetchOnce(ctx, token) {
     projectId = projectId || (typeof proj === 'string' ? proj : proj?.id) || null;
     cache.projectId = projectId;
     cache.plan = tierName(data) || 'Free';
+    cache.planAt = Date.now();
   }
   if (!projectId) throw new ProviderError('parse', '回傳缺少 project id');
   const { data } = await post('fetchAvailableModels', token, { project: projectId }, ctx.signal);
