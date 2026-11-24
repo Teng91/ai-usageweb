@@ -107,7 +107,7 @@
 [data-skin="adventure"][data-map="autumn"] body { background: linear-gradient(180deg, #7fb6e6 0%, #f3d3a8 60%, #ffc98a 100%) fixed; }
 [data-skin="adventure"][data-map="winter"] body { background: linear-gradient(180deg, #8fb4dc 0%, #c8dcf0 55%, #eef5fc 100%) fixed; }
 
-.scene, .map-name, .bg-exit, .expbar, .alert-bubble, .dmg, .bg-btn { display: none; }
+.scene, .map-name, .bg-exit, .alert-bubble, .dmg, .bg-btn { display: none; }
 
 [data-skin="adventure"] .scene {
   display: block;
@@ -634,7 +634,7 @@
 
 [data-skin="adventure"] .card { position: relative; }
 
-/* ---- 遊戲介面：快用完的泡泡、跳出的數字、對話框的 ▼、經驗值條 ---- */
+/* ---- 遊戲介面：快用完的泡泡、跳出的數字、對話框的 ▼ ---- */
 [data-skin="adventure"] .alert-bubble:not([hidden]) {
   display: inline-block;
   position: absolute;
@@ -714,64 +714,13 @@
   50% { opacity: 0; }
 }
 
-[data-skin="adventure"] .expbar:not([hidden]) {
-  display: flex;
-  position: fixed;
-  left: 50%;
-  bottom: 10px;
-  z-index: 15;
-  translate: -50% 0;
-  width: min(560px, calc(100vw - 32px));
-  align-items: center;
-  gap: 10px;
-  padding: 5px 12px;
-  background: var(--panel);
-  border: 3px solid var(--frame);
-  border-radius: 12px;
-  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.25);
-  font-weight: 900;
-  color: var(--text);
-}
-
-.exp-lv {
-  flex: none;
-  padding: 0 8px;
-  border-radius: 6px;
-  background: linear-gradient(180deg, #fff1a0, #f7c531);
-  border: 2px solid var(--frame);
-  color: #4a3426;
-  font-size: 0.8rem;
-}
-
-.exp-track {
-  flex: 1;
-  height: 14px;
-  padding: 2px;
-  border: 2px solid var(--frame);
-  border-radius: 999px;
-  background: var(--gauge-bg);
-  overflow: hidden;
-}
-
-.exp-fill {
-  display: block;
-  height: 100%;
-  border-radius: 999px;
-  background: linear-gradient(180deg, #fff5a8 0%, #ffd23f 50%, #f0a500 100%);
-  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.55);
-  transition: width 0.8s ease;
-}
-
-.exp-text { flex: none; font-size: 0.78rem; font-variant-numeric: tabular-nums; }
-
 /* ---- 只看風景：卡片全部收起來，只留場景（可以點怪物玩） ---- */
 [data-skin="adventure"] .bg-btn { display: inline-flex; align-items: center; justify-content: center; width: 30px; padding: 0; }
 
 [data-skin="adventure"][data-bgonly] .topbar,
 [data-skin="adventure"][data-bgonly] .banner,
 [data-skin="adventure"][data-bgonly] .cards,
-[data-skin="adventure"][data-bgonly] .foot,
-[data-skin="adventure"][data-bgonly] .expbar { display: none !important; }
+[data-skin="adventure"][data-bgonly] .foot { display: none !important; }
 
 [data-skin="adventure"][data-bgonly] .scene { z-index: 0; pointer-events: none; }
 

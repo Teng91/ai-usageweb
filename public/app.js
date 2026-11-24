@@ -304,7 +304,7 @@ function renderCard(p) {
 // ---------- 冒險風格的小遊戲效果（簡約風格時 CSS 會把它們藏起來） ----------
 const lastPct = new Map(); // `${provider}:${window}` → 上次的已用 %
 
-/** 用量上升時從卡片跳出「+3%」；額度用到 90% 以上時頭上冒「快用完了！」泡泡（餘額不提醒）；Claude 每週用量更新經驗值條 */
+/** 用量上升時從卡片跳出「+3%」；額度用到 90% 以上時頭上冒「快用完了！」泡泡（餘額不提醒） */
 function gameEffects(el, p) {
   let rise = 0;
   let low = false;
@@ -335,18 +335,6 @@ function gameEffects(el, p) {
     n.addEventListener('animationend', () => n.remove());
   }
 
-  if (p.id === 'claude') renderExp(p.windows?.find((w) => w.id === '7d'));
-}
-
-function renderExp(w) {
-  const bar = $('expbar');
-  if (!w) { bar.hidden = true; return; }
-  const pct = Math.max(0, Math.min(100, Number(w.usedPct) || 0));
-  bar.hidden = false;
-  $('exp-lv').textContent = `Lv.${Math.floor(pct / 10) + 1}`;
-  $('exp-fill').style.width = `${pct}%`;
-  $('exp-text').textContent = `經驗值 ${pct.toFixed(1)}%`;
-  bar.title = `Claude 每週已用 ${pct.toFixed(1)}%（每 10% 升一級）`;
 }
 
 // ---------- OpenRouter 模型排行 ----------
