@@ -429,7 +429,7 @@ function renderRankings() {
     col.append(h, ol);
     cols.append(col);
   }
-  foot.textContent = `依 OpenRouter 全站 token 用量（輸入＋輸出）排名 · 資料 ${ago(state.rankings.updatedAt)}更新`;
+  foot.textContent = '依 OpenRouter 全站 token 用量（輸入＋輸出）排名';
 }
 
 /** 每百萬 token 的價格：$10、$2.5、$0.14、$0.035 */
