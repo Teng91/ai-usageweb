@@ -14,7 +14,15 @@ const PF_H = 32; // 平台高度（8 格 × 4）
 const onPf = (pfBottom) => `calc(${pfBottom} + ${PF_H - 4}px)`; // 站在平台上的高度
 const GROUND = '52px';
 
-// 春夏秋冬四季輪流；樹的顏色（櫻花、楓紅）用 CSS 濾鏡從同一張樹的圖變出來
+// 卡片區最寬 1440px＋左右 16px，兩側剩下的空白寬度；平台與天上的怪物只放在這裡，才不會被卡片擋住
+const SIDE = 'max(0px, (100vw - 1472px) / 2)';
+// 左側空白裡、右緣距離卡片 gap px 的位置（w＝元素寬度）；right 版本同理
+const inLeft = (w, gap = 16) => `calc(${SIDE} - ${w + gap}px)`;
+const inRight = inLeft;
+const PF_W = 144; // 平台寬度
+
+// 春夏秋冬四季輪流；櫻花、楓紅、金黃的樹由產生器換色
+// side: true 的東西放在卡片兩側的空白，螢幕不夠寬時 CSS 會藏起來
 const MAPS = [
   {
     id: 'spring',
@@ -26,15 +34,15 @@ const MAPS = [
       { cls: 'sc-tree blossom', s: { left: 'calc(2.5% + 150px)', bottom: GROUND, width: '80px', height: '95px' } },
       { cls: 'sc-tree blossom', s: { right: 'calc(3% + 90px)', bottom: GROUND, width: '96px', height: '114px' } },
       { cls: 'sc-tree', s: { right: 'calc(3% + 190px)', bottom: GROUND, width: '64px', height: '76px' } },
-      { cls: 'sc-pf pf-grass', s: { left: '6%', bottom: '38vh', width: '192px' } },
-      { cls: 'sc-ladder', s: { left: 'calc(6% + 150px)', bottom: GROUND, height: 'calc(38vh - 52px)' } },
-      { cls: 'sc-pf pf-grass', s: { right: '7%', bottom: '52vh', width: '160px' } },
-      { cls: 'sc-rope', s: { right: 'calc(7% + 24px)', bottom: GROUND, height: 'calc(52vh - 52px)' } },
+      { side: true, cls: 'sc-pf pf-grass', s: { left: inLeft(PF_W), bottom: '38vh', width: `${PF_W}px` } },
+      { side: true, cls: 'sc-ladder', s: { left: inLeft(40), bottom: GROUND, height: 'calc(38vh - 52px)' } },
+      { side: true, cls: 'sc-pf pf-grass', s: { right: inRight(PF_W), bottom: '54vh', width: `${PF_W}px` } },
+      { side: true, cls: 'sc-rope', s: { right: inRight(30), bottom: GROUND, height: 'calc(54vh - 52px)' } },
+      { side: true, mon: 'slime-pink', s: { left: inLeft(PF_W - 20), bottom: onPf('38vh') } },
+      { side: true, mon: 'chick', s: { right: inRight(PF_W - 30), bottom: onPf('54vh') } },
+      { side: true, mon: 'cloudling', s: { left: inLeft(110), top: '16%' } },
       { mon: 'slime', s: { right: '24%', bottom: GROUND } },
-      { mon: 'slime-pink', s: { left: 'calc(6% + 40px)', bottom: onPf('38vh') } },
       { mon: 'leafling', s: { left: '30%', bottom: GROUND } },
-      { mon: 'chick', s: { right: 'calc(7% + 70px)', bottom: onPf('52vh') } },
-      { mon: 'cloudling', s: { left: '40%', top: '12%' } },
       { cls: 'sc-petals' },
     ],
   },
@@ -50,13 +58,13 @@ const MAPS = [
       { cls: 'sc-palm', s: { left: '3%', bottom: GROUND, width: '96px', height: '96px' } },
       { cls: 'sc-palm', s: { left: 'calc(3% + 110px)', bottom: GROUND, width: '72px', height: '72px' } },
       { cls: 'sc-palm', s: { right: 'calc(3% + 100px)', bottom: GROUND, width: '88px', height: '88px' } },
-      { cls: 'sc-pf pf-wood', s: { left: '8%', bottom: '42vh', width: '176px' } },
-      { cls: 'sc-rope', s: { left: 'calc(8% + 140px)', bottom: GROUND, height: 'calc(42vh - 52px)' } },
+      { side: true, cls: 'sc-pf pf-wood', s: { left: inLeft(PF_W), bottom: '44vh', width: `${PF_W}px` } },
+      { side: true, cls: 'sc-rope', s: { left: inLeft(30), bottom: GROUND, height: 'calc(44vh - 52px)' } },
+      { side: true, mon: 'leafling', s: { left: inLeft(PF_W - 10), bottom: onPf('44vh') } },
+      { side: true, mon: 'cloudling', s: { right: inRight(100), top: '14%' } },
+      { side: true, mon: 'cloudling', s: { left: inLeft(90), top: '22%' }, small: true, delay: '-2s' },
       { mon: 'crab', s: { left: '28%', bottom: GROUND } },
       { mon: 'crab', s: { right: '24%', bottom: GROUND }, delay: '-1.4s' },
-      { mon: 'leafling', s: { left: 'calc(8% + 30px)', bottom: onPf('42vh') } },
-      { mon: 'cloudling', s: { right: '28%', top: '9%' } },
-      { mon: 'cloudling', s: { left: '52%', top: '22%' }, small: true, delay: '-2s' },
     ],
   },
   {
@@ -70,15 +78,15 @@ const MAPS = [
       { cls: 'sc-tree maple', s: { left: 'calc(2.5% + 170px)', bottom: GROUND, width: '64px', height: '76px' } },
       { cls: 'sc-tree maple-gold', s: { right: 'calc(3% + 90px)', bottom: GROUND, width: '96px', height: '114px' } },
       { cls: 'sc-tree maple', s: { right: 'calc(3% + 190px)', bottom: GROUND, width: '72px', height: '86px' } },
-      { cls: 'sc-pf pf-grass autumn-grass', s: { left: '8%', bottom: '46vh', width: '176px' } },
-      { cls: 'sc-ladder', s: { left: 'calc(8% + 130px)', bottom: GROUND, height: 'calc(46vh - 52px)' } },
-      { cls: 'sc-pf pf-grass autumn-grass', s: { right: '8%', bottom: '36vh', width: '160px' } },
-      { cls: 'sc-rope', s: { right: 'calc(8% + 120px)', bottom: GROUND, height: 'calc(36vh - 52px)' } },
+      { side: true, cls: 'sc-pf pf-grass autumn-grass', s: { left: inLeft(PF_W), bottom: '48vh', width: `${PF_W}px` } },
+      { side: true, cls: 'sc-ladder', s: { left: inLeft(40), bottom: GROUND, height: 'calc(48vh - 52px)' } },
+      { side: true, cls: 'sc-pf pf-grass autumn-grass', s: { right: inRight(PF_W), bottom: '36vh', width: `${PF_W}px` } },
+      { side: true, cls: 'sc-rope', s: { right: inRight(30), bottom: GROUND, height: 'calc(36vh - 52px)' } },
+      { side: true, mon: 'chick', s: { left: inLeft(PF_W - 20), bottom: onPf('48vh') } },
+      { side: true, mon: 'slime', s: { right: inRight(PF_W - 20), bottom: onPf('36vh') } },
+      { side: true, mon: 'cloudling', s: { right: inRight(100), top: '14%' } },
       { mon: 'leafling', s: { left: '28%', bottom: GROUND } },
       { mon: 'leafling', s: { right: '26%', bottom: GROUND }, delay: '-4s' },
-      { mon: 'chick', s: { left: 'calc(8% + 50px)', bottom: onPf('46vh') } },
-      { mon: 'slime', s: { right: 'calc(8% + 50px)', bottom: onPf('36vh') } },
-      { mon: 'cloudling', s: { left: '44%', top: '13%' } },
       { cls: 'sc-leaves' },
     ],
   },
@@ -93,13 +101,13 @@ const MAPS = [
       { cls: 'sc-pine', s: { left: 'calc(2.5% + 220px)', bottom: GROUND, width: '56px', height: '60px' } },
       { cls: 'sc-pine', s: { right: 'calc(3% + 90px)', bottom: GROUND, width: '96px', height: '102px' } },
       { cls: 'sc-snowman', s: { left: '24%', bottom: GROUND } },
-      { cls: 'sc-pf pf-snow', s: { right: '9%', bottom: '40vh', width: '192px' } },
-      { cls: 'sc-ladder', s: { right: 'calc(9% + 150px)', bottom: GROUND, height: 'calc(40vh - 52px)' } },
-      { cls: 'sc-pf pf-snow', s: { left: '7%', bottom: '56vh', width: '128px' } },
+      { side: true, cls: 'sc-pf pf-snow', s: { right: inRight(PF_W), bottom: '42vh', width: `${PF_W}px` } },
+      { side: true, cls: 'sc-ladder', s: { right: inRight(40), bottom: GROUND, height: 'calc(42vh - 52px)' } },
+      { side: true, cls: 'sc-pf pf-snow', s: { left: inLeft(PF_W), bottom: '56vh', width: `${PF_W}px` } },
+      { side: true, mon: 'slime-pink', s: { right: inRight(PF_W - 20), bottom: onPf('42vh') } },
+      { side: true, mon: 'leafling', s: { left: inLeft(PF_W - 10), bottom: onPf('56vh') } },
+      { side: true, mon: 'cloudling', s: { left: inLeft(100), top: '18%' } },
       { mon: 'chick', s: { left: '34%', bottom: GROUND } },
-      { mon: 'slime-pink', s: { right: 'calc(9% + 90px)', bottom: onPf('40vh') } },
-      { mon: 'leafling', s: { left: 'calc(7% + 30px)', bottom: onPf('56vh') } },
-      { mon: 'cloudling', s: { left: '46%', top: '14%' } },
       { cls: 'sc-snowfall' },
     ],
   },
@@ -118,12 +126,12 @@ const mapEls = MAPS.map((m) => {
   layer.dataset.map = m.id;
   for (const it of m.items) {
     if (it.mon) {
-      const mon = el(`mon mon-${it.mon}${it.small ? ' small' : ''}`, it.s);
+      const mon = el(`mon mon-${it.mon}${it.small ? ' small' : ''}${it.side ? ' side' : ''}`, it.s);
       if (it.delay) mon.style.animationDelay = it.delay;
       mon.dataset.mon = it.mon;
       layer.append(mon);
     } else {
-      layer.append(el(it.cls, it.s));
+      layer.append(el(it.side ? `${it.cls} side` : it.cls, it.s));
     }
   }
   sceneEl.append(layer);

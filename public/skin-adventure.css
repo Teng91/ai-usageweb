@@ -626,10 +626,14 @@
   to { opacity: 1; }
 }
 
+/* 平台、梯子、繩子、平台上和天上的怪物只放在卡片兩側的空白；兩側放不下（螢幕不夠寬）就不顯示，免得被卡片擋住 */
+@media (max-width: 1790px) {
+  .scene .side { display: none; }
+}
+
 /* 手機：少放一點東西 */
 @media (max-width: 720px) {
-  .scene .sc-house, .scene .sc-pf, .scene .sc-ladder, .scene .sc-rope, .scene .sc-snowman { display: none; }
-  .scene .mon[style*="vh"] { display: none; }
+  .scene .sc-house, .scene .sc-snowman { display: none; }
 }
 
 [data-skin="adventure"] .card { position: relative; }
