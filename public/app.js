@@ -1,7 +1,12 @@
 // AI 用量 — 前端：fetch 快照 → SSE 即時更新 → 每秒自己重算倒數
 const ORDER = ['claude', 'codex', 'antigravity', 'copilot', 'openrouter'];
 const STALE_INTERVALS = 3;
-const FALLBACK_POLL_MS = 60_000;
+// 即時連線（SSE）失敗時改用輪詢；伺服器每分鐘抓一次，輪詢 30 秒一次，數字最多晚半分鐘
+const FALLBACK_POLL_MS = 30_000;
+// SSE 這麼久還沒連上就當作被擋（例如公司 proxy 會卡住串流，連線不成功也不報錯）
+const SSE_OPEN_TIMEOUT_MS = 6_000;
+// 輪詢模式下，每隔幾次再試一次 SSE
+const SSE_RETRY_EVERY = 10;
 // 打開頁面後這段時間內，舊資料視為「更新中」而不是「過期」（伺服器剛喚醒正在抓）
 const WAKE_WINDOW_MS = 90_000;
 // 喚醒超過這麼久才在右上角顯示「喚醒伺服器…」，避免熱機時閃一下
@@ -19,6 +24,9 @@ const state = {
   live: false,
   sseFailures: 0,
   fallbackTimer: null,
+  fallbackTicks: 0,
+  sseOpenTimer: null,
+  sseBlocked: false,
   waking: false,
   slowWake: false,
   sessionStart: 0,
@@ -69,7 +77,17 @@ function openStream() {
   closeStream();
   const es = new EventSource(withKey('/api/stream'));
   state.es = es;
+  // 連線卡住（不成功也不報錯）時改用輪詢，不要一直停在「連線中…」
+  state.sseOpenTimer = setTimeout(() => {
+    if (state.es !== es || state.live) return;
+    state.sseBlocked = true;
+    closeStream();
+    startFallback();
+    loadSnapshot();
+  }, SSE_OPEN_TIMEOUT_MS);
   es.addEventListener('open', () => {
+    clearTimeout(state.sseOpenTimer);
+    state.sseBlocked = false;
     state.live = true;
     state.sseFailures = 0;
     state.offline = false;
@@ -94,6 +112,7 @@ function openStream() {
     renderChrome();
     // 瀏覽器會自動重連（retry: 5000）；連續失敗 3 次改用輪詢備援
     if (state.sseFailures >= 3) {
+      state.sseBlocked = true;
       closeStream();
       startFallback();
     }
@@ -101,6 +120,7 @@ function openStream() {
 }
 
 function closeStream() {
+  clearTimeout(state.sseOpenTimer);
   if (state.es) {
     state.es.close();
     state.es = null;
@@ -110,10 +130,12 @@ function closeStream() {
 
 function startFallback() {
   if (state.fallbackTimer) return;
+  state.fallbackTicks = 0;
   state.fallbackTimer = setInterval(async () => {
     await loadSnapshot();
-    // 偶爾再試一次 SSE
-    if (!state.offline && !state.es) {
+    state.fallbackTicks += 1;
+    // 偶爾再試一次 SSE（連不上的話 SSE_OPEN_TIMEOUT_MS 後又回到輪詢）
+    if (!state.offline && !state.es && state.fallbackTicks % SSE_RETRY_EVERY === 0) {
       state.sseFailures = 0;
       openStream();
     }
@@ -141,7 +163,10 @@ async function start() {
     renderEmpty();
     renderChrome();
   }
-  if (document.visibilityState === 'visible') openStream();
+  if (document.visibilityState !== 'visible') return;
+  // 已經在輪詢（SSE 被擋）就繼續輪詢，不必每次回到前景都再等一次 SSE 逾時
+  if (state.sseBlocked) startFallback();
+  else openStream();
 }
 
 document.addEventListener('visibilitychange', () => {
@@ -218,15 +243,18 @@ function effectiveStatus(p, now = Date.now()) {
   return 'ok';
 }
 
-/** 剛打開頁面、這家的資料比這次打開還舊、而且已經排到要重抓 → 視為更新中 */
+/**
+ * 只有「剛打開頁面、資料已經舊到算過期（伺服器停機好一陣子）」才顯示更新中。
+ * 平常每分鐘的例行更新不顯示任何 loading，數字到了直接換掉。
+ */
 function isUpdating(p, now = Date.now()) {
   if (p.status === 'error' || p.status === 'auth') return false;
   if (!state.sessionStart || now - state.sessionStart > WAKE_WINDOW_MS) return false;
   if (state.offline) return false;
-  const fetched = p.fetchedAt ? Date.parse(p.fetchedAt) : 0;
-  if (fetched >= state.sessionStart - 15_000) return false;
-  const next = p.nextFetchAt ? Date.parse(p.nextFetchAt) : 0;
-  return !next || next <= now + 5_000;
+  if (!p.fetchedAt) return true;
+  if (Date.parse(p.fetchedAt) >= state.sessionStart) return false;
+  const interval = (p.intervalSec || state.pollIntervalSec) * 1000;
+  return state.sessionStart - Date.parse(p.fetchedAt) > STALE_INTERVALS * interval;
 }
 
 function renderCard(p) {
@@ -320,7 +348,7 @@ function tickCard(el, p, now = Date.now()) {
   status.className = 'card-status';
   if (updating) {
     status.classList.add('updating');
-    status.textContent = p.fetchedAt ? `更新中…（目前是 ${ago(p.fetchedAt, now)}的數字）` : '更新中…';
+    status.textContent = p.fetchedAt ? `更新中，先顯示 ${ago(p.fetchedAt, now)}的數字` : '更新中…';
   } else if (st === 'stale') {
     status.classList.add('info');
     status.textContent = `資料已過期（${ago(p.fetchedAt, now)}）`;
@@ -341,13 +369,14 @@ function tickCard(el, p, now = Date.now()) {
 
 function renderChrome(now = Date.now()) {
   const dot = $('conn-dot');
-  dot.classList.toggle('live', state.live);
+  const polling = Boolean(state.fallbackTimer) && !state.offline;
+  dot.classList.toggle('live', state.live || polling);
   $('conn-text').textContent = state.live
     ? '即時'
     : state.offline ? '離線'
       : document.visibilityState === 'hidden' ? '暫停'
         : state.slowWake ? '喚醒伺服器…'
-          : state.fallbackTimer ? '輪詢中' : '連線中…';
+          : polling ? '自動更新' : '連線中…';
   $('offline-banner').hidden = !state.offline;
 
   let anyUpdating = false;

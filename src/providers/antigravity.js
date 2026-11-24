@@ -135,7 +135,6 @@ export default {
   id: 'antigravity',
   name: 'Antigravity',
   minIntervalSec: 60,
-  intervalSec: 90,
   isConfigured(creds) {
     const c = creds.antigravity;
     return Boolean(c?.refreshToken && c?.clientId && c?.clientSecret);

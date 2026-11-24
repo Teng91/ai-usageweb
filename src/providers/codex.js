@@ -96,7 +96,6 @@ export default {
   id: 'codex',
   name: 'Codex',
   minIntervalSec: 60,
-  intervalSec: 90,
   isConfigured(creds) {
     return Boolean(creds.codex?.refreshToken || creds.codex?.accessToken);
   },
