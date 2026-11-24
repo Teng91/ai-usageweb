@@ -16,7 +16,7 @@ primary_region = "sin"
 [http_service]
   internal_port = 8080
   force_https = true
-  auto_stop_machines = "stop"     # 可實測 "suspend"：喚醒更快，但要確認跟 volume 相容
+  auto_stop_machines = "suspend"  # 喚醒只要幾百毫秒；volume 不受影響。部署或主機搬移後第一次仍是冷啟動
   auto_start_machines = true
   min_machines_running = 0         # 沒人看就全部停掉
 
