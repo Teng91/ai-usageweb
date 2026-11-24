@@ -2,7 +2,9 @@
 // 用法：node scripts/gen-pixel-art.mjs [輸出資料夾，預設 public/pixel]
 import fs from 'node:fs';
 import path from 'node:path';
-const out = process.argv[2] || new URL("../public/pixel/", import.meta.url).pathname.replace(/^/([A-Za-z]:)/, "$1");
+import { fileURLToPath } from 'node:url';
+
+const out = process.argv[2] || fileURLToPath(new URL('../public/pixel/', import.meta.url));
 fs.mkdirSync(out, { recursive: true });
 
 const P = {
