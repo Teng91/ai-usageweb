@@ -111,6 +111,8 @@ button {
 
 .topbar h1 {
   flex: 1;
+  min-width: 0;
+  white-space: nowrap;
   margin: 0;
   font-size: 1.05rem;
   font-weight: 600;
@@ -161,6 +163,23 @@ button {
 }
 
 .theme-btn:hover { color: var(--text); border-color: var(--accent); }
+
+/* 風格切換鈕（簡約／冒險） */
+.skin-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--text-2);
+  font-size: 0.76rem;
+  white-space: nowrap;
+}
+
+.skin-btn:hover { color: var(--text); border-color: var(--accent); }
 
 .theme-btn .icon-moon { display: none; }
 :root[data-theme="light"] .theme-btn .icon-sun { display: none; }
