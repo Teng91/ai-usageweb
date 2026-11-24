@@ -1,0 +1,10 @@
+{ "data": [
+  { "date": "2026-11-22 00:00:00", "model_permaslug": "openai/gpt-x-20261001", "variant": "standard", "total_prompt_tokens": 900, "total_completion_tokens": 100, "count": 10 },
+  { "date": "2026-11-23 00:00:00", "model_permaslug": "openai/gpt-x-20261001", "variant": "batch", "total_prompt_tokens": 400, "total_completion_tokens": 100, "count": 5 },
+  { "date": "2026-11-23 00:00:00", "model_permaslug": "acme/big-20260901", "variant": "standard", "total_prompt_tokens": 1200, "total_completion_tokens": 0, "count": 3 },
+  { "date": "2026-11-22 00:00:00", "model_permaslug": "nvidia/nemo-20260604", "variant": "free", "total_prompt_tokens": 700, "total_completion_tokens": 50, "count": 9 },
+  { "date": "2026-11-23 00:00:00", "model_permaslug": "nvidia/nemo-20260604", "variant": "free", "total_prompt_tokens": 200, "total_completion_tokens": 50, "count": 4 },
+  { "date": "2026-11-23 00:00:00", "model_permaslug": "nvidia/nemo-20260604", "variant": "standard", "total_prompt_tokens": 10, "total_completion_tokens": 0, "count": 1 },
+  { "date": "2026-11-23 00:00:00", "model_permaslug": "mystery/unknown-model-20261111", "variant": "free", "total_prompt_tokens": 300, "total_completion_tokens": 0, "count": 2 },
+  { "date": "2026-11-23 00:00:00", "model_permaslug": "zero/model-20261111", "variant": "free", "total_prompt_tokens": 0, "total_completion_tokens": 0, "count": 0 }
+] }

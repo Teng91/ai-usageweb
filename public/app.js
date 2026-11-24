@@ -7,6 +7,9 @@ const FALLBACK_POLL_MS = 30_000;
 const SSE_OPEN_TIMEOUT_MS = 6_000;
 // 輪詢模式下，每隔幾次再試一次 SSE
 const SSE_RETRY_EVERY = 10;
+// OpenRouter 模型排行：伺服器每小時才更新，前端 10 分鐘問一次就夠
+const RANKINGS_POLL_MS = 10 * 60_000;
+const RANK_VIEWS = [['day', '每天'], ['week', '每週'], ['month', '每月']];
 // 打開頁面後這段時間內，舊資料視為「更新中」而不是「過期」（伺服器剛喚醒正在抓）
 const WAKE_WINDOW_MS = 90_000;
 // 喚醒超過這麼久才在右上角顯示「喚醒伺服器…」，避免熱機時閃一下
@@ -30,6 +33,10 @@ const state = {
   waking: false,
   slowWake: false,
   sessionStart: 0,
+  rankings: null,
+  rankingsLoadedAt: 0,
+  rankingsFailed: false,
+  rankView: readRankView(),
   offline: !navigator.onLine,
 };
 
@@ -148,6 +155,7 @@ function stopFallback() {
 }
 
 async function start() {
+  if (Date.now() - state.rankingsLoadedAt > RANKINGS_POLL_MS) loadRankings();
   state.sessionStart = Date.now();
   state.waking = true;
   const slowTimer = setTimeout(() => { state.slowWake = true; renderChrome(); }, SLOW_WAKE_MS);
@@ -269,8 +277,12 @@ function renderCard(p) {
   const body = el.querySelector('.card-body');
   body.replaceChildren();
 
+  body.classList.toggle('or-body', p.id === 'openrouter');
   if (p.balance) {
-    body.append(renderBalance(p.balance));
+    const bal = document.createElement('div');
+    bal.className = 'balance';
+    bal.append(renderBalance(p.balance));
+    body.append(bal);
   } else if (p.windows?.length) {
     for (const w of p.windows) body.append(renderWindow(w));
   } else if (p.note) {
@@ -284,7 +296,138 @@ function renderCard(p) {
     n.textContent = '等待第一次資料…';
     body.append(n);
   }
+  if (p.id === 'openrouter') body.append(rankingsEl());
   tickCard(el, p);
+}
+
+// ---------- OpenRouter 模型排行 ----------
+function readRankView() {
+  try {
+    const v = localStorage.getItem('rankView');
+    return RANK_VIEWS.some(([id]) => id === v) ? v : 'week';
+  } catch {
+    return 'week';
+  }
+}
+
+async function loadRankings() {
+  state.rankingsLoadedAt = Date.now();
+  try {
+    const res = await fetch(withKey('/api/rankings'), { cache: 'no-store' });
+    if (!res.ok) throw new Error(String(res.status));
+    const data = await res.json();
+    if (data?.views) state.rankings = data;
+    state.rankingsFailed = !data?.views;
+  } catch {
+    state.rankingsFailed = !state.rankings;
+  }
+  renderRankings();
+}
+
+setInterval(() => {
+  if (document.visibilityState === 'visible') loadRankings();
+}, RANKINGS_POLL_MS);
+
+let rankRoot = null;
+/** 排行區塊只建一次，卡片重畫時搬回去，切換的分頁不會被重設 */
+function rankingsEl() {
+  if (!rankRoot) {
+    rankRoot = document.createElement('section');
+    rankRoot.className = 'rank';
+    rankRoot.setAttribute('aria-label', 'OpenRouter 熱門模型');
+    const head = document.createElement('div');
+    head.className = 'rank-head';
+    const title = document.createElement('h3');
+    title.className = 'rank-title';
+    title.textContent = '熱門模型';
+    const seg = document.createElement('div');
+    seg.className = 'seg';
+    seg.setAttribute('role', 'group');
+    seg.setAttribute('aria-label', '時間範圍');
+    for (const [id, label] of RANK_VIEWS) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.dataset.view = id;
+      b.textContent = label;
+      b.addEventListener('click', () => {
+        state.rankView = id;
+        try { localStorage.setItem('rankView', id); } catch { /* 不能存就算了 */ }
+        renderRankings();
+      });
+      seg.append(b);
+    }
+    head.append(title, seg);
+    const cols = document.createElement('div');
+    cols.className = 'rank-cols';
+    const foot = document.createElement('p');
+    foot.className = 'rank-foot';
+    rankRoot.append(head, cols, foot);
+    renderRankings();
+  }
+  return rankRoot;
+}
+
+function renderRankings() {
+  if (!rankRoot) return;
+  for (const b of rankRoot.querySelectorAll('.seg button')) {
+    b.setAttribute('aria-pressed', String(b.dataset.view === state.rankView));
+  }
+  const cols = rankRoot.querySelector('.rank-cols');
+  const foot = rankRoot.querySelector('.rank-foot');
+  cols.replaceChildren();
+  const view = state.rankings?.views?.[state.rankView];
+  if (!view) {
+    const n = document.createElement('p');
+    n.className = 'note';
+    n.textContent = state.rankingsFailed ? '暫時拿不到排行榜' : '排行榜載入中…';
+    cols.append(n);
+    foot.textContent = '';
+    return;
+  }
+  for (const [key, label] of [['free', '免費'], ['paid', '付費']]) {
+    const col = document.createElement('div');
+    col.className = 'rank-col';
+    const h = document.createElement('h4');
+    h.textContent = label;
+    const ol = document.createElement('ol');
+    ol.className = 'rank-list';
+    const list = view[key] || [];
+    const max = list[0]?.tokens || 1;
+    for (const m of list) {
+      const li = document.createElement('li');
+      li.style.setProperty('--share', `${Math.max(2, Math.round((m.tokens / max) * 100))}%`);
+      const rk = document.createElement('span');
+      rk.className = 'rk';
+      rk.textContent = String(m.rank);
+      const nm = document.createElement('span');
+      nm.className = 'nm';
+      nm.textContent = m.name;
+      nm.title = m.slug;
+      const tk = document.createElement('span');
+      tk.className = 'tk';
+      tk.textContent = tokens(m.tokens);
+      li.append(rk, nm, tk);
+      ol.append(li);
+    }
+    if (!list.length) {
+      const li = document.createElement('li');
+      li.className = 'note';
+      li.textContent = '沒有資料';
+      ol.append(li);
+    }
+    col.append(h, ol);
+    cols.append(col);
+  }
+  foot.textContent = `依 OpenRouter 全站 token 用量排名 · ${ago(state.rankings.updatedAt)}更新`;
+}
+
+function tokens(n) {
+  const v = Number(n);
+  if (v >= 1e12) return `${(v / 1e12).toFixed(1)}T`;
+  if (v >= 1e9) return `${(v / 1e9).toFixed(1)}B`;
+  if (v >= 1e6) return `${(v / 1e6).toFixed(1)}M`;
+  if (v >= 1e3) return `${(v / 1e3).toFixed(1)}K`;
+  return String(v);
 }
 
 /** 訂閱到期日：剩 30 天內變橘色，過期變紅色 */

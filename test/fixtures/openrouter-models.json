@@ -1,0 +1,24 @@
+{
+  "data": [
+    {
+      "id": "openai/gpt-x",
+      "canonical_slug": "openai/gpt-x-20261001",
+      "name": "OpenAI: GPT-X"
+    },
+    {
+      "id": "acme/big",
+      "canonical_slug": "acme/big-20260901",
+      "name": "Acme: Big Model"
+    },
+    {
+      "id": "nvidia/nemo:free",
+      "canonical_slug": "nvidia/nemo-20260604",
+      "name": "NVIDIA: Nemo (free)"
+    },
+    {
+      "id": "openai/gpt-x:batch",
+      "canonical_slug": "openai/gpt-x-20261001",
+      "name": "OpenAI: GPT-X (batch)"
+    }
+  ]
+}

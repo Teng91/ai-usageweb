@@ -9,6 +9,7 @@ import { SnapshotStore } from './src/snapshot.js';
 import { SseHub } from './src/sse.js';
 import { Poller } from './src/poller.js';
 import { loadProviders } from './src/providers/index.js';
+import { RankingsService } from './src/rankings.js';
 import { logInfo, logWarn } from './src/log.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
@@ -39,6 +40,8 @@ export async function createApp(opts = {}) {
     pollIntervalSec: cfg.pollIntervalSec,
     providers,
   }).load();
+
+  const rankings = await new RankingsService({ dataDir: cfg.dataDir }).load();
 
   // 啟動時先把沒設定憑證的標成 disabled，前端就不會顯示空卡片
   for (const p of providers) {
@@ -87,6 +90,11 @@ export async function createApp(opts = {}) {
     if (p === '/api/usage' && req.method === 'GET') {
       poller.touch();
       return sendJson(res, 200, snapshot.snapshot(), { 'Cache-Control': 'no-store' });
+    }
+
+    if (p === '/api/rankings' && req.method === 'GET') {
+      // OpenRouter 全站模型排行（公開資料，每小時最多抓一次）
+      return sendJson(res, 200, (await rankings.get()) || { updatedAt: null, views: null }, { 'Cache-Control': 'no-store' });
     }
 
     if (p === '/api/stream' && req.method === 'GET') {

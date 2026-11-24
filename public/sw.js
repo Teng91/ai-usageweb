@@ -1,5 +1,5 @@
 // 快取名稱帶版本號；改了前端檔案就把版本 +1
-const CACHE = 'app-v8';
+const CACHE = 'app-v9';
 const SHELL = [
   '/',
   '/index.html',
@@ -37,7 +37,7 @@ self.addEventListener('fetch', (event) => {
   if (url.origin !== self.location.origin) return;
 
   // SSE 與管理 API 完全不經過 service worker
-  if (url.pathname === '/api/stream' || url.pathname.startsWith('/admin/') || url.pathname === '/healthz') return;
+  if (url.pathname === '/api/stream' || url.pathname === '/api/rankings' || url.pathname.startsWith('/admin/') || url.pathname === '/healthz') return;
 
   if (url.pathname === '/api/usage') {
     event.respondWith(networkFirstUsage(req));

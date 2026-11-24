@@ -1,12 +1,13 @@
 import { test, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { fixture, mockFetch, ctxFor } from './helpers.js';
+import { fixture, mockFetch, ctxFor, tmpDir } from './helpers.js';
 import openrouter from '../src/providers/openrouter.js';
 import copilot, { parseCopilot } from '../src/providers/copilot.js';
 import claude, { parseClaude, parsePlanExpiry } from '../src/providers/claude.js';
 import codex, { parseCodex } from '../src/providers/codex.js';
 import antigravity, { parseModels, tierName, _resetCache } from '../src/providers/antigravity.js';
 import { ProviderError } from '../src/errors.js';
+import { parseRankings, parseModelNames, RankingsService } from '../src/rankings.js';
 
 let mock;
 afterEach(() => {
@@ -37,6 +38,47 @@ test('openrouter: /credits 被拒就改用 /key', async () => {
 test('openrouter: 缺欄位 → parse 錯誤', async () => {
   mock = mockFetch([['/credits', () => ({ json: { data: {} } })]]);
   await assert.rejects(openrouter.fetch(ctxFor({ openrouter: { apiKey: 'k' } })), (e) => e.kind === 'parse');
+});
+
+// ---------- OpenRouter 排行榜 ----------
+test('openrouter 排行榜: 免費／付費分開、跨時間桶與變體加總、依 token 排名', () => {
+  const names = parseModelNames(fixture('openrouter-models.json'));
+  assert.equal(names['openai/gpt-x-20261001'], 'GPT-X', '去掉廠商前綴');
+  assert.equal(names['nvidia/nemo-20260604'], 'Nemo', '去掉 (free)');
+  assert.equal(names['openai/gpt-x:batch'], 'GPT-X', '去掉 (batch)，batch 變體不蓋掉一般版名稱');
+  const r = parseRankings(fixture('openrouter-rankings.json'), names);
+  // 付費：GPT-X standard 1000 + batch 500 = 1500 > Big 1200 > Nemo 付費 10
+  assert.deepEqual(r.paid.map((m) => [m.rank, m.name, m.tokens]), [[1, 'GPT-X', 1500], [2, 'Big Model', 1200], [3, 'Nemo', 10]]);
+  // 免費：Nemo 750 + 250 = 1000 > 不認得的模型用 slug 顯示；0 token 的不列
+  assert.deepEqual(r.free.map((m) => [m.rank, m.name, m.tokens]), [[1, 'Nemo', 1000], [2, 'unknown-model', 300]]);
+});
+
+test('openrouter 排行榜: 最多 10 名；缺 data → 丟錯', () => {
+  const rows = Array.from({ length: 15 }, (_, i) => ({ model_permaslug: `m/x${i}`, variant: 'free', total_prompt_tokens: i + 1, total_completion_tokens: 0 }));
+  const r = parseRankings({ data: rows });
+  assert.equal(r.free.length, 10);
+  assert.equal(r.free[0].slug, 'm/x14');
+  assert.throws(() => parseRankings({}));
+});
+
+test('openrouter 排行榜: 一小時內只抓一次，三個時間範圍都抓', async () => {
+  const views = [];
+  mock = mockFetch([
+    ['/api/v1/models', () => ({ json: fixture('openrouter-models.json') })],
+    ['/rankings/models', (req) => { views.push(new URL(req.url).searchParams.get('view')); return { json: fixture('openrouter-rankings.json') }; }],
+  ]);
+  let t = Date.parse('2026-11-24T00:00:00Z');
+  const svc = new RankingsService({ dataDir: tmpDir(), now: () => t });
+  const d1 = await svc.get();
+  assert.deepEqual(views, ['day', 'week', 'month']);
+  assert.equal(d1.views.week.paid[0].name, 'GPT-X');
+  t += 30 * 60 * 1000;
+  await svc.get();
+  assert.equal(views.length, 3, '30 分鐘後沿用');
+  t += 31 * 60 * 1000;
+  await svc.get();
+  await svc.inflight;
+  assert.equal(views.length, 6, '超過一小時重抓');
 });
 
 // ---------- Copilot ----------
