@@ -2,7 +2,7 @@
 
 一個打開就看得到 AI 服務本期還剩多少的 PWA：**Claude Pro、Codex（ChatGPT）、Antigravity、GitHub Copilot** 的額度，加上 **OpenRouter** 餘額。電腦、手機瀏覽器都能看，手機可以「加到主畫面」當 App。
 
-部署在 fly.io：**有人打開才喚醒機器**，開著時每 60 秒更新並用 SSE 推到畫面上；沒人看幾分鐘後機器自動暫停（suspend，下次喚醒只要幾百毫秒），不收 CPU／記憶體費用。
+部署在 fly.io：**有人打開才喚醒機器**，開著時每 2 分鐘更新並用 SSE 推到畫面上；沒人看幾分鐘後機器自動暫停（suspend，下次喚醒只要幾百毫秒），不收 CPU／記憶體費用。
 
 - Node 22、零相依套件（`node:http`、內建 `fetch`、`node:crypto`、`node:test`）
 - 前端是純 HTML＋CSS＋原生 JS，沒有打包
@@ -18,7 +18,7 @@
                               │    └─▶ history.js（每日最高用量，/data/history.json）
                               ▼
                           poller.js（觀看者計數、每家排程、退避）
-                              │ 有人看才跑，每 60 秒
+                              │ 有人看才跑，每 2 分鐘
                               ▼
          providers/{claude,codex,antigravity,copilot,openrouter}.js
                               │ 續期時

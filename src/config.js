@@ -8,7 +8,7 @@ function int(name, def) {
 export const config = {
   port: int('PORT', 8080),
   dataDir: path.resolve(process.env.DATA_DIR || './data'),
-  pollIntervalSec: int('POLL_INTERVAL_SEC', 60),
+  pollIntervalSec: int('POLL_INTERVAL_SEC', 120),
   idleGraceSec: int('IDLE_GRACE_SEC', 90),
   // 歷史用量以哪個時區的日期分天
   historyTz: process.env.HISTORY_TZ || 'Asia/Taipei',
