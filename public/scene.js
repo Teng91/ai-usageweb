@@ -1,4 +1,4 @@
-// 冒險風格的像素場景：三張地圖輪流、小勇者走到傳送點就換地圖、怪物可以點、只看風景模式、快捷鍵
+// 冒險風格的像素場景：春夏秋冬四張地圖輪流、小勇者走到傳送點就換地圖、怪物可以點、只看風景模式、快捷鍵
 // 只在 <html data-skin="adventure"> 時動作；所有圖都是 /pixel/ 底下的原創像素圖
 
 const root = document.documentElement;
@@ -14,30 +14,33 @@ const PF_H = 32; // 平台高度（8 格 × 4）
 const onPf = (pfBottom) => `calc(${pfBottom} + ${PF_H - 4}px)`; // 站在平台上的高度
 const GROUND = '52px';
 
+// 春夏秋冬四季輪流；樹的顏色（櫻花、楓紅）用 CSS 濾鏡從同一張樹的圖變出來
 const MAPS = [
   {
-    id: 'forest',
-    name: '森林村莊',
+    id: 'spring',
+    name: '春・櫻花村',
     items: [
       { cls: 'sc-mountains' },
       { cls: 'sc-ground ground-grass' },
       { cls: 'sc-house', s: { left: '2.5%', bottom: GROUND } },
-      { cls: 'sc-tree', s: { left: 'calc(2.5% + 150px)', bottom: GROUND, width: '80px', height: '95px' } },
-      { cls: 'sc-tree', s: { right: 'calc(3% + 90px)', bottom: GROUND, width: '96px', height: '114px' } },
+      { cls: 'sc-tree blossom', s: { left: 'calc(2.5% + 150px)', bottom: GROUND, width: '80px', height: '95px' } },
+      { cls: 'sc-tree blossom', s: { right: 'calc(3% + 90px)', bottom: GROUND, width: '96px', height: '114px' } },
+      { cls: 'sc-tree', s: { right: 'calc(3% + 190px)', bottom: GROUND, width: '64px', height: '76px' } },
       { cls: 'sc-pf pf-grass', s: { left: '6%', bottom: '38vh', width: '192px' } },
       { cls: 'sc-ladder', s: { left: 'calc(6% + 150px)', bottom: GROUND, height: 'calc(38vh - 52px)' } },
       { cls: 'sc-pf pf-grass', s: { right: '7%', bottom: '52vh', width: '160px' } },
       { cls: 'sc-rope', s: { right: 'calc(7% + 24px)', bottom: GROUND, height: 'calc(52vh - 52px)' } },
-      { mon: 'slime', s: { right: '22%', bottom: GROUND } },
+      { mon: 'slime', s: { right: '24%', bottom: GROUND } },
       { mon: 'slime-pink', s: { left: 'calc(6% + 40px)', bottom: onPf('38vh') } },
       { mon: 'leafling', s: { left: '30%', bottom: GROUND } },
       { mon: 'chick', s: { right: 'calc(7% + 70px)', bottom: onPf('52vh') } },
       { mon: 'cloudling', s: { left: '40%', top: '12%' } },
+      { cls: 'sc-petals' },
     ],
   },
   {
-    id: 'beach',
-    name: '海邊碼頭',
+    id: 'summer',
+    name: '夏・海邊碼頭',
     items: [
       { cls: 'sc-sun' },
       { cls: 'sc-sea' },
@@ -57,8 +60,31 @@ const MAPS = [
     ],
   },
   {
-    id: 'snow',
-    name: '雪山小鎮',
+    id: 'autumn',
+    name: '秋・楓葉林',
+    items: [
+      { cls: 'sc-mountains autumn-hills' },
+      { cls: 'sc-ground ground-grass autumn-grass' },
+      { cls: 'sc-tree maple', s: { left: '2.5%', bottom: GROUND, width: '96px', height: '114px' } },
+      { cls: 'sc-tree maple-gold', s: { left: 'calc(2.5% + 90px)', bottom: GROUND, width: '72px', height: '86px' } },
+      { cls: 'sc-tree maple', s: { left: 'calc(2.5% + 170px)', bottom: GROUND, width: '64px', height: '76px' } },
+      { cls: 'sc-tree maple-gold', s: { right: 'calc(3% + 90px)', bottom: GROUND, width: '96px', height: '114px' } },
+      { cls: 'sc-tree maple', s: { right: 'calc(3% + 190px)', bottom: GROUND, width: '72px', height: '86px' } },
+      { cls: 'sc-pf pf-grass autumn-grass', s: { left: '8%', bottom: '46vh', width: '176px' } },
+      { cls: 'sc-ladder', s: { left: 'calc(8% + 130px)', bottom: GROUND, height: 'calc(46vh - 52px)' } },
+      { cls: 'sc-pf pf-grass autumn-grass', s: { right: '8%', bottom: '36vh', width: '160px' } },
+      { cls: 'sc-rope', s: { right: 'calc(8% + 120px)', bottom: GROUND, height: 'calc(36vh - 52px)' } },
+      { mon: 'leafling', s: { left: '28%', bottom: GROUND } },
+      { mon: 'leafling', s: { right: '26%', bottom: GROUND }, delay: '-4s' },
+      { mon: 'chick', s: { left: 'calc(8% + 50px)', bottom: onPf('46vh') } },
+      { mon: 'slime', s: { right: 'calc(8% + 50px)', bottom: onPf('36vh') } },
+      { mon: 'cloudling', s: { left: '44%', top: '13%' } },
+      { cls: 'sc-leaves' },
+    ],
+  },
+  {
+    id: 'winter',
+    name: '冬・雪山小鎮',
     items: [
       { cls: 'sc-mountains snowy' },
       { cls: 'sc-ground ground-snow' },
@@ -234,6 +260,21 @@ function setBgOnly(on) {
 
 bgBtn.addEventListener('click', () => setBgOnly(true));
 bgExit.addEventListener('click', () => setBgOnly(false));
+
+// 只看風景時，點兩下背景（不是點怪物、勇者、傳送點）也能回來；手機上不一定有 dblclick，自己算兩次點擊
+let lastTap = { t: 0, x: 0, y: 0 };
+document.addEventListener('pointerup', (e) => {
+  if (!root.dataset.bgonly) return;
+  const t = e.target;
+  if (t instanceof HTMLElement && (t.classList.contains('mon') || t === hero || t === portal || t === bgExit)) return;
+  const now = Date.now();
+  if (now - lastTap.t < 400 && Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) < 40) {
+    lastTap.t = 0;
+    setBgOnly(false);
+  } else {
+    lastTap = { t: now, x: e.clientX, y: e.clientY };
+  }
+});
 
 // ---------- 快捷鍵（冒險風格的快捷欄）：B 風景、M 換地圖、T 白天／夜晚、S 換風格、Esc 回來 ----------
 document.addEventListener('keydown', (e) => {

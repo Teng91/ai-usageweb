@@ -102,8 +102,10 @@
 }
 
 /* 每張地圖的天空色調 */
-[data-skin="adventure"][data-map="beach"] body { background: linear-gradient(180deg, #4cc3ff 0%, #9fe3ff 55%, #fff1c9 100%) fixed; }
-[data-skin="adventure"][data-map="snow"] body { background: linear-gradient(180deg, #8fb4dc 0%, #c8dcf0 55%, #eef5fc 100%) fixed; }
+[data-skin="adventure"][data-map="spring"] body { background: linear-gradient(180deg, #78c8ff 0%, #c4e8ff 55%, #ffe6f0 100%) fixed; }
+[data-skin="adventure"][data-map="summer"] body { background: linear-gradient(180deg, #4cc3ff 0%, #9fe3ff 55%, #fff1c9 100%) fixed; }
+[data-skin="adventure"][data-map="autumn"] body { background: linear-gradient(180deg, #7fb6e6 0%, #f3d3a8 60%, #ffc98a 100%) fixed; }
+[data-skin="adventure"][data-map="winter"] body { background: linear-gradient(180deg, #8fb4dc 0%, #c8dcf0 55%, #eef5fc 100%) fixed; }
 
 .scene, .map-name, .bg-exit, .expbar, .alert-bubble, .dmg, .bg-btn { display: none; }
 
@@ -175,6 +177,44 @@
 }
 
 .sc-tree { background-image: url(/pixel/tree.svg); }
+.sc-tree.blossom { background-image: url(/pixel/tree-blossom.svg); }
+.sc-tree.maple { background-image: url(/pixel/tree-maple.svg); }
+.sc-tree.maple-gold { background-image: url(/pixel/tree-gold.svg); }
+.sc-mountains.autumn-hills { filter: hue-rotate(165deg) saturate(0.75) brightness(1.05); }
+.ground-grass.autumn-grass { background: url(/pixel/grass-autumn.svg) repeat-x 0 0 / 128px 40px, linear-gradient(transparent 39px, #b39a3a 39px) !important; }
+.sc-pf.autumn-grass { background-image: url(/pixel/platform-autumn.svg); }
+
+/* 春天的花瓣、秋天的落葉：斜斜飄落 */
+.sc-petals, .sc-leaves {
+  inset: 0;
+  background-size: 360px 360px !important;
+  background-repeat: repeat !important;
+  animation: sc-flutter 16s linear infinite;
+}
+
+.sc-petals {
+  background:
+    radial-gradient(4px 3px at 12% 18%, #ffc2dc 98%, transparent),
+    radial-gradient(3px 4px at 38% 62%, #f7a6c8 98%, transparent),
+    radial-gradient(4px 3px at 64% 30%, #ffd6e8 98%, transparent),
+    radial-gradient(3px 3px at 82% 78%, #ffc2dc 98%, transparent),
+    radial-gradient(4px 3px at 50% 90%, #f7a6c8 98%, transparent) !important;
+}
+
+.sc-leaves {
+  background:
+    radial-gradient(5px 3px at 14% 22%, #ff9a4a 98%, transparent),
+    radial-gradient(4px 4px at 40% 66%, #e0602a 98%, transparent),
+    radial-gradient(5px 3px at 66% 34%, #ffd45a 98%, transparent),
+    radial-gradient(4px 4px at 86% 74%, #e0602a 98%, transparent),
+    radial-gradient(5px 3px at 52% 92%, #ff9a4a 98%, transparent) !important;
+  animation-duration: 12s;
+}
+
+@keyframes sc-flutter {
+  from { background-position: 0 0; }
+  to { background-position: -120px 360px; }
+}
 .sc-pine { background-image: url(/pixel/pine.svg); }
 .sc-snowman { width: 48px; height: 64px; background-image: url(/pixel/snowman.svg); }
 .sc-palm { background-image: url(/pixel/palm.svg); transform-origin: 50% 100%; animation: sc-sway 4s ease-in-out infinite; }
@@ -592,55 +632,7 @@
   .scene .mon[style*="vh"] { display: none; }
 }
 
-/* ---- 卡片上的小傢伙：貓坐在 OpenRouter、史萊姆坐在 Claude ---- */
 [data-skin="adventure"] .card { position: relative; }
-
-[data-skin="adventure"] .card[data-id="openrouter"],
-[data-skin="adventure"] .card[data-id="claude"] { overflow: visible; }
-
-[data-skin="adventure"] .card[data-id="openrouter"] { margin-top: 34px; }
-
-[data-skin="adventure"] .card[data-id="openrouter"] .card-head,
-[data-skin="adventure"] .card[data-id="claude"] .card-head { border-radius: 11px 11px 0 0; }
-
-[data-skin="adventure"] .card[data-id="openrouter"]::after {
-  content: "";
-  position: absolute;
-  top: -45px;
-  right: 36px;
-  width: 48px;
-  height: 48px;
-  padding: 0;
-  background: url(/pixel/cat.svg) 0 0 / 96px 48px no-repeat;
-  image-rendering: pixelated;
-  animation: sc-tail 1.6s steps(2) infinite;
-  pointer-events: none;
-}
-
-@keyframes sc-tail {
-  from { background-position: 0 0; }
-  to { background-position: -96px 0; }
-}
-
-[data-skin="adventure"] .card[data-id="claude"]::after {
-  content: "";
-  position: absolute;
-  top: -33px;
-  right: 22px;
-  width: 36px;
-  height: 36px;
-  padding: 0;
-  background: url(/pixel/slime-pink.svg) 0 0 / 100% 100% no-repeat;
-  image-rendering: pixelated;
-  transform-origin: 50% 100%;
-  animation: sc-sit 2.4s ease-in-out infinite;
-  pointer-events: none;
-}
-
-@keyframes sc-sit {
-  0%, 100% { transform: scale(1.06, 0.94); }
-  50% { transform: scale(0.97, 1.03); }
-}
 
 /* ---- 遊戲介面：快用完的泡泡、跳出的數字、對話框的 ▼、經驗值條 ---- */
 [data-skin="adventure"] .alert-bubble:not([hidden]) {
@@ -681,8 +673,6 @@
   50% { transform: translateY(-4px); }
 }
 
-[data-skin="adventure"] .card[data-id="claude"] .alert-bubble { right: 70px; }
-[data-skin="adventure"] .card[data-id="openrouter"] .alert-bubble { right: 96px; }
 
 [data-skin="adventure"] .dmg {
   display: block;
@@ -788,8 +778,9 @@
 [data-skin="adventure"] .bg-exit:not([hidden]) {
   display: block;
   position: fixed;
-  top: 14px;
-  right: 16px;
+  /* 避開 iPhone 的狀態列與瀏海，不然按不到 */
+  top: calc(env(safe-area-inset-top) + 14px);
+  right: calc(env(safe-area-inset-right) + 16px);
   z-index: 30;
   padding: 6px 14px;
   border: 2px solid var(--frame);
@@ -802,6 +793,27 @@
 }
 
 [data-skin="adventure"] .bg-exit:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--frame); }
+
+/* 手機：「顯示用量」放在下方正中間，大一點好按 */
+@media (max-width: 720px) {
+  [data-skin="adventure"] .bg-exit:not([hidden]) {
+    top: auto;
+    right: auto;
+    left: 50%;
+    bottom: calc(env(safe-area-inset-bottom) + 20px);
+    translate: -50% 0;
+    padding: 10px 26px;
+    font-size: 1rem;
+  }
+}
+
+/* ---- 手機的頂列：標題和連線狀態一列，按鈕靠右另一列，不會擠在一起 ---- */
+@media (max-width: 560px) {
+  .topbar { flex-wrap: wrap; row-gap: 10px; }
+  .topbar h1 { flex: 1 0 calc(100% - 130px); }
+  /* 第二排（換風格、亮暗、安裝）靠右 */
+  .topbar .skin-btn { margin-left: auto; }
+}
 
 /* ---- 快捷欄：按鈕右下角標出快捷鍵 ---- */
 [data-skin="adventure"] [data-key] { position: relative; }
@@ -860,6 +872,7 @@
 }
 
 [data-skin="adventure"] .conn,
+[data-skin="adventure"] .bg-btn,
 [data-skin="adventure"] .theme-btn,
 [data-skin="adventure"] .skin-btn,
 [data-skin="adventure"] .install {
@@ -873,20 +886,23 @@
 
 [data-skin="adventure"] .conn { padding: 2px 10px; }
 
+[data-skin="adventure"] .bg-btn,
 [data-skin="adventure"] .theme-btn,
 [data-skin="adventure"] .skin-btn,
 [data-skin="adventure"] .install { height: 30px; }
 
+[data-skin="adventure"] .bg-btn:hover,
 [data-skin="adventure"] .theme-btn:hover,
 [data-skin="adventure"] .skin-btn:hover,
 [data-skin="adventure"] .install:hover { background: #ffe8a8; color: #3b2a1e; }
 
+[data-skin="adventure"] .bg-btn:active,
 [data-skin="adventure"] .theme-btn:active,
 [data-skin="adventure"] .skin-btn:active,
 [data-skin="adventure"] .install:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--frame); }
 
 /* ---- 卡片：遊戲視窗（粗外框＋內白框＋藍色標題列） ---- */
-[data-skin="adventure"] .cards { gap: 16px; margin-top: 26px; /* 留位置給坐在卡片上的史萊姆 */ }
+[data-skin="adventure"] .cards { gap: 16px; margin-top: 18px; }
 
 [data-skin="adventure"] .card,
 [data-skin="adventure"] .sk-card {

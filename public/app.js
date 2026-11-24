@@ -304,7 +304,7 @@ function renderCard(p) {
 // ---------- 冒險風格的小遊戲效果（簡約風格時 CSS 會把它們藏起來） ----------
 const lastPct = new Map(); // `${provider}:${window}` → 上次的已用 %
 
-/** 用量上升時從卡片跳出「+3%」；快用完時頭上冒「快用完了！」泡泡；Claude 每週用量更新經驗值條 */
+/** 用量上升時從卡片跳出「+3%」；額度用到 90% 以上時頭上冒「快用完了！」泡泡（餘額不提醒）；Claude 每週用量更新經驗值條 */
 function gameEffects(el, p) {
   let rise = 0;
   let low = false;
@@ -315,7 +315,6 @@ function gameEffects(el, p) {
     lastPct.set(key, w.usedPct);
     if (w.usedPct >= 90) low = true;
   }
-  if (p.balance && Number(p.balance.remaining) < 0) low = true;
 
   let bubble = el.querySelector('.alert-bubble');
   if (low && !bubble) {
@@ -325,7 +324,7 @@ function gameEffects(el, p) {
   }
   if (bubble) {
     bubble.hidden = !low;
-    bubble.textContent = p.balance ? '餘額不足！' : '快用完了！';
+    bubble.textContent = '快用完了！';
   }
 
   if (rise >= 0.5 && document.documentElement.dataset.skin === 'adventure') {

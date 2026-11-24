@@ -27,6 +27,10 @@ const P = {
   q: '#fff1a8', // 傳送點中心
   z: '#3f8f5a', Z: '#2a6b41', // 松樹
   f: '#a8743f', F: '#7a4f26', // 木板
+  i: '#ffc2dc', I: '#f28bb8', j: '#d9638f', // 櫻花
+  u: '#ff9a4a', U: '#e0602a', x: '#b8401c', // 楓紅
+  l: '#ffd45a', L: '#e8a925', d: '#b97a14', // 金黃
+  h: '#d8c25a', N: '#b39a3a', // 秋天的草
 };
 
 function svg(name, frames) {
@@ -119,7 +123,7 @@ const tail2 = catBody.map((r, i) => (i === 12 ? r.slice(0, 12) + 'kook' : i === 
 svg('cat', [tail1, tail2]);
 
 // 樹
-svg('tree', [[
+const TREE = [
   '.....kkkkkk.....',
   '...kkggggggkk...',
   '..kggggggGgggk..',
@@ -139,7 +143,8 @@ svg('tree', [[
   '......kTtk......',
   '.....kTttTk.....',
   '....kkkkkkkk....',
-]]);
+];
+svg('tree', [TREE]);
 
 // 小木屋（牆面每列固定 15 格，由 wall() 組出）
 const wall = (inner) => { if (inner.length !== 15) throw new Error("wall " + inner); return "....k" + inner + "k..."; };
@@ -176,7 +181,7 @@ svg('cloud', [[
 ]]);
 
 // 草地邊緣＋花（橫向重複的 32x10 圖塊）
-svg('grass', [[
+const GRASS = [
   '.....p.............n........y...',
   '....pnp...g.......nnn......yny..',
   '.....p...gHg.......n.......yy...',
@@ -187,7 +192,8 @@ svg('grass', [[
   'GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG',
   'GGGHGGGGGGGHGGGGGGGGHGGGGGGGGHGG',
   'GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG',
-]]);
+];
+svg('grass', [GRASS]);
 
 // 遠山（橫向重複 96x28；階梯狀山形＋雪頂）
 {
@@ -313,7 +319,7 @@ svg('crab', [
 }
 
 // 浮空平台圖塊（16x8，橫向重複）：草地、雪地、木板
-svg('platform-grass', [[
+const PF_GRASS = [
   'gggggggggggggggg',
   'GgGGgGGgGGGgGgGG',
   'tttttttttttttttt',
@@ -322,7 +328,8 @@ svg('platform-grass', [[
   'TtttttTttttttTtt',
   'tTTttTttTTttTttT',
   'kkkkkkkkkkkkkkkk',
-]]);
+];
+svg('platform-grass', [PF_GRASS]);
 svg('platform-snow', [[
   'wwwwwwwwwwwwwwww',
   'WwWWwwWwwWWwwWwW',
@@ -476,3 +483,11 @@ svg('snowman', [[
   '.kWWwwwwWWk.',
   '..kkkkkkkk..',
 ]]);
+
+// ---------- 四季的換色版本（只換葉子／草的顏色，樹幹與輪廓不變） ----------
+const recolor = (rows, map) => rows.map((r) => [...r].map((c) => map[c] ?? c).join(''));
+svg('tree-blossom', [recolor(TREE, { g: 'i', G: 'I', H: 'j', w: 'w' })]);
+svg('tree-maple', [recolor(TREE, { g: 'u', G: 'U', H: 'x' })]);
+svg('tree-gold', [recolor(TREE, { g: 'l', G: 'L', H: 'd' })]);
+svg('grass-autumn', [recolor(GRASS, { g: 'h', G: 'N', H: 'x' })]);
+svg('platform-autumn', [recolor(PF_GRASS, { g: 'h', G: 'N' })]);
