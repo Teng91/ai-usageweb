@@ -1,5 +1,5 @@
 // 快取名稱帶版本號；改了前端檔案就把版本 +1
-const CACHE = 'app-v22';
+const CACHE = 'app-v24';
 const SHELL = [
   '/',
   '/index.html',
@@ -7,10 +7,19 @@ const SHELL = [
   '/theme.js',
   '/skin-adventure.css',
   '/app.js',
+  '/ui/dom.js',
+  '/ui/format.js',
+  '/ui/cards.js',
+  '/ui/effects.js',
+  '/ui/history.js',
+  '/ui/rankings.js',
+  '/ui/theme-toggle.js',
+  '/ui/pwa.js',
   '/scene.js',
+  '/scene-maps.js',
+  '/scene.css',
   '/manifest.webmanifest',
   '/icons/icon.svg',
-  '/pixel/cat.svg',
   '/pixel/cloud.svg',
   '/pixel/grass.svg',
   '/pixel/hero.svg',
@@ -71,7 +80,7 @@ self.addEventListener('fetch', (event) => {
   if (url.origin !== self.location.origin) return;
 
   // SSE 與管理 API 完全不經過 service worker
-  if (url.pathname === '/api/stream' || url.pathname === '/api/rankings' || url.pathname.startsWith('/admin/') || url.pathname === '/healthz') return;
+  if (url.pathname === '/api/stream' || url.pathname === '/api/rankings' || url.pathname === '/api/history' || url.pathname.startsWith('/admin/') || url.pathname === '/healthz') return;
 
   if (url.pathname === '/api/usage') {
     event.respondWith(networkFirstUsage(req));

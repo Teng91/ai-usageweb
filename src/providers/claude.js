@@ -90,7 +90,8 @@ export default {
   },
   async fetch(ctx) {
     const c0 = ctx.creds.claude;
-    const plan = c0.plan || 'Pro';
+    // 方案名稱直接讀環境變數：憑證存進 volume 後會蓋過環境變數，改 fly secrets 才會生效
+    const plan = process.env.CLAUDE_PLAN || c0.plan || 'Pro';
     const planExpiresAt = parsePlanExpiry(process.env.CLAUDE_PLAN_EXPIRES_AT);
     let c = c0;
     const canRefresh = Boolean(c.refreshToken);

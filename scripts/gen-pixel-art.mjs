@@ -99,28 +99,6 @@ const slime = (c, d) => [
 svg('slime', [slime('g', 'G')]);
 svg('slime-pink', [slime('p', 'P')]);
 
-// 坐著的貓（尾巴兩格擺動）
-const catBody = [
-  '................',
-  '..k.......k.....',
-  '..kk.....kk.....',
-  '..kOk...kOk.....',
-  '..kooookoook....',
-  '..koooooooook...',
-  '..kokwooowkok...',
-  '..kookooookok...',
-  '..koooppoook....',
-  '...koooooook....',
-  '..koowwwwook....',
-  '..kooowwoook....',
-  '..kooooooook....',
-  '..kokoooookok...',
-  '...kkkkkkkkk....',
-  '................',
-];
-const tail1 = catBody.map((r, i) => (i === 10 ? r.slice(0, 12) + 'kok.' : i === 11 ? r.slice(0, 12) + 'k.k.' : i === 9 ? r.slice(0, 12) + '.kk.' : r));
-const tail2 = catBody.map((r, i) => (i === 12 ? r.slice(0, 12) + 'kook' : i === 13 ? r.slice(0, 12) + 'kkk.' : r));
-svg('cat', [tail1, tail2]);
 
 // 樹
 const TREE = [

@@ -185,10 +185,15 @@ src/credentials.js        環境變數＋加密 volume、每家續期鎖
 src/sse.js                SSE 連線、ping、廣播、連線上限 30 分鐘
 src/http.js               對外請求、錯誤分類、Cloudflare 偵測
 src/providers/*.js        五家 adapter（統一輸出 { plan, windows, balance, note }）
-public/                   PWA（index.html、app.js、style.css、sw.js、manifest、icons）
+public/                   PWA（index.html、style.css、sw.js、manifest、icons）
+public/app.js             前端進入點：資料與連線（快照、SSE、SSE 被擋時改輪詢）
+public/ui/                前端模組：cards（卡片）、rankings（排行）、history（小長條圖）、effects（冒險效果）、
+                          theme-toggle（亮暗與風格）、pwa（離線與安裝）、format、dom（共用狀態）
 public/theme.js           畫面出現前套用亮暗與風格（CSP 不允許內嵌 script）
-public/skin-adventure.css 冒險風格（只在 data-skin="adventure" 生效）
-public/scene.js           冒險風格的四季場景、傳送點、怪物互動、只看風景、快捷鍵
+public/skin-adventure.css 冒險風格的卡片、按鈕與遊戲介面（只在 data-skin="adventure" 生效）
+public/scene.css          冒險風格的場景（天空、地形、怪物、勇者、傳送點、夜晚）
+public/scene.js           場景邏輯：建立地圖、勇者走到傳送點換季、怪物互動、只看風景、快捷鍵
+public/scene-maps.js      四季地圖資料（加地圖改這裡）
 public/pixel/             原創像素圖（由 scripts/gen-pixel-art.mjs 產生）
 scripts/                  extract-credentials.js、antigravity-login.js、setup-antigravity.ps1、gen-pixel-art.mjs、smoke-ui.mjs
 test/                     node:test＋假 fetch＋fixtures
