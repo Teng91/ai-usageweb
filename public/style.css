@@ -23,6 +23,51 @@
   color-scheme: dark;
 }
 
+/* 亮色：沒選過就跟隨系統；按鈕選過就用 data-theme 固定 */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: #f4f6fa;
+    --panel: #ffffff;
+    --panel-2: #f1f4f9;
+    --line: #e1e6ef;
+    --line-soft: #ecf0f6;
+    --line-strong: #cdd5e3;
+    --text: #0f172a;
+    --text-2: #475569;
+    --muted: #7b879e;
+    --track: #e7ecf4;
+    --accent: #2f6fec;
+    --accent-soft: rgba(47, 111, 236, 0.1);
+    --ok: #2f6fec;
+    --warn: #c98a04;
+    --danger: #dc3545;
+    --live: #12a26b;
+    --idle: #a6b0c3;
+    color-scheme: light;
+  }
+}
+
+:root[data-theme="light"] {
+  --bg: #f4f6fa;
+  --panel: #ffffff;
+  --panel-2: #f1f4f9;
+  --line: #e1e6ef;
+  --line-soft: #ecf0f6;
+  --line-strong: #cdd5e3;
+  --text: #0f172a;
+  --text-2: #475569;
+  --muted: #7b879e;
+  --track: #e7ecf4;
+  --accent: #2f6fec;
+  --accent-soft: rgba(47, 111, 236, 0.1);
+  --ok: #2f6fec;
+  --warn: #c98a04;
+  --danger: #dc3545;
+  --live: #12a26b;
+  --idle: #a6b0c3;
+  color-scheme: light;
+}
+
 * { box-sizing: border-box; }
 
 html, body { margin: 0; }
@@ -91,6 +136,31 @@ button {
 }
 
 .dot.live { background: var(--live); }
+
+/* 亮暗切換鈕：暗色時顯示太陽（按了變亮），亮色時顯示月亮 */
+.theme-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--text-2);
+}
+
+.theme-btn:hover { color: var(--text); border-color: var(--accent); }
+
+.theme-btn .icon-moon { display: none; }
+:root[data-theme="light"] .theme-btn .icon-sun { display: none; }
+:root[data-theme="light"] .theme-btn .icon-moon { display: block; }
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) .theme-btn .icon-sun { display: none; }
+  :root:not([data-theme="dark"]) .theme-btn .icon-moon { display: block; }
+}
 
 .install, .banner button {
   border: 1px solid var(--line-strong);

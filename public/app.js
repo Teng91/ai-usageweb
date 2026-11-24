@@ -631,6 +631,35 @@ function localWhen(t, now) {
   return `${md} ${hm}`;
 }
 
+// ---------- 亮色／暗色 ----------
+// 沒選過就跟隨系統；按一下切到另一個並記住（theme.js 會在下次載入時、畫面出現前套用）
+const THEME_COLORS = { light: '#f4f6fa', dark: '#070b16' };
+const systemLight = window.matchMedia('(prefers-color-scheme: light)');
+
+function currentTheme() {
+  const t = document.documentElement.dataset.theme;
+  if (t === 'light' || t === 'dark') return t;
+  return systemLight.matches ? 'light' : 'dark';
+}
+
+function renderThemeButton() {
+  const theme = currentTheme();
+  const label = theme === 'dark' ? '切換成亮色' : '切換成暗色';
+  const btn = $('theme-btn');
+  btn.setAttribute('aria-label', label);
+  btn.title = label;
+  $('theme-color').setAttribute('content', THEME_COLORS[theme]);
+}
+
+$('theme-btn').addEventListener('click', () => {
+  const next = currentTheme() === 'dark' ? 'light' : 'dark';
+  document.documentElement.dataset.theme = next;
+  try { localStorage.setItem('theme', next); } catch { /* 不能存就只在這次有效 */ }
+  renderThemeButton();
+});
+systemLight.addEventListener('change', renderThemeButton);
+renderThemeButton();
+
 // ---------- PWA ----------
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js').then((reg) => {

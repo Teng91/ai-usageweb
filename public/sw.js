@@ -1,9 +1,10 @@
 // 快取名稱帶版本號；改了前端檔案就把版本 +1
-const CACHE = 'app-v12';
+const CACHE = 'app-v13';
 const SHELL = [
   '/',
   '/index.html',
   '/style.css',
+  '/theme.js',
   '/app.js',
   '/manifest.webmanifest',
   '/icons/icon.svg',

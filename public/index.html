@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>AI 用量</title>
   <meta name="description" content="Claude、Codex、Antigravity、Copilot 額度與 OpenRouter 餘額">
-  <meta name="theme-color" content="#070b16">
+  <meta name="theme-color" content="#070b16" id="theme-color">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
@@ -13,6 +13,7 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="AI 用量">
+  <script src="/theme.js"></script>
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
@@ -22,6 +23,10 @@
       <span class="dot" id="conn-dot" aria-hidden="true"></span>
       <span id="conn-text">連線中…</span>
     </div>
+    <button class="theme-btn" id="theme-btn" type="button" aria-label="切換亮色／暗色" title="切換亮色／暗色">
+      <svg class="icon-sun" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      <svg class="icon-moon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+    </button>
     <button class="install" id="install-btn" type="button" hidden>安裝</button>
   </header>
 
