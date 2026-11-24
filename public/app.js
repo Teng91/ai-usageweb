@@ -703,4 +703,16 @@ $('install-btn').addEventListener('click', async () => {
 });
 window.addEventListener('appinstalled', () => { $('install-btn').hidden = true; });
 
+// iPhone／iPad 不支援「安裝」按鈕，改提示用「分享 → 加入主畫面」；已經從主畫面打開或按過「知道了」就不再出現
+const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent)
+  || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); // iPadOS 會偽裝成 Mac
+const isStandalone = navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+let iosHintDismissed = false;
+try { iosHintDismissed = localStorage.getItem('iosHintDismissed') === '1'; } catch { /* 讀不到就照常顯示 */ }
+if (isIos && !isStandalone && !iosHintDismissed) $('ios-banner').hidden = false;
+$('ios-banner-close').addEventListener('click', () => {
+  $('ios-banner').hidden = true;
+  try { localStorage.setItem('iosHintDismissed', '1'); } catch { /* 不能存就只關這次 */ }
+});
+
 start();

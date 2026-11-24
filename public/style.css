@@ -199,7 +199,15 @@ button {
 
 .banner.warn { border-left-color: var(--warn); }
 
+.banner button { flex: none; white-space: nowrap; }
+
 .banner[hidden], .install[hidden] { display: none; }
+
+.share-icon {
+  vertical-align: -2px;
+  margin: 0 2px;
+  color: var(--accent);
+}
 
 /* 頂端細進度條：喚醒伺服器時出現 */
 .progress {
