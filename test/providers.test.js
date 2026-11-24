@@ -197,10 +197,20 @@ test('codex: Cloudflare 挑戰頁 → forbidden', async () => {
 });
 
 // ---------- Antigravity ----------
-test('antigravity: 模型分兩組取最低剩餘', () => {
+test('antigravity: 模型分兩組取最低剩餘；缺 remainingFraction 的模型跳過不誤報', () => {
+  // fixture 裡 gpt-oss-120b 有 quotaInfo 但沒有 remainingFraction：應被跳過，
+  // 所以 Claude/GPT 只看 claude-sonnet-4-5（0.4 → 用 60%），不會被拉成 100%。
   const w = parseModels(fixture('antigravity-models.json'));
-  assert.deepEqual(w.map((x) => [x.id, x.label, x.usedPct]), [['gemini', 'Gemini', 20], ['claude_gpt', 'Claude/GPT', 100]]);
-  assert.equal(w[1].resetsAt, '2026-11-28T00:00:00.000Z');
+  assert.deepEqual(w.map((x) => [x.id, x.label, x.usedPct]), [['gemini', 'Gemini', 20], ['claude_gpt', 'Claude/GPT', 60]]);
+  assert.equal(w[1].resetsAt, '2026-11-29T00:00:00.000Z');
+});
+
+test('antigravity: 一組全部缺 remainingFraction → 那組不顯示', () => {
+  const w = parseModels({ models: {
+    'gemini-x': { quotaInfo: { remainingFraction: 0.5, resetTime: '2026-12-01T00:00:00Z' } },
+    'claude-y': { quotaInfo: { resetTime: '2026-12-01T00:00:00Z' } },
+  } });
+  assert.deepEqual(w.map((x) => x.id), ['gemini']);
 });
 
 test('antigravity: 續期 → loadCodeAssist → fetchAvailableModels', async () => {

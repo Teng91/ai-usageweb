@@ -38,8 +38,10 @@ export function parseModels(data) {
     if (!q) continue;
     const fam = family(`${key} ${m.displayName || ''} ${m.model || ''}`);
     if (!fam) continue;
-    // quotaInfo 存在但沒有 remainingFraction 代表已用完
-    const frac = q.remainingFraction === undefined || q.remainingFraction === null ? 0 : Number(q.remainingFraction);
+    // 只採計有「數字」remainingFraction 的模型；缺這個欄位的（可能是無上限或尚未初始化）
+    // 就跳過，不要當成已用完而讓整組誤報 100%
+    if (q.remainingFraction === undefined || q.remainingFraction === null) continue;
+    const frac = Number(q.remainingFraction);
     if (!Number.isFinite(frac)) continue;
     const cur = groups[fam];
     if (!cur || frac < cur.frac) groups[fam] = { frac, resetTime: q.resetTime };
