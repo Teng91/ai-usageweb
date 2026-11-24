@@ -389,6 +389,12 @@ function renderRankings() {
     col.className = 'rank-col';
     const h = document.createElement('h4');
     h.textContent = label;
+    if (key === 'paid') {
+      const hint = document.createElement('span');
+      hint.className = 'rank-hint';
+      hint.textContent = '價格：每百萬 token 輸入 / 輸出';
+      h.append(hint);
+    }
     const ol = document.createElement('ol');
     ol.className = 'rank-list';
     const list = view[key] || [];
@@ -401,8 +407,18 @@ function renderRankings() {
       rk.textContent = String(m.rank);
       const nm = document.createElement('span');
       nm.className = 'nm';
-      nm.textContent = m.name;
-      nm.title = m.slug;
+      const nmText = document.createElement('span');
+      nmText.className = 'nm-text';
+      nmText.textContent = m.name;
+      nmText.title = m.slug;
+      nm.append(nmText);
+      if (m.price) {
+        const pr = document.createElement('span');
+        pr.className = 'pr';
+        pr.textContent = `${usd(m.price.input)} / ${usd(m.price.output)}`;
+        pr.title = `每百萬 token：輸入 ${usd(m.price.input)}、輸出 ${usd(m.price.output)}`;
+        nm.append(pr);
+      }
       const tk = document.createElement('span');
       tk.className = 'tk';
       tk.textContent = tokens(m.tokens);
@@ -419,6 +435,15 @@ function renderRankings() {
     cols.append(col);
   }
   foot.textContent = `依 OpenRouter 全站 token 用量排名 · ${ago(state.rankings.updatedAt)}更新`;
+}
+
+/** 每百萬 token 的價格：$10、$2.5、$0.14、$0.035 */
+function usd(n) {
+  const v = Number(n);
+  if (!Number.isFinite(v)) return '—';
+  if (v === 0) return '$0';
+  if (v >= 1) return `$${Number(v.toFixed(2))}`;
+  return `$${Number(v.toPrecision(2))}`;
 }
 
 function tokens(n) {

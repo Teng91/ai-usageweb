@@ -1,24 +1,9 @@
 {
   "data": [
-    {
-      "id": "openai/gpt-x",
-      "canonical_slug": "openai/gpt-x-20261001",
-      "name": "OpenAI: GPT-X"
-    },
-    {
-      "id": "acme/big",
-      "canonical_slug": "acme/big-20260901",
-      "name": "Acme: Big Model"
-    },
-    {
-      "id": "nvidia/nemo:free",
-      "canonical_slug": "nvidia/nemo-20260604",
-      "name": "NVIDIA: Nemo (free)"
-    },
-    {
-      "id": "openai/gpt-x:batch",
-      "canonical_slug": "openai/gpt-x-20261001",
-      "name": "OpenAI: GPT-X (batch)"
-    }
+    { "id": "openai/gpt-x", "canonical_slug": "openai/gpt-x-20261001", "name": "OpenAI: GPT-X", "pricing": { "prompt": "0.0000025", "completion": "0.00001" } },
+    { "id": "acme/big", "canonical_slug": "acme/big-20260901", "name": "Acme: Big Model", "pricing": { "prompt": "-1", "completion": "-1" } },
+    { "id": "nvidia/nemo:free", "canonical_slug": "nvidia/nemo-20260604", "name": "NVIDIA: Nemo (free)", "pricing": { "prompt": "0", "completion": "0" } },
+    { "id": "nvidia/nemo", "canonical_slug": "nvidia/nemo-20260604", "name": "NVIDIA: Nemo", "pricing": { "prompt": "0.0000005", "completion": "0.0000022" } },
+    { "id": "openai/gpt-x:batch", "canonical_slug": "openai/gpt-x-20261001", "name": "OpenAI: GPT-X (batch)", "pricing": { "prompt": "0.00000125", "completion": "0.000005" } }
   ]
 }

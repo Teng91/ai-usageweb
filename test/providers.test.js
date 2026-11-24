@@ -7,7 +7,7 @@ import claude, { parseClaude, parsePlanExpiry } from '../src/providers/claude.js
 import codex, { parseCodex } from '../src/providers/codex.js';
 import antigravity, { parseModels, tierName, _resetCache } from '../src/providers/antigravity.js';
 import { ProviderError } from '../src/errors.js';
-import { parseRankings, parseModelNames, RankingsService } from '../src/rankings.js';
+import { parseRankings, parseModelCatalog, RankingsService } from '../src/rankings.js';
 
 let mock;
 afterEach(() => {
@@ -42,15 +42,24 @@ test('openrouter: 缺欄位 → parse 錯誤', async () => {
 
 // ---------- OpenRouter 排行榜 ----------
 test('openrouter 排行榜: 免費／付費分開、跨時間桶與變體加總、依 token 排名', () => {
-  const names = parseModelNames(fixture('openrouter-models.json'));
-  assert.equal(names['openai/gpt-x-20261001'], 'GPT-X', '去掉廠商前綴');
-  assert.equal(names['nvidia/nemo-20260604'], 'Nemo', '去掉 (free)');
-  assert.equal(names['openai/gpt-x:batch'], 'GPT-X', '去掉 (batch)，batch 變體不蓋掉一般版名稱');
-  const r = parseRankings(fixture('openrouter-rankings.json'), names);
+  const cat = parseModelCatalog(fixture('openrouter-models.json'));
+  assert.equal(cat['openai/gpt-x-20261001'].name, 'GPT-X', '去掉廠商前綴');
+  assert.equal(cat['nvidia/nemo-20260604'].name, 'Nemo', '去掉 (free)');
+  assert.equal(cat['openai/gpt-x:batch'].name, 'GPT-X', '去掉 (batch)，batch 變體不蓋掉一般版名稱');
+  const r = parseRankings(fixture('openrouter-rankings.json'), cat);
   // 付費：GPT-X standard 1000 + batch 500 = 1500 > Big 1200 > Nemo 付費 10
   assert.deepEqual(r.paid.map((m) => [m.rank, m.name, m.tokens]), [[1, 'GPT-X', 1500], [2, 'Big Model', 1200], [3, 'Nemo', 10]]);
-  // 免費：Nemo 750 + 250 = 1000 > 不認得的模型用 slug 顯示；0 token 的不列
+  // 免費：Nemo 750 + 250 = 1000 > 不認得的模型用 slug 顯示；0 token 的不列；免費不附價格
   assert.deepEqual(r.free.map((m) => [m.rank, m.name, m.tokens]), [[1, 'Nemo', 1000], [2, 'unknown-model', 300]]);
+  assert.equal(r.free[0].price, undefined);
+});
+
+test('openrouter 排行榜: 付費模型附一般版的每百萬 token 價格', () => {
+  const r = parseRankings(fixture('openrouter-rankings.json'), parseModelCatalog(fixture('openrouter-models.json')));
+  const price = Object.fromEntries(r.paid.map((m) => [m.name, m.price]));
+  assert.deepEqual(price['GPT-X'], { input: 2.5, output: 10 }, '用一般版，不是 batch 版的半價');
+  assert.deepEqual(price.Nemo, { input: 0.5, output: 2.2 }, '不是免費版的 0');
+  assert.equal(price['Big Model'], null, '動態計價（-1）不顯示');
 });
 
 test('openrouter 排行榜: 最多 10 名；缺 data → 丟錯', () => {

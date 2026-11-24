@@ -20,17 +20,33 @@ function fallbackName(slug) {
   return last.replace(/-\d{8}$/, '');
 }
 
-/** 模型列表 → { canonical_slug: 顯示名稱 }，名稱去掉「OpenAI: 」這類廠商前綴 */
-export function parseModelNames(data) {
+/** 每 token 的美元字串 → 每百萬 token 美元；負數（動態計價）或不是數字就當沒有 */
+function perMillion(v) {
+  const n = Number(v);
+  if (v === undefined || v === null || v === '' || !Number.isFinite(n) || n < 0) return null;
+  return Math.round(n * 1e6 * 10000) / 10000;
+}
+
+/**
+ * 模型列表 → { canonical_slug 或 id: { name, input, output } }。
+ * 名稱去掉「OpenAI: 」這類廠商前綴；同一個模型的一般、免費、batch 變體共用 canonical_slug，
+ * 名稱去掉變體標記後取第一個；價格（每百萬 token 的輸入／輸出美元）取一般版（id 不帶 :free、:batch）。
+ */
+export function parseModelCatalog(data) {
   const out = {};
   for (const m of Array.isArray(data?.data) ? data.data : []) {
-    // 同一個模型會有一般、免費、batch 幾個變體共用 canonical_slug；名稱去掉變體標記後只取第一個
     const name = typeof m?.name === 'string'
       ? m.name.replace(/^[^:]{1,40}:\s*/, '').replace(/\s*\((free|batch)\)$/i, '')
       : null;
     if (!name) continue;
-    if (m.canonical_slug) out[m.canonical_slug] = out[m.canonical_slug] || name;
-    if (m.id) out[m.id] = out[m.id] || name;
+    const base = typeof m.id === 'string' && !m.id.includes(':');
+    const input = perMillion(m.pricing?.prompt);
+    const output = perMillion(m.pricing?.completion);
+    for (const key of [m.canonical_slug, m.id]) {
+      if (!key) continue;
+      if (!out[key]) out[key] = { name, input: null, output: null };
+      if (base && input !== null && output !== null) Object.assign(out[key], { input, output });
+    }
   }
   return out;
 }
@@ -39,7 +55,7 @@ export function parseModelNames(data) {
  * 排行榜原始資料（每列是某個時間桶裡某模型某變體的用量）→ 免費／付費各前 10 名。
  * 依 prompt＋completion token 總量排名；variant 為 free 的算免費，其餘（standard、batch…）算付費。
  */
-export function parseRankings(data, names = {}) {
+export function parseRankings(data, catalog = {}) {
   const rows = Array.isArray(data?.data) ? data.data : null;
   if (!rows) throw new Error('排行榜回傳缺少 data');
   const totals = { free: new Map(), paid: new Map() };
@@ -54,8 +70,13 @@ export function parseRankings(data, names = {}) {
   const top = (map) => [...map.entries()]
     .sort((a, b) => b[1] - a[1])
     .slice(0, TOP_N)
-    .map(([slug, tokens], i) => ({ rank: i + 1, slug, name: names[slug] || fallbackName(slug), tokens }));
-  return { free: top(totals.free), paid: top(totals.paid) };
+    .map(([slug, tokens], i) => ({ rank: i + 1, slug, name: catalog[slug]?.name || fallbackName(slug), tokens }));
+  // 付費模型附上一般版的價格（每百萬 token 的輸入／輸出美元），查不到就是 null
+  const paid = top(totals.paid).map((m) => {
+    const c = catalog[m.slug];
+    return { ...m, price: c && c.input !== null ? { input: c.input, output: c.output } : null };
+  });
+  return { free: top(totals.free), paid };
 }
 
 /** 有人看時才抓（由 /api/rankings 觸發），每小時最多一次，結果存檔讓冷啟動也有資料 */
@@ -64,8 +85,8 @@ export class RankingsService {
     this.file = path.join(dataDir, 'rankings.json');
     this.now = now;
     this.data = null; // { updatedAt, views: { day: {free, paid}, ... } }
-    this.names = {};
-    this.namesAt = 0;
+    this.catalog = {};
+    this.catalogAt = 0;
     this.lastAttemptAt = 0;
     this.inflight = null;
   }
@@ -98,19 +119,19 @@ export class RankingsService {
   async refresh() {
     this.lastAttemptAt = this.now();
     try {
-      if (this.now() - this.namesAt > MODELS_REFRESH_MS) {
+      if (this.now() - this.catalogAt > MODELS_REFRESH_MS) {
         try {
           const { data } = await requestJson(MODELS_URL, { label: 'OpenRouter 模型列表' });
-          this.names = parseModelNames(data);
-          this.namesAt = this.now();
+          this.catalog = parseModelCatalog(data);
+          this.catalogAt = this.now();
         } catch {
-          // 名稱拿不到就用 slug 顯示，排行照樣更新
+          // 模型列表拿不到就用 slug 顯示、不附價格，排行照樣更新
         }
       }
       const views = {};
       for (const view of VIEWS) {
         const { data } = await requestJson(`${RANKINGS_URL}?view=${view}`, { label: 'OpenRouter 排行榜' });
-        views[view] = parseRankings(data, this.names);
+        views[view] = parseRankings(data, this.catalog);
       }
       this.data = { updatedAt: new Date(this.now()).toISOString(), views };
       await writeFileAtomic(this.file, JSON.stringify(this.data)).catch(() => {});
