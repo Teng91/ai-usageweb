@@ -12,7 +12,8 @@
     "dev": "node --env-file-if-exists=.env.local --watch server.js",
     "test": "node --test",
     "extract-credentials": "node scripts/extract-credentials.js",
-    "antigravity-login": "node --env-file-if-exists=.env.local scripts/antigravity-login.js"
+    "antigravity-login": "node --env-file-if-exists=.env.local scripts/antigravity-login.js",
+    "test:ui": "node scripts/smoke-ui.mjs"
   },
   "license": "MIT"
 }

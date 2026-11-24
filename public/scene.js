@@ -121,22 +121,31 @@ function el(cls, style) {
   return d;
 }
 
-const mapEls = MAPS.map((m) => {
-  const layer = el(`map map-${m.id}`);
-  layer.dataset.map = m.id;
-  for (const it of m.items) {
-    if (it.mon) {
-      const mon = el(`mon mon-${it.mon}${it.small ? ' small' : ''}${it.side ? ' side' : ''}`, it.s);
-      if (it.delay) mon.style.animationDelay = it.delay;
-      mon.dataset.mon = it.mon;
-      layer.append(mon);
-    } else {
-      layer.append(el(it.side ? `${it.cls} side` : it.cls, it.s));
+let mapIndex = 0;
+
+// 地圖圖層等第一次切到冒險風格才建立；選簡約風格的人不會多出這些元素
+const mapEls = [];
+
+function buildMaps() {
+  if (mapEls.length) return;
+  for (const m of MAPS) {
+    const layer = el(`map map-${m.id}`);
+    layer.dataset.map = m.id;
+    for (const it of m.items) {
+      if (it.mon) {
+        const mon = el(`mon mon-${it.mon}${it.small ? ' small' : ''}${it.side ? ' side' : ''}`, it.s);
+        if (it.delay) mon.style.animationDelay = it.delay;
+        mon.dataset.mon = it.mon;
+        layer.append(mon);
+      } else {
+        layer.append(el(it.side ? `${it.cls} side` : it.cls, it.s));
+      }
     }
+    sceneEl.insertBefore(layer, flies); // 地圖在勇者、傳送點、螢火蟲的下面
+    mapEls.push(layer);
   }
-  sceneEl.append(layer);
-  return layer;
-});
+  mapEls.forEach((m, j) => m.classList.toggle('active', j === mapIndex));
+}
 
 const flies = el('sc-flies');
 for (let i = 1; i <= 6; i++) flies.append(el(`sc-fly f${i}`));
@@ -154,7 +163,6 @@ plaque.setAttribute('aria-live', 'polite');
 document.body.append(plaque);
 
 // ---------- 換地圖 ----------
-let mapIndex = 0;
 
 function showMap(i, { announce = true } = {}) {
   mapIndex = (i + MAPS.length) % MAPS.length;
@@ -179,6 +187,7 @@ function heroTargetX() {
 }
 
 function startWalk() {
+  if (isAdventure()) buildMaps();
   clearTimeout(walkTimer);
   warping = false;
   hero.classList.remove('warp', 'walking');

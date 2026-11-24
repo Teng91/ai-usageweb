@@ -10,6 +10,7 @@ import { SseHub } from './src/sse.js';
 import { Poller } from './src/poller.js';
 import { loadProviders } from './src/providers/index.js';
 import { RankingsService } from './src/rankings.js';
+import { HistoryStore } from './src/history.js';
 import { logInfo, logWarn } from './src/log.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
@@ -42,6 +43,7 @@ export async function createApp(opts = {}) {
   }).load();
 
   const rankings = await new RankingsService({ dataDir: cfg.dataDir }).load();
+  const history = await new HistoryStore({ dataDir: cfg.dataDir, tz: cfg.historyTz }).load();
 
   // 啟動時先把沒設定憑證的標成 disabled，前端就不會顯示空卡片
   for (const p of providers) {
@@ -62,6 +64,7 @@ export async function createApp(opts = {}) {
     broadcast: (event, data) => hub.broadcast(event, data),
     pollIntervalSec: cfg.pollIntervalSec,
     idleGraceSec: cfg.idleGraceSec,
+    onResult: (id, result) => history.record(id, result),
   });
 
   const server = http.createServer((req, res) => {
@@ -95,6 +98,11 @@ export async function createApp(opts = {}) {
     if (p === '/api/rankings' && req.method === 'GET') {
       // OpenRouter 全站模型排行（公開資料，每小時最多抓一次）
       return sendJson(res, 200, (await rankings.get()) || { updatedAt: null, views: null }, { 'Cache-Control': 'no-store' });
+    }
+
+    if (p === '/api/history' && req.method === 'GET') {
+      // 每日最高用量（只有百分比與餘額）
+      return sendJson(res, 200, history.view(30), { 'Cache-Control': 'no-store' });
     }
 
     if (p === '/api/stream' && req.method === 'GET') {
@@ -163,6 +171,7 @@ export async function createApp(opts = {}) {
     poller.stop();
     hub.closeAll();
     await snapshot.save();
+    await history.save().catch(() => {});
     await snapshot.flush();
     await new Promise((r) => server.close(() => r()));
   }

@@ -142,6 +142,8 @@ export class CredentialStore {
       this.creds[id] = prev;
       throw err;
     }
+    // 只記服務名稱，方便從 log 確認伺服器有自己續期（不記 token）
+    logInfo('憑證已續期並寫入', { provider: id });
   }
 
   /** 管理 API：整份替換某一家的憑證（視為新登入） */

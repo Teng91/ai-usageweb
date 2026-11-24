@@ -10,6 +10,9 @@ const SSE_RETRY_EVERY = 10;
 // OpenRouter 模型排行：伺服器每小時才更新，前端 10 分鐘問一次就夠
 const RANKINGS_POLL_MS = 10 * 60_000;
 const RANK_VIEWS = [['day', '每天'], ['week', '每週'], ['month', '每月']];
+// 歷史用量：每張卡片的額度條下面畫近 30 天每日最高用量的小長條圖
+const HISTORY_POLL_MS = 30 * 60_000;
+const SPARK_DAYS = 30;
 // 打開頁面後這段時間內，舊資料視為「更新中」而不是「過期」（伺服器剛喚醒正在抓）
 const WAKE_WINDOW_MS = 90_000;
 // 喚醒超過這麼久才在右上角顯示「喚醒伺服器…」，避免熱機時閃一下
@@ -37,6 +40,8 @@ const state = {
   rankingsLoadedAt: 0,
   rankingsFailed: false,
   rankView: readRankView(),
+  history: null,
+  historyLoadedAt: 0,
   offline: !navigator.onLine,
 };
 
@@ -156,6 +161,7 @@ function stopFallback() {
 
 async function start() {
   if (Date.now() - state.rankingsLoadedAt > RANKINGS_POLL_MS) loadRankings();
+  if (Date.now() - state.historyLoadedAt > HISTORY_POLL_MS) loadHistory();
   state.sessionStart = Date.now();
   state.waking = true;
   const slowTimer = setTimeout(() => { state.slowWake = true; renderChrome(); }, SLOW_WAKE_MS);
@@ -284,7 +290,7 @@ function renderCard(p) {
     bal.append(renderBalance(p.balance));
     body.append(bal);
   } else if (p.windows?.length) {
-    for (const w of p.windows) body.append(renderWindow(w));
+    for (const w of p.windows) body.append(renderWindow(w, p.id));
   } else if (p.note) {
     const n = document.createElement('p');
     n.className = 'note';
@@ -335,6 +341,84 @@ function gameEffects(el, p) {
     n.addEventListener('animationend', () => n.remove());
   }
 
+}
+
+// ---------- 歷史用量 ----------
+async function loadHistory() {
+  state.historyLoadedAt = Date.now();
+  try {
+    const res = await fetch(withKey('/api/history'), { cache: 'no-store' });
+    if (!res.ok) throw new Error(String(res.status));
+    const data = await res.json();
+    if (Array.isArray(data?.days)) {
+      state.history = data;
+      renderAll();
+    }
+  } catch {
+    // 拿不到就不畫，不影響其他資料
+  }
+}
+
+setInterval(() => {
+  if (document.visibilityState === 'visible') loadHistory();
+}, HISTORY_POLL_MS);
+
+/** 'YYYY-MM-DD' 往前推 n 天 */
+function shiftDay(ymd, n) {
+  const [y, m, d] = ymd.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d - n)).toISOString().slice(0, 10);
+}
+
+function todayIn(tz) {
+  try {
+    return new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+  } catch {
+    return new Date().toISOString().slice(0, 10);
+  }
+}
+
+/** 近 30 天每日最高用量的小長條圖；有資料的日子少於 2 天就不畫 */
+function renderSpark(providerId, w) {
+  const h = state.history;
+  if (!h?.days?.length || !providerId) return null;
+  const byDate = new Map(h.days.map((d) => [d.date, d.providers?.[providerId]?.[w.id]]));
+  const today = todayIn(h.tz || 'Asia/Taipei');
+  const values = [];
+  for (let i = SPARK_DAYS - 1; i >= 0; i--) {
+    const date = shiftDay(today, i);
+    let v = byDate.get(date);
+    // 今天的長條跟著即時數字走
+    if (i === 0) v = Math.max(Number.isFinite(v) ? v : 0, Number(w.usedPct) || 0);
+    values.push([date, Number.isFinite(v) ? v : null]);
+  }
+  const known = values.filter(([, v]) => v !== null);
+  if (known.length < 2) return null;
+
+  const rowEl = document.createElement('div');
+  rowEl.className = 'spark-row';
+  const cap = document.createElement('span');
+  cap.className = 'spark-cap';
+  cap.textContent = '近 30 天';
+  const box = document.createElement('div');
+  box.className = 'spark';
+  const peak = Math.max(...known.map(([, v]) => v));
+  box.setAttribute('role', 'img');
+  box.setAttribute('aria-label', `${w.label} 近 30 天每日最高用量，最高 ${Math.round(peak)}%，有資料 ${known.length} 天`);
+  for (const [date, v] of values) {
+    const b = document.createElement('span');
+    const md = `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))}`;
+    if (v === null) {
+      b.className = 'sp none';
+      b.title = `${md}：沒有資料`;
+    } else {
+      b.className = v >= 90 ? 'sp danger' : v >= 70 ? 'sp warn' : 'sp';
+      b.style.height = `${Math.max(6, Math.min(100, v))}%`;
+      b.title = `${md}：最高 ${Math.round(v * 10) / 10}%`;
+    }
+    box.append(b);
+  }
+  rowEl.append(cap, box);
+  return rowEl;
 }
 
 // ---------- OpenRouter 模型排行 ----------
@@ -521,7 +605,7 @@ function renderBalance(b) {
   return frag;
 }
 
-function renderWindow(w) {
+function renderWindow(w, providerId) {
   const wrap = document.createElement('div');
   wrap.className = 'win';
   const pct = Math.round(w.usedPct);
@@ -552,6 +636,8 @@ function renderWindow(w) {
   sub.dataset.resetsAt = w.resetsAt || '';
 
   wrap.append(row, bar, sub);
+  const spark = renderSpark(providerId, w);
+  if (spark) wrap.append(spark);
   return wrap;
 }
 

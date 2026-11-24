@@ -2,7 +2,7 @@
 
 一個打開就看得到 AI 服務本期還剩多少的 PWA：**Claude Pro、Codex（ChatGPT）、Antigravity、GitHub Copilot** 的額度，加上 **OpenRouter** 餘額。電腦、手機瀏覽器都能看，手機可以「加到主畫面」當 App。
 
-部署在 fly.io：**有人打開才喚醒機器**，開著時每 60 秒更新並用 SSE 推到畫面上；沒人看幾分鐘後機器自動停掉，不計費。
+部署在 fly.io：**有人打開才喚醒機器**，開著時每 60 秒更新並用 SSE 推到畫面上；沒人看幾分鐘後機器自動暫停（suspend，下次喚醒只要幾百毫秒），不收 CPU／記憶體費用。
 
 - Node 22、零相依套件（`node:http`、內建 `fetch`、`node:crypto`、`node:test`）
 - 前端是純 HTML＋CSS＋原生 JS，沒有打包
@@ -14,7 +14,8 @@
 
 ```
 瀏覽器 ──GET /api/usage──▶ server.js ──▶ snapshot.js（記憶體＋/data/snapshot.json）
-       ◀──SSE /api/stream──   │
+       ◀──SSE /api/stream──   │    ├─▶ rankings.js（OpenRouter 排行，/data/rankings.json）
+                              │    └─▶ history.js（每日最高用量，/data/history.json）
                               ▼
                           poller.js（觀看者計數、每家排程、退避）
                               │ 有人看才跑，每 60 秒
@@ -31,10 +32,13 @@
 | `GET /api/usage` | 目前快照；也算「有人在看」 | 公開（或 `ACCESS_KEY`） |
 | `GET /api/stream` | SSE：先送 `snapshot`，之後每家 `provider`；25 秒 `: ping` | 公開（或 `ACCESS_KEY`） |
 | `GET /api/rankings` | OpenRouter 全站模型排行（每天／每週／每月，免費與付費各前 10 名，依 token 用量；付費附每百萬 token 輸入／輸出價格）；資料來自 OpenRouter 排行榜頁面的非官方端點，每小時最多抓一次 | 公開（或 `ACCESS_KEY`） |
+| `GET /api/history` | 近 30 天每日最高用量（每個額度窗口的最高 %、OpenRouter 當天餘額）；只在有人看時記錄，沒人看的日子是空的 | 公開（或 `ACCESS_KEY`） |
 | `GET /healthz` | 健康檢查，不觸發輪詢 | 公開 |
 | `POST /admin/refresh` | 立刻重抓（仍受每家最短間隔限制） | `ADMIN_TOKEN` |
 | `PUT /admin/credentials/:provider` | 替換某一家的憑證（JSON body） | `ADMIN_TOKEN` |
 | `GET /admin/status` | 各家錯誤種類、下次抓取、token 到期時間（不含 token） | `ADMIN_TOKEN` |
+
+SSE 被擋時（例如公司 proxy 會卡住串流），前端 6 秒內沒連上就改成每 30 秒輪詢 `/api/usage`，右上角顯示「自動更新」。
 
 錯誤處理：429 依 `Retry-After` 或 60→120→240→最多 900 秒退避（卡片保留舊數字並標「更新放慢」）；401 先續期再重試一次；續期失敗標「需要重新登入」並停止那一家；403／Cloudflare 這次觀看期間不再試；網路／5xx 退避最多 300 秒；格式變了每 300 秒試一次。
 
@@ -56,6 +60,12 @@ npm run dev
 
 ```powershell
 npm test
+```
+
+前端 smoke test（用假資料起本機伺服器，開本機的 Chrome／Edge 實際操作畫面：卡片、排行、歷史小長條圖、亮暗與風格切換、四季地圖、只看風景、手機版）。需要本機有 Chrome 或 Edge，或設 `CHROME_PATH`：
+
+```powershell
+npm run test:ui
 ```
 
 `test/fixtures/` 目前是依照規格欄位寫的**假資料**；拿到各家真實回傳（去掉 email、帳號 ID）後請替換掉。
@@ -124,7 +134,7 @@ fly volumes create usage_data --size 1 --region sin
 fly deploy
 ```
 
-打開 `https://ai-usageweb.fly.dev`，`fly logs` 會看到每家一行 JSON 抓取紀錄。關掉網頁等 5–10 分鐘，`fly machine list` 應該是 `stopped`。
+打開 `https://ai-usageweb.fly.dev`，`fly logs` 會看到每家一行 JSON 抓取紀錄（續期成功會多一行「憑證已續期並寫入」）。關掉網頁等 5–10 分鐘，`fly machine list` 應該是 `suspended`；部署或主機搬移後的第一次喚醒仍是一般冷啟動。
 
 自動部署：`fly tokens create deploy` 產生 token，存成 GitHub repo secret `FLY_API_TOKEN`，之後推到 `main` 會先跑 `npm test` 再 `fly deploy`。
 
@@ -142,10 +152,24 @@ curl.exe -X PUT https://ai-usageweb.fly.dev/admin/credentials/claude -H "Authori
 
 設 `ACCESS_KEY`，第一次用 `https://ai-usageweb.fly.dev/?k=<ACCESS_KEY>` 打開，之後記在 cookie。
 
+## 畫面
+
+- **兩種風格**（右上角旗子按鈕切換，會記住）：
+  - 簡約：深藍細線的資料儀表板風格
+  - 冒險：原創的像素 RPG 風格，春夏秋冬四張地圖輪流（小勇者走進右邊的傳送點就換下一季）、會動的原創怪物（點了會跳）、用量上升時卡片跳出「+N%」、額度用到 90% 以上冒「快用完了！」
+- **亮色／暗色**（太陽／月亮按鈕）：沒選過就跟隨系統；冒險風格裡是白天／夜晚
+- **只看風景**（冒險風格的山形按鈕或 B 鍵）：收起所有卡片只留場景，按「顯示用量」、Esc 或點兩下背景回來
+- **快捷鍵**（冒險風格）：B 只看風景、M 換地圖、T 白天／夜晚、S 換風格
+- **近 30 天小長條圖**：每個額度條下面，一天一格、顯示當天最高用量，最右邊是今天
+- **OpenRouter 熱門模型**：免費／付費前 10 名（每天／每週／每月），付費附每百萬 token 價格
+- **Claude 到期日**：設 `CLAUDE_PLAN_EXPIRES_AT=YYYY-MM-DD`，剩 30 天內變橘色
+
+冒險風格的像素圖全部是原創點陣，放在 `public/pixel/`，由 `scripts/gen-pixel-art.mjs` 從文字點陣產生；要改角色就改點陣再執行 `node scripts/gen-pixel-art.mjs`。
+
 ## 加到主畫面
 
-- iPhone：Safari → 分享 → 加入主畫面
-- Android：Chrome 會跳安裝提示，或點頁面右上的「安裝」
+- iPhone／iPad：瀏覽器的「分享」→「加入主畫面」（頁面頂端會提示，按「知道了」就不再出現）
+- Android、電腦的 Chrome／Edge：點頁面右上的「安裝」（瀏覽器支援時才會出現）
 
 離線時會顯示上次的數字並標示「離線」。部署新版後頁面頂端會出現「有新版本，點此重新載入」（改前端檔案時記得把 `public/sw.js` 的 `CACHE` 版本號 +1）。
 
@@ -155,11 +179,17 @@ curl.exe -X PUT https://ai-usageweb.fly.dev/admin/credentials/claude -H "Authori
 server.js                 HTTP、SSE、靜態檔、管理 API
 src/poller.js             觀看者計數、每家排程、退避、共用 in-flight Promise
 src/snapshot.js           記憶體快照、/data/snapshot.json 原子寫入
+src/rankings.js           OpenRouter 模型排行（每小時最多抓一次）
+src/history.js            每日最高用量歷史（保留 45 天）
 src/credentials.js        環境變數＋加密 volume、每家續期鎖
 src/sse.js                SSE 連線、ping、廣播、連線上限 30 分鐘
 src/http.js               對外請求、錯誤分類、Cloudflare 偵測
 src/providers/*.js        五家 adapter（統一輸出 { plan, windows, balance, note }）
 public/                   PWA（index.html、app.js、style.css、sw.js、manifest、icons）
-scripts/                  extract-credentials.js、antigravity-login.js
+public/theme.js           畫面出現前套用亮暗與風格（CSP 不允許內嵌 script）
+public/skin-adventure.css 冒險風格（只在 data-skin="adventure" 生效）
+public/scene.js           冒險風格的四季場景、傳送點、怪物互動、只看風景、快捷鍵
+public/pixel/             原創像素圖（由 scripts/gen-pixel-art.mjs 產生）
+scripts/                  extract-credentials.js、antigravity-login.js、setup-antigravity.ps1、gen-pixel-art.mjs、smoke-ui.mjs
 test/                     node:test＋假 fetch＋fixtures
 ```
