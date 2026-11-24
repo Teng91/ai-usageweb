@@ -15,6 +15,9 @@
   --ok: #4d8dff;
   --warn: #f0b429;
   --danger: #f2616d;
+  --bar-ok: #4d8dff;
+  --bar-warn: #f0b429;
+  --bar-danger: #f2616d;
   --live: #3ecf8e;
   --idle: #4a5674;
   --radius: 8px;
@@ -35,12 +38,15 @@
     --text: #0f172a;
     --text-2: #475569;
     --muted: #7b879e;
-    --track: #e7ecf4;
+    --track: #e8edf4;
     --accent: #2f6fec;
     --accent-soft: rgba(47, 111, 236, 0.1);
     --ok: #2f6fec;
     --warn: #c98a04;
     --danger: #dc3545;
+    --bar-ok: #3b82f6;
+    --bar-warn: #f59e0b;
+    --bar-danger: #ef4444;
     --live: #12a26b;
     --idle: #a6b0c3;
     color-scheme: light;
@@ -57,12 +63,15 @@
   --text: #0f172a;
   --text-2: #475569;
   --muted: #7b879e;
-  --track: #e7ecf4;
+  --track: #e8edf4;
   --accent: #2f6fec;
   --accent-soft: rgba(47, 111, 236, 0.1);
   --ok: #2f6fec;
   --warn: #c98a04;
   --danger: #dc3545;
+  --bar-ok: #3b82f6;
+  --bar-warn: #f59e0b;
+  --bar-danger: #ef4444;
   --live: #12a26b;
   --idle: #a6b0c3;
   color-scheme: light;
@@ -348,12 +357,12 @@ button {
   display: block;
   height: 100%;
   border-radius: 2px;
-  background: var(--ok);
+  background: var(--bar-ok);
   transition: width 0.5s ease;
 }
 
-.bar.warn > span { background: var(--warn); }
-.bar.danger > span { background: var(--danger); }
+.bar.warn > span { background: var(--bar-warn); }
+.bar.danger > span { background: var(--bar-danger); }
 
 .win-sub {
   font-size: 0.74rem;
