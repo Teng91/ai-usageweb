@@ -2,7 +2,6 @@
 // 畫面在 ui/cards.js，其他功能各自在 ui/ 底下的模組
 import { state, withKey } from './ui/dom.js';
 import { renderAll, renderCard, renderEmpty, renderChrome, startTicker } from './ui/cards.js';
-import { initHistory, refreshHistoryIfStale } from './ui/history.js';
 import { initRankings, refreshRankingsIfStale } from './ui/rankings.js';
 import { initThemeToggle } from './ui/theme-toggle.js';
 import { initPwa } from './ui/pwa.js';
@@ -129,7 +128,6 @@ function stopFallback() {
 
 async function start() {
   refreshRankingsIfStale();
-  refreshHistoryIfStale();
   state.sessionStart = Date.now();
   state.waking = true;
   const slowTimer = setTimeout(() => { state.slowWake = true; renderChrome(); }, SLOW_WAKE_MS);
@@ -169,6 +167,5 @@ window.addEventListener('offline', () => { state.offline = true; renderChrome();
 initThemeToggle();
 initPwa();
 initRankings();
-initHistory(renderAll);
 startTicker();
 start();

@@ -2,7 +2,6 @@
 import { $, ORDER, STALE_INTERVALS, WAKE_WINDOW_MS, state, visible } from './dom.js';
 import { money, ago, resetText } from './format.js';
 import { gameEffects } from './effects.js';
-import { renderSpark } from './history.js';
 import { rankingsEl } from './rankings.js';
 
 const cardsEl = $('cards');
@@ -97,7 +96,7 @@ export function renderCard(p) {
     bal.append(renderBalance(p.balance));
     body.append(bal);
   } else if (p.windows?.length) {
-    for (const w of p.windows) body.append(renderWindow(w, p.id));
+    for (const w of p.windows) body.append(renderWindow(w));
   } else if (p.note) {
     body.append(note(p.note));
   } else if (!p.fetchedAt) {
@@ -149,7 +148,7 @@ function renderBalance(b) {
   return frag;
 }
 
-function renderWindow(w, providerId) {
+function renderWindow(w) {
   const wrap = document.createElement('div');
   wrap.className = 'win';
   const pct = Math.round(w.usedPct);
@@ -180,8 +179,6 @@ function renderWindow(w, providerId) {
   sub.dataset.resetsAt = w.resetsAt || '';
 
   wrap.append(row, bar, sub);
-  const spark = renderSpark(providerId, w);
-  if (spark) wrap.append(spark);
   return wrap;
 }
 

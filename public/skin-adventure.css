@@ -550,12 +550,3 @@
   /* 場景動畫在上面已關掉 */
   [data-skin="adventure"] .card:hover { transform: none; }
 }
-
-/* 近 30 天小長條圖：冒險風格用黃色立體條 */
-[data-skin="adventure"] .spark { border-bottom: 2px solid var(--frame); }
-[data-skin="adventure"] .sp { background: linear-gradient(180deg, #ffe680, #f0a500); opacity: 0.75; border-radius: 2px 2px 0 0; }
-[data-skin="adventure"] .sp.warn { background: linear-gradient(180deg, #ffc56b, #f08c00); }
-[data-skin="adventure"] .sp.danger { background: linear-gradient(180deg, #ff9a9a, #d11f2a); }
-[data-skin="adventure"] .sp.none { background: var(--line-strong); }
-[data-skin="adventure"] .sp:last-child, [data-skin="adventure"] .sp:hover { opacity: 1; }
-[data-skin="adventure"] .spark-cap { font-weight: 700; }

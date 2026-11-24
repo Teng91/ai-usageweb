@@ -8,6 +8,7 @@ import { CredentialStore } from '../src/credentials.js';
 import { SnapshotStore } from '../src/snapshot.js';
 import { Poller } from '../src/poller.js';
 import { ProviderError } from '../src/errors.js';
+import { requestJson } from '../src/http.js';
 
 const KEY = crypto.randomBytes(32).toString('base64');
 
@@ -226,4 +227,17 @@ test('poller: 抓取中再觸發共用同一個 Promise', async () => {
   await a;
   assert.equal(n, 1);
   void p;
+});
+
+test('http: 讀回應內容時出錯（例如逾時）算網路錯誤，不是「回傳不是 JSON」', async () => {
+  const original = globalThis.fetch;
+  globalThis.fetch = async () => new Response(
+    new ReadableStream({ start(c) { c.error(new Error('boom')); } }),
+    { status: 200, headers: { 'content-type': 'application/json' } },
+  );
+  try {
+    await assert.rejects(requestJson('https://example.test/', { label: 'Codex ' }), (e) => e.kind === 'network' && e.message === 'Codex 讀取回應失敗');
+  } finally {
+    globalThis.fetch = original;
+  }
 });

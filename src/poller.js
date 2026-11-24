@@ -13,9 +13,8 @@ const TICK_MS = 1000;
  *  - 每家各自的排程、退避、共用 in-flight Promise；兩次請求至少隔 minIntervalSec
  */
 export class Poller {
-  constructor({ providers, creds, snapshot, broadcast, pollIntervalSec, idleGraceSec, onResult = () => {}, now = Date.now, random = Math.random }) {
+  constructor({ providers, creds, snapshot, broadcast, pollIntervalSec, idleGraceSec, now = Date.now, random = Math.random }) {
     this.providers = providers;
-    this.onResult = onResult;
     this.creds = creds;
     this.snapshot = snapshot;
     this.broadcast = broadcast;
@@ -194,7 +193,6 @@ export class Poller {
       s.lastErrorKind = null;
       s.lastHttpStatus = 200;
       s.nextAt = this.now() + interval * 1000;
-      try { this.onResult(p.id, result); } catch { /* 歷史紀錄失敗不影響更新 */ }
       this.#publish(p.id, {
         status: 'ok',
         plan: result.plan ?? this.snapshot.entry(p.id).plan,

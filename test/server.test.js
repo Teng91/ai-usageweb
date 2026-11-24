@@ -67,15 +67,6 @@ test('GET /api/usage 回快照，並喚醒輪詢；未設定的服務標 disable
   assert.equal(after.balance.remaining, 7.42);
 });
 
-test('GET /api/history 回每日用量（時區、今天、日期陣列）', async () => {
-  const res = await realFetch(`${base}/api/history`);
-  assert.equal(res.status, 200);
-  const body = await res.json();
-  assert.equal(body.tz, 'Asia/Taipei');
-  assert.match(body.today, /^\d{4}-\d{2}-\d{2}$/);
-  assert.ok(Array.isArray(body.days));
-});
-
 test('GET /api/stream 先送 snapshot', async () => {
   const ctrl = new AbortController();
   const res = await realFetch(`${base}/api/stream`, { signal: ctrl.signal });

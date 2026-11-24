@@ -14,8 +14,7 @@
 
 ```
 瀏覽器 ──GET /api/usage──▶ server.js ──▶ snapshot.js（記憶體＋/data/snapshot.json）
-       ◀──SSE /api/stream──   │    ├─▶ rankings.js（OpenRouter 排行，/data/rankings.json）
-                              │    └─▶ history.js（每日最高用量，/data/history.json）
+       ◀──SSE /api/stream──   │    └─▶ rankings.js（OpenRouter 排行，/data/rankings.json）
                               ▼
                           poller.js（觀看者計數、每家排程、退避）
                               │ 有人看才跑，每 2 分鐘
@@ -32,7 +31,6 @@
 | `GET /api/usage` | 目前快照；也算「有人在看」 | 公開（或 `ACCESS_KEY`） |
 | `GET /api/stream` | SSE：先送 `snapshot`，之後每家 `provider`；25 秒 `: ping` | 公開（或 `ACCESS_KEY`） |
 | `GET /api/rankings` | OpenRouter 全站模型排行（每天／每週／每月，免費與付費各前 10 名，依 token 用量；付費附每百萬 token 輸入／輸出價格）；資料來自 OpenRouter 排行榜頁面的非官方端點，每小時最多抓一次 | 公開（或 `ACCESS_KEY`） |
-| `GET /api/history` | 近 30 天每日最高用量（每個額度窗口的最高 %、OpenRouter 當天餘額）；只在有人看時記錄，沒人看的日子是空的 | 公開（或 `ACCESS_KEY`） |
 | `GET /healthz` | 健康檢查，不觸發輪詢 | 公開 |
 | `POST /admin/refresh` | 立刻重抓（仍受每家最短間隔限制） | `ADMIN_TOKEN` |
 | `PUT /admin/credentials/:provider` | 替換某一家的憑證（JSON body） | `ADMIN_TOKEN` |
@@ -62,7 +60,7 @@ npm run dev
 npm test
 ```
 
-前端 smoke test（用假資料起本機伺服器，開本機的 Chrome／Edge 實際操作畫面：卡片、排行、歷史小長條圖、亮暗與風格切換、四季地圖、只看風景、手機版）。需要本機有 Chrome 或 Edge，或設 `CHROME_PATH`：
+前端 smoke test（用假資料起本機伺服器，開本機的 Chrome／Edge 實際操作畫面：卡片、排行、亮暗與風格切換、四季地圖、只看風景、手機版）。需要本機有 Chrome 或 Edge，或設 `CHROME_PATH`：
 
 ```powershell
 npm run test:ui
@@ -160,7 +158,6 @@ curl.exe -X PUT https://ai-usageweb.fly.dev/admin/credentials/claude -H "Authori
 - **亮色／暗色**（太陽／月亮按鈕）：沒選過就跟隨系統；冒險風格裡是白天／夜晚
 - **只看風景**（冒險風格的山形按鈕或 B 鍵）：收起所有卡片只留場景，按「顯示用量」、Esc 或點兩下背景回來
 - **快捷鍵**（冒險風格）：B 只看風景、M 換地圖、T 白天／夜晚、S 換風格
-- **近 30 天小長條圖**：每個額度條下面，一天一格、顯示當天最高用量，最右邊是今天
 - **OpenRouter 熱門模型**：免費／付費前 10 名（每天／每週／每月），付費附每百萬 token 價格
 - **Claude 到期日**：設 `CLAUDE_PLAN_EXPIRES_AT=YYYY-MM-DD`，剩 30 天內變橘色
 
@@ -180,14 +177,13 @@ server.js                 HTTP、SSE、靜態檔、管理 API
 src/poller.js             觀看者計數、每家排程、退避、共用 in-flight Promise
 src/snapshot.js           記憶體快照、/data/snapshot.json 原子寫入
 src/rankings.js           OpenRouter 模型排行（每小時最多抓一次）
-src/history.js            每日最高用量歷史（保留 45 天）
 src/credentials.js        環境變數＋加密 volume、每家續期鎖
 src/sse.js                SSE 連線、ping、廣播、連線上限 30 分鐘
 src/http.js               對外請求、錯誤分類、Cloudflare 偵測
 src/providers/*.js        五家 adapter（統一輸出 { plan, windows, balance, note }）
 public/                   PWA（index.html、style.css、sw.js、manifest、icons）
 public/app.js             前端進入點：資料與連線（快照、SSE、SSE 被擋時改輪詢）
-public/ui/                前端模組：cards（卡片）、rankings（排行）、history（小長條圖）、effects（冒險效果）、
+public/ui/                前端模組：cards（卡片）、rankings（排行）、effects（冒險效果）、
                           theme-toggle（亮暗與風格）、pwa（離線與安裝）、format、dom（共用狀態）
 public/theme.js           畫面出現前套用亮暗與風格（CSP 不允許內嵌 script）
 public/skin-adventure.css 冒險風格的卡片、按鈕與遊戲介面（只在 data-skin="adventure" 生效）

@@ -22,8 +22,6 @@ const providers = (claude5h) => [
   { ...base, id: 'copilot', name: 'GitHub Copilot', plan: 'Free', windows: [{ id: 'chat', label: 'Chat', usedPct: 1, used: 2, limit: 200, resetsAt: iso(7 * 86400e3) }] },
   { ...base, id: 'openrouter', name: 'OpenRouter', plan: '預付', windows: [], balance: { currency: 'USD', remaining: -0.2, total: 10, used: 10.2 } },
 ];
-const day = (n) => new Date(now - n * 86400e3).toISOString().slice(0, 10);
-const history = { tz: 'UTC', today: day(0), days: [3, 2, 1, 0].map((n) => ({ date: day(n), providers: { claude: { '5h': 10 + n * 10, '7d': 5 + n } } })) };
 const rank = (prefix, paid) => Array.from({ length: 10 }, (_, i) => ({ rank: i + 1, slug: `${prefix}/m${i}`, name: `${prefix} 模型 ${i + 1}`, tokens: 1e12 / (i + 1), ...(paid ? { price: { input: 0.5, output: 2 } } : {}) }));
 const rankings = { version: 2, updatedAt: iso(-60e3), views: Object.fromEntries(['day', 'week', 'month'].map((v) => [v, { free: rank('free', false), paid: rank('paid', true) }])) };
 
@@ -32,7 +30,6 @@ const server = http.createServer((req, res) => {
   const u = new URL(req.url, 'http://x');
   const json = (o) => { res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify(o)); };
   if (u.pathname === '/api/usage') return json({ version: 1, pollIntervalSec: 60, providers: providers(30) });
-  if (u.pathname === '/api/history') return json(history);
   if (u.pathname === '/api/rankings') return json(rankings);
   if (u.pathname === '/api/stream') {
     res.writeHead(200, { 'content-type': 'text/event-stream' });
@@ -101,8 +98,6 @@ async function main() {
     check('SSE 連上顯示「即時」', (await ev(`document.getElementById('conn-text').textContent`)) === '即時');
     check('排行榜免費／付費各 10 名', (await ev(`[...document.querySelectorAll('.rank-list')].map((l) => l.children.length).join(',')`)) === '10,10');
     check('付費排行有價格', (await ev(`document.querySelector('.rank-col.paid .rank-list .pr')?.textContent`)) === '$0.5 / $2');
-    check('歷史小長條圖出現（Claude 有 30 格）', (await ev(`document.querySelector('.card[data-id="claude"] .spark')?.children.length`)) === 30);
-    check('沒資料的服務不畫小長條圖', (await ev(`!document.querySelector('.card[data-id="codex"] .spark')`)) === true);
     check('Codex 95% 有「快用完了！」泡泡（元素存在）', (await ev(`!!document.querySelector('.card[data-id="codex"] .alert-bubble:not([hidden])')`)) === true);
     check('簡約風格不建立場景地圖', (await ev(`document.querySelectorAll('.scene .map').length`)) === 0);
     check('Claude 到期日', /2027\/11\/4 到期/.test(await ev(`document.querySelector('.card[data-id="claude"] .plan-exp').textContent`)));

@@ -22,7 +22,14 @@ export async function requestJson(url, { method = 'GET', headers = {}, body, sig
     throw new ProviderError('network', timedOut ? `${label}逾時`.trim() : `${label}連線失敗`.trim());
   }
 
-  const text = await res.text().catch(() => '');
+  // 讀回應內容時逾時或斷線（伺服器回得很慢）要算網路錯誤，不能當成「回傳不是 JSON」
+  let text;
+  try {
+    text = await res.text();
+  } catch (err) {
+    const timedOut = err?.name === 'TimeoutError' || timeout.aborted;
+    throw new ProviderError('network', timedOut ? `${label}逾時`.trim() : `${label}讀取回應失敗`.trim(), { httpStatus: res.status });
+  }
   const contentType = res.headers.get('content-type') || '';
   const looksHtml = contentType.includes('text/html') || /^\s*</.test(text);
   const cloudflare = looksHtml && /cloudflare|cf-chl|cf-ray|challenge-platform/i.test(text)

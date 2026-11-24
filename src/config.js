@@ -10,8 +10,6 @@ export const config = {
   dataDir: path.resolve(process.env.DATA_DIR || './data'),
   pollIntervalSec: int('POLL_INTERVAL_SEC', 120),
   idleGraceSec: int('IDLE_GRACE_SEC', 90),
-  // 歷史用量以哪個時區的日期分天
-  historyTz: process.env.HISTORY_TZ || 'Asia/Taipei',
   requestTimeoutMs: int('REQUEST_TIMEOUT_MS', 10_000),
   sseMaxAgeSec: int('SSE_MAX_AGE_SEC', 30 * 60),
   ssePingSec: int('SSE_PING_SEC', 25),

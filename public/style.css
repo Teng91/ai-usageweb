@@ -398,45 +398,6 @@ button {
   font-variant-numeric: tabular-nums;
 }
 
-/* 近 30 天每日最高用量：細長條，最右邊是今天；沒資料的日子只畫一條底線 */
-.spark-row {
-  display: flex;
-  align-items: flex-end;
-  gap: 8px;
-  margin-top: 6px;
-}
-
-.spark-cap {
-  flex: none;
-  font-size: 0.66rem;
-  color: var(--muted);
-  line-height: 1;
-}
-
-.spark {
-  flex: 1;
-  display: flex;
-  align-items: flex-end;
-  gap: 2px;
-  height: 22px;
-  border-bottom: 1px solid var(--line-soft);
-}
-
-.sp {
-  flex: 1;
-  min-width: 2px;
-  background: var(--bar-ok);
-  border-radius: 1px 1px 0 0;
-  opacity: 0.5;
-  transition: opacity 0.15s;
-}
-
-.sp.warn { background: var(--bar-warn); }
-.sp.danger { background: var(--bar-danger); }
-.sp.none { height: 1px; background: var(--line-strong); opacity: 0.6; }
-.sp:last-child { opacity: 1; }
-.sp:hover { opacity: 1; }
-
 .card-status {
   margin: 0 0 12px;
   font-size: 0.8rem;
