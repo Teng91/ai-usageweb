@@ -84,8 +84,15 @@ async function main() {
 
   try {
     let list;
-    for (let i = 0; i < 30 && !list; i++) { await sleep(300); list = await fetch(`http://127.0.0.1:${port}/json`).then((r) => r.json()).catch(() => null); }
-    const ws = new WebSocket(list.find((t) => t.type === 'page').webSocketDebuggerUrl);
+    // CI 的 runner 有時候 Chrome 啟動得很慢：最多等 30 秒，等到有分頁才連
+    let page;
+    for (let i = 0; i < 100 && !page; i++) {
+      await sleep(300);
+      list = await fetch(`http://127.0.0.1:${port}/json`).then((r) => r.json()).catch(() => null);
+      page = Array.isArray(list) ? list.find((t) => t.type === 'page') : null;
+    }
+    if (!page) throw new Error(`Chrome 30 秒內沒有開好 DevTools（port ${port}）`);
+    const ws = new WebSocket(page.webSocketDebuggerUrl);
     let id = 0;
     const pend = new Map();
     const errors = [];
