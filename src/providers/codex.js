@@ -31,7 +31,10 @@ function parseWindow(w, id, fallbackLabel, now) {
   let resetsAt = toIso(w.reset_at ?? w.resets_at);
   const after = Number(w.reset_after_seconds ?? w.resets_in_seconds);
   if (!resetsAt && Number.isFinite(after)) resetsAt = new Date(now + after * 1000).toISOString();
-  return { id, label: windowLabel(w.limit_window_seconds ?? w.window_minutes * 60, fallbackLabel), usedPct, resetsAt };
+  const sec = Number(w.limit_window_seconds ?? w.window_minutes * 60);
+  const out = { id, label: windowLabel(sec, fallbackLabel), usedPct, resetsAt };
+  if (Number.isFinite(sec) && sec > 0) out.periodSec = sec;
+  return out;
 }
 
 export function parseCodex(data, now = Date.now()) {

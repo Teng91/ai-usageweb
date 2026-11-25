@@ -1,5 +1,5 @@
 // 快取名稱帶版本號；改了前端檔案就把版本 +1
-const CACHE = 'app-v27';
+const CACHE = 'app-v28';
 const SHELL = [
   '/',
   '/index.html',
@@ -14,6 +14,7 @@ const SHELL = [
   '/ui/rankings.js',
   '/ui/theme-toggle.js',
   '/ui/pwa.js',
+  '/ui/push.js',
   '/scene.js',
   '/scene-maps.js',
   '/scene.css',
@@ -72,14 +73,39 @@ self.addEventListener('message', (event) => {
   if (event.data?.type === 'SKIP_WAITING') self.skipWaiting();
 });
 
+// ---- 推播 ----
+self.addEventListener('push', (event) => {
+  let d = {};
+  try { d = event.data ? event.data.json() : {}; } catch { d = { body: event.data?.text() }; }
+  event.waitUntil(self.registration.showNotification(d.title || 'AI 用量', {
+    body: d.body || '',
+    tag: d.tag || 'usage', // 同一類的新通知蓋掉舊的
+    renotify: true,
+    icon: '/icons/icon-192.png',
+    badge: '/icons/icon-192.png',
+    data: { url: d.url || '/' },
+  }));
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const target = new URL(event.notification.data?.url || '/', self.location.origin).href;
+  event.waitUntil((async () => {
+    const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    const win = wins.find((w) => new URL(w.url).origin === self.location.origin);
+    if (win) return win.focus();
+    return self.clients.openWindow(target);
+  })());
+});
+
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
 
-  // SSE 與管理 API 完全不經過 service worker
-  if (url.pathname === '/api/stream' || url.pathname === '/api/rankings' || url.pathname.startsWith('/admin/') || url.pathname === '/healthz') return;
+  // SSE、推播與管理 API 完全不經過 service worker
+  if (url.pathname === '/api/stream' || url.pathname === '/api/rankings' || url.pathname.startsWith('/api/push/') || url.pathname.startsWith('/admin/') || url.pathname === '/healthz') return;
 
   if (url.pathname === '/api/usage') {
     event.respondWith(networkFirstUsage(req));

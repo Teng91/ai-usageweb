@@ -10,6 +10,8 @@ import { SseHub } from './src/sse.js';
 import { Poller } from './src/poller.js';
 import { loadProviders } from './src/providers/index.js';
 import { RankingsService } from './src/rankings.js';
+import { PushService } from './src/push.js';
+import { parseQuiet } from './src/alerts.js';
 import { createHandler } from './src/routes.js';
 import { sendJson, safePath } from './src/respond.js';
 import { logInfo, logWarn } from './src/log.js';
@@ -40,6 +42,14 @@ export async function createApp(opts = {}) {
   }
 
   let poller;
+  const push = await new PushService({
+    dataDir: cfg.dataDir,
+    vapid: cfg.pushKey ? { publicKey: cfg.vapidPublicKey, privateKey: cfg.vapidPrivateKey, subject: cfg.vapidSubject } : null,
+    tz: cfg.pushTz,
+    quiet: parseQuiet(cfg.pushQuiet),
+    snapshot,
+    viewers: () => poller.viewers,
+  }).load();
   const hub = new SseHub({
     pingSec: cfg.ssePingSec,
     maxAgeSec: cfg.sseMaxAgeSec,
@@ -50,12 +60,15 @@ export async function createApp(opts = {}) {
     providers,
     creds,
     snapshot,
-    broadcast: (event, data) => hub.broadcast(event, data),
+    broadcast: (event, data) => {
+      hub.broadcast(event, data);
+      if (event === 'provider') push.observe(data);
+    },
     pollIntervalSec: cfg.pollIntervalSec,
     idleGraceSec: cfg.idleGraceSec,
   });
 
-  const handle = createHandler({ cfg, poller, hub, snapshot, creds, providers, rankings, publicDir: PUBLIC_DIR });
+  const handle = createHandler({ cfg, poller, hub, snapshot, creds, providers, rankings, push, publicDir: PUBLIC_DIR });
   const server = http.createServer((req, res) => {
     handle(req, res).catch((err) => {
       logWarn('request failed', { path: safePath(req.url), err: err?.code || err?.name || 'error' });
@@ -69,10 +82,11 @@ export async function createApp(opts = {}) {
     hub.closeAll();
     await snapshot.save();
     await snapshot.flush();
+    await push.flush();
     await new Promise((r) => server.close(() => r()));
   }
 
-  return { server, poller, hub, snapshot, creds, providers, shutdown };
+  return { server, poller, hub, snapshot, creds, providers, push, shutdown };
 }
 
 // ---- 直接執行時啟動 ----

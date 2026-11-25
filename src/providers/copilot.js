@@ -5,6 +5,8 @@ const URL_USER = process.env.COPILOT_USER_URL || 'https://api.github.com/copilot
 
 const LABELS = { chat: 'Chat', completions: '程式碼補全', premium_interactions: 'Premium 請求' };
 const ORDER = ['chat', 'completions', 'premium_interactions'];
+// 每月重置；推播用來判斷是不是長週期
+const MONTH_SEC = 30 * 86400;
 
 function planName(raw) {
   if (!raw) return null;
@@ -36,7 +38,7 @@ export function parseCopilot(data) {
       if (Number.isFinite(Number(q.percent_remaining))) usedPct = clampPct(100 - Number(q.percent_remaining));
       else if (limit > 0 && Number.isFinite(remaining)) usedPct = clampPct(((limit - remaining) / limit) * 100);
       if (usedPct === null) continue;
-      const w = { id: key, label: LABELS[key] || key, usedPct, resetsAt };
+      const w = { id: key, label: LABELS[key] || key, usedPct, resetsAt, periodSec: MONTH_SEC };
       if (limit > 0 && Number.isFinite(remaining)) {
         w.used = Math.max(0, Math.round(limit - remaining));
         w.limit = Math.round(limit);
@@ -70,6 +72,7 @@ export function parseCopilot(data) {
         used: Math.round(used),
         limit: Math.round(limit),
         resetsAt,
+        periodSec: MONTH_SEC,
       });
     }
     if (!windows.length) throw new ProviderError('parse', '回傳缺少額度欄位');

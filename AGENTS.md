@@ -8,16 +8,17 @@ ai-usageweb：顯示 Claude、Codex、Antigravity、Copilot 額度與 OpenRouter
 - **絕不在 log、錯誤訊息、API 回應裡出現 token、完整 header 或原始回應。** 錯誤只留服務名、狀態碼、簡短中文說明。
 - 公開 API 只回傳百分比、剩餘量、重置時間；不回傳 email、帳號 ID、組織名。排行也一樣只存公開資料。
 - repo 是公開的：不要提交 `.env*`、`server-*`、`*.enc`、`data/`。
-- 每家 adapter 輸出統一格式 `{ plan, planExpiresAt?, windows: [{ id, label, usedPct, resetsAt, used?, limit? }], balance, note }`；`usedPct` 一律是「已用」0–100。前端只認這個格式。
+- 每家 adapter 輸出統一格式 `{ plan, planExpiresAt?, windows: [{ id, label, usedPct, resetsAt, periodSec?, used?, limit? }], balance, note }`；`usedPct` 一律是「已用」0–100。前端只認這個格式。`periodSec` 是窗口長度（秒），推播靠它分辨週／月額度，知道就要填。
 - 續期拿到新 refresh token 時：**先 `await saveCreds()` 成功才使用**；續期包在 `withLock` 裡。
 - 對各家的請求不論幾個人在看都不超過每家每 `minIntervalSec` 一次；不要新增公開的「立刻重抓」。OpenRouter 排行最多每小時抓一次。
 - 手動設定的值（`CLAUDE_PLAN`、`CLAUDE_PLAN_EXPIRES_AT`）直接讀環境變數，不要放進憑證：volume 裡的憑證會蓋過環境變數。
-- `/healthz` 不能算「有人在看」。
+- `/healthz` 與 `/api/push/tick` 不能算「有人在看」。
+- 推播：規則在 `src/alerts.js`（純函式）、服務在 `src/push.js`、加密在 `src/webpush.js`。推播內容只放百分比與重置時間。改規則要更新 `test/push.test.js` 與 README 的規則表。之後要做的事記在 `docs/TODO.md`。
 - 存檔格式（例如 `rankings.json`）改了欄位就把該檔的 `FORMAT_VERSION` +1，讓舊檔被丟掉。
 
 ## 前端
 - 改了 `public/` 的檔案要把 `public/sw.js` 的 `CACHE` 版本號 +1；新增要離線可用的檔案要加進 `SHELL`。新的 `/api/*` 不經 service worker（加進 `sw.js` 的略過清單）。
-- 前端模組分工：`app.js` 資料與連線、`ui/cards.js` 卡片與頂列、`ui/rankings.js` 排行、`ui/effects.js` 冒險風格效果、`ui/theme-toggle.js` 亮暗與風格切換、`ui/pwa.js` 離線／安裝、`ui/format.js` 格式化、`ui/dom.js` 共用的取元素函式、狀態與 localStorage。不要再把東西塞回 `app.js`。`public/theme.js` 是畫面出現前套用主題的小腳本（非模組），跟 `ui/theme-toggle.js` 不同。
+- 前端模組分工：`app.js` 資料與連線、`ui/cards.js` 卡片與頂列、`ui/rankings.js` 排行、`ui/effects.js` 冒險風格效果、`ui/theme-toggle.js` 亮暗與風格切換、`ui/pwa.js` 離線／安裝、`ui/push.js` 通知設定、`ui/format.js` 格式化、`ui/dom.js` 共用的取元素函式、狀態與 localStorage。不要再把東西塞回 `app.js`。`public/theme.js` 是畫面出現前套用主題的小腳本（非模組），跟 `ui/theme-toggle.js` 不同。
 - CSP 不允許內嵌 script 與 HTML 裡的 `style=""`；要動態樣式用 JS 設 `element.style`。
 - 兩種風格：簡約（`style.css`）與冒險（`skin-adventure.css` 卡片、按鈕與遊戲介面；`scene.css` 場景）。冒險風格的規則一律限定在 `[data-skin="adventure"]` 底下，不能影響簡約風格。
 - 冒險風格的場景：地圖資料在 `public/scene-maps.js`，邏輯在 `public/scene.js`。平台與天上的怪物只放卡片兩側（`side: true`），不要放在會被卡片擋住的地方。

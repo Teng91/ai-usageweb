@@ -152,6 +152,30 @@ curl.exe -X PUT https://ai-usageweb.fly.dev/admin/credentials/claude -H "Authori
 
 設 `ACCESS_KEY`，第一次用 `https://ai-usageweb.fly.dev/?k=<ACCESS_KEY>` 打開，之後記在 cookie。
 
+## 手機通知（Web Push）
+
+額度快用完、或週／月額度快重置卻還剩很多時，推播到手機。不設定就不會出現鈴鐺按鈕。
+
+1. 產生金鑰與密碼，照印出來的指令設到 fly：
+
+   ```powershell
+   npm run gen-vapid
+   ```
+
+2. GitHub repo 的 Settings → Secrets and variables → Actions，新增 secret `PUSH_TICK_TOKEN`（同上）。`.github/workflows/push-tick.yml` 每 15 分鐘叫醒機器抓一輪，沒開網頁也能判斷；網址不是 `https://ai-usageweb.fly.dev` 的話再設 variable `APP_URL`。
+3. 手機打開網站（iPhone 要先「加入主畫面」，再從主畫面打開），點頂列的鈴鐺，輸入 `PUSH_KEY`、開啟通知，按「送測試通知」確認收得到。
+
+通知規則：
+
+| 類型 | 什麼時候發 |
+| --- | --- |
+| 用量警告 | 已用 ≥ 50%，且照最近 90 分鐘的速度會在重置前用完；或已用 95%。同一個重置週期各一次 |
+| 快重置還有剩 | 只看週／月額度，而且最近一小時沒在用：24 小時內剩 ≥ 40%、12 小時內剩 ≥ 20%、6 小時內剩 ≥ 10% 各一次 |
+
+- 00:00–08:00 不發（`PUSH_QUIET`，時區 `PUSH_TZ`）；「快重置」會落在勿擾時段的提醒，提前到 22:00 後發。
+- 網頁開著時不推播；同一類合成一則，新的蓋掉舊的；每家每天最多 4 則。
+- 機器每 15 分鐘被叫醒一次、抓完約幾分鐘後又 suspend，執行時間大約多三分之一，費用每月不到 1 美元。
+
 ## 畫面
 
 - **兩種風格**（右上角旗子按鈕切換，會記住）：
@@ -182,6 +206,9 @@ src/routes.js             路由：公開 API、SSE、管理 API、ACCESS_KEY
 src/static.js             靜態檔（擋路徑穿越、快取標頭）
 src/respond.js            回應與驗證的共用小工具（JSON、安全標頭、固定時間比較）
 src/rankings.js           OpenRouter 模型排行（每小時最多抓一次）
+src/alerts.js             推播規則（用量警告、快重置還有剩、勿擾時段；純函式）
+src/push.js               推播服務：訂閱、樣本、去重、每日上限，存 /data/push.json
+src/webpush.js            Web Push：VAPID 簽名與 RFC 8291 加密（只用內建 crypto）
 src/credentials.js        環境變數＋加密 volume、每家續期鎖
 src/sse.js                SSE 連線、ping、廣播、連線上限 30 分鐘
 src/http.js               對外請求、錯誤分類、Cloudflare 偵測
@@ -189,13 +216,14 @@ src/providers/*.js        五家 adapter（統一輸出 { plan, windows, balance
 public/                   PWA（index.html、style.css、sw.js、manifest、icons）
 public/app.js             前端進入點：資料與連線（快照、SSE、SSE 被擋時改輪詢）
 public/ui/                前端模組：cards（卡片）、rankings（排行）、effects（冒險效果）、
-                          theme-toggle（亮暗與風格）、pwa（離線與安裝）、format、dom（共用狀態）
+                          theme-toggle（亮暗與風格）、pwa（離線與安裝）、push（通知設定）、format、dom（共用狀態）
 public/theme.js           畫面出現前套用亮暗與風格（CSP 不允許內嵌 script）
 public/skin-adventure.css 冒險風格的卡片、按鈕與遊戲介面（只在 data-skin="adventure" 生效）
 public/scene.css          冒險風格的場景（天空、地形、怪物、勇者、傳送點、夜晚）
 public/scene.js           場景邏輯：建立地圖、勇者走到傳送點換季、怪物互動、只看風景、快捷鍵
 public/scene-maps.js      四季地圖資料（加地圖改這裡）
 public/pixel/             原創像素圖（由 scripts/gen-pixel-art.mjs 產生）
-scripts/                  extract-credentials.js、setup-antigravity.ps1、gen-pixel-art.mjs、smoke-ui.mjs
+scripts/                  extract-credentials.js、setup-antigravity.ps1、gen-pixel-art.mjs、smoke-ui.mjs、gen-vapid.mjs
+docs/TODO.md              之後可以做的事
 test/                     node:test＋假 fetch＋fixtures
 ```

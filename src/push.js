@@ -1,0 +1,189 @@
+// 推播服務：訂閱管理、樣本累積、依規則（src/alerts.js）發通知；狀態存在 /data/push.json
+import path from 'node:path';
+import { writeFileAtomic, readFileOrNull } from './fsutil.js';
+import { logInfo, logWarn } from './log.js';
+import { sendPush } from './webpush.js';
+import { evaluateAlerts, mergeAlerts, recordSample, localParts } from './alerts.js';
+
+// 存檔欄位改了就 +1，舊檔會被丟掉
+const FORMAT_VERSION = 1;
+const MAX_SUBS = 10;
+const DAILY_CAP = 4; // 每家每天最多幾則
+const SENT_KEEP_MS = 40 * 86400_000;
+const EVAL_DEBOUNCE_MS = 3000; // 各家陸續抓完再一起判斷，才能合成一則
+const DEFAULT_PREFS = { usage: true, reset: true };
+
+export class PushService {
+  constructor({ dataDir, vapid, tz, quiet, snapshot, viewers = () => 0, now = Date.now, send = sendPush }) {
+    this.file = path.join(dataDir, 'push.json');
+    this.vapid = vapid;
+    this.tz = tz;
+    this.quiet = quiet;
+    this.snapshot = snapshot;
+    this.viewers = viewers;
+    this.now = now;
+    this.send = send;
+    this.state = blankState();
+    this.lastFetched = {};
+    this.timer = null;
+    this.evaluating = null;
+    this.writeChain = Promise.resolve();
+  }
+
+  get enabled() {
+    return Boolean(this.vapid?.publicKey && this.vapid?.privateKey);
+  }
+
+  async load() {
+    const raw = await readFileOrNull(this.file);
+    if (!raw) return this;
+    try {
+      const s = JSON.parse(raw.toString('utf8'));
+      if (s.version === FORMAT_VERSION) this.state = { ...blankState(), ...s };
+    } catch {
+      logWarn('push.json 壞了，從空白開始');
+    }
+    return this;
+  }
+
+  save() {
+    const data = JSON.stringify(this.state);
+    const job = this.writeChain.then(() => writeFileAtomic(this.file, data));
+    this.writeChain = job.catch((err) => logWarn('寫入 push.json 失敗', { code: err.code }));
+    return this.writeChain;
+  }
+
+  // ---- 訂閱 ----
+  subscribe(sub, prefs) {
+    const i = this.state.subs.findIndex((s) => s.endpoint === sub.endpoint);
+    const entry = { endpoint: sub.endpoint, keys: { p256dh: sub.keys.p256dh, auth: sub.keys.auth }, prefs: { ...DEFAULT_PREFS, ...cleanPrefs(prefs) }, createdAt: new Date(this.now()).toISOString() };
+    if (i >= 0) this.state.subs[i] = { ...this.state.subs[i], ...entry, prefs: { ...this.state.subs[i].prefs, ...cleanPrefs(prefs) } };
+    else {
+      this.state.subs.push(entry);
+      if (this.state.subs.length > MAX_SUBS) this.state.subs.shift();
+    }
+    this.save();
+    return this.prefs(sub.endpoint);
+  }
+
+  unsubscribe(endpoint) {
+    const n = this.state.subs.length;
+    this.state.subs = this.state.subs.filter((s) => s.endpoint !== endpoint);
+    if (this.state.subs.length !== n) this.save();
+  }
+
+  prefs(endpoint) {
+    return this.state.subs.find((s) => s.endpoint === endpoint)?.prefs || null;
+  }
+
+  async test(endpoint) {
+    const sub = this.state.subs.find((s) => s.endpoint === endpoint);
+    if (!sub) return false;
+    return this.#deliver(sub, { title: '🔔 測試通知', body: '收得到這則，額度快用完或快重置時就會通知你', tag: 'test', url: '/' });
+  }
+
+  // ---- 資料 ----
+  /** 每次某家抓到新資料時呼叫 */
+  observe(view) {
+    if (!view || view.status !== 'ok' || !view.fetchedAt) return;
+    if (this.lastFetched[view.id] === view.fetchedAt) return;
+    this.lastFetched[view.id] = view.fetchedAt;
+    const now = this.now();
+    for (const w of view.windows || []) recordSample(this.state.history, `${view.id}:${w.id}`, w, now);
+    this.save();
+    clearTimeout(this.timer);
+    this.timer = setTimeout(() => { this.evaluate().catch(() => {}); }, EVAL_DEBOUNCE_MS);
+    this.timer.unref?.();
+  }
+
+  /** 判斷並發送；回傳送出的則數 */
+  evaluate() {
+    clearTimeout(this.timer);
+    if (!this.evaluating) this.evaluating = this.#evaluateOnce().finally(() => { this.evaluating = null; });
+    return this.evaluating;
+  }
+
+  async #evaluateOnce() {
+    if (!this.enabled || !this.state.subs.length) return 0;
+    const now = this.now();
+    this.#prune(now);
+    const providers = this.snapshot.snapshot(now).providers;
+    const alerts = evaluateAlerts({ providers, history: this.state.history, sent: this.state.sent, now, tz: this.tz, quiet: this.quiet });
+    if (!alerts.length) return 0;
+
+    const watching = this.viewers() > 0;
+    const day = localParts(now, this.tz).dateKey;
+    const toSend = [];
+    for (const a of alerts) {
+      for (const k of a.keys) this.state.sent[k] = now; // 看著網頁時也記下：畫面上已經看到了
+      if (watching) continue;
+      const d = this.state.daily[a.provider];
+      const count = d?.day === day ? d.count : 0;
+      if (count >= DAILY_CAP) continue;
+      this.state.daily[a.provider] = { day, count: count + 1 };
+      toSend.push(a);
+    }
+    this.save();
+    if (!toSend.length) return 0;
+
+    let sent = 0;
+    for (const msg of mergeAlerts(toSend)) {
+      const payload = { title: msg.title, body: msg.body, tag: msg.kind, url: '/' };
+      for (const sub of [...this.state.subs]) {
+        if (sub.prefs?.[msg.kind] === false) continue;
+        if (await this.#deliver(sub, payload, msg.kind === 'usage' ? 'high' : 'normal')) sent++;
+      }
+    }
+    logInfo('push sent', { count: sent, kinds: toSend.map((a) => a.kind) });
+    return sent;
+  }
+
+  async #deliver(sub, payload, urgency = 'normal') {
+    const r = await this.send(sub, payload, this.vapid, { urgency });
+    if (r.gone) {
+      this.unsubscribe(sub.endpoint);
+      logInfo('push subscription gone', { status: r.status });
+    } else if (!r.ok) {
+      logWarn('push failed', { status: r.status });
+    }
+    return r.ok;
+  }
+
+  #prune(now) {
+    for (const [k, t] of Object.entries(this.state.sent)) if (now - t > SENT_KEEP_MS) delete this.state.sent[k];
+    for (const [k, h] of Object.entries(this.state.history)) {
+      const last = h.samples[h.samples.length - 1];
+      if (!last || now - last[0] > SENT_KEEP_MS) delete this.state.history[k];
+    }
+  }
+
+  flush() {
+    return this.writeChain;
+  }
+}
+
+function blankState() {
+  return { version: FORMAT_VERSION, subs: [], sent: {}, daily: {}, history: {} };
+}
+
+function cleanPrefs(p) {
+  const out = {};
+  if (p && typeof p.usage === 'boolean') out.usage = p.usage;
+  if (p && typeof p.reset === 'boolean') out.reset = p.reset;
+  return out;
+}
+
+/** 檢查瀏覽器送來的訂閱物件；不合格回 null */
+export function validSubscription(s) {
+  if (!s || typeof s !== 'object') return null;
+  const { endpoint, keys } = s;
+  if (typeof endpoint !== 'string' || endpoint.length > 1024) return null;
+  let u;
+  try { u = new URL(endpoint); } catch { return null; }
+  if (u.protocol !== 'https:') return null;
+  if (!keys || typeof keys.p256dh !== 'string' || typeof keys.auth !== 'string') return null;
+  const p256dh = keys.p256dh.replace(/=+$/, '');
+  const auth = keys.auth.replace(/=+$/, '');
+  if (!/^[A-Za-z0-9_-]{80,100}$/.test(p256dh) || !/^[A-Za-z0-9_-]{16,32}$/.test(auth)) return null;
+  return { endpoint, keys: { p256dh, auth } };
+}

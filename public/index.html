@@ -36,6 +36,9 @@
       <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M5 21V4m0 0h11l-2 4 2 4H5" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
       <span id="skin-label">冒險風</span>
     </button>
+    <button class="push-btn" id="push-btn" type="button" hidden aria-label="通知設定" title="通知設定">
+      <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M10 20.5a2 2 0 0 0 4 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+    </button>
     <button class="theme-btn" id="theme-btn" type="button" data-key="T" aria-label="切換亮色／暗色" title="切換亮色／暗色">
       <svg class="icon-sun" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
       <svg class="icon-moon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
@@ -77,6 +80,22 @@
       <p class="card-meta"></p>
     </article>
   </template>
+
+  <dialog class="push-dialog" id="push-dialog" aria-labelledby="push-title">
+    <h2 id="push-title">通知</h2>
+    <label class="push-row push-main"><input type="checkbox" id="push-on"> 在這台裝置開啟通知</label>
+    <label class="push-row" id="push-key-row">推播密碼 <input type="password" id="push-key" autocomplete="off" placeholder="PUSH_KEY"></label>
+    <fieldset class="push-kinds">
+      <label class="push-row"><input type="checkbox" id="push-usage" checked> <span><b>用量警告</b><small>照目前速度會在重置前用完、或已用 95%</small></span></label>
+      <label class="push-row"><input type="checkbox" id="push-reset" checked> <span><b>快重置還有剩</b><small>週／月額度：24 小時內剩 40%、12 小時剩 20%、6 小時剩 10%</small></span></label>
+    </fieldset>
+    <p class="push-note">00:00–08:00 不通知；網頁開著時也不通知。</p>
+    <p class="push-msg" id="push-msg" role="status"></p>
+    <div class="push-actions">
+      <button type="button" id="push-test" disabled>送測試通知</button>
+      <button type="button" id="push-close">關閉</button>
+    </div>
+  </dialog>
 
   <script src="/app.js" type="module"></script>
   <script src="/scene.js" type="module"></script>

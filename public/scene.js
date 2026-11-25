@@ -194,6 +194,7 @@ document.addEventListener('pointerup', (e) => {
 document.addEventListener('keydown', (e) => {
   if (e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
   if (e.target instanceof HTMLElement && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
+  if (document.querySelector('dialog[open]')) return; // 通知設定開著時不吃快捷鍵
   const k = e.key.toLowerCase();
   if (k === 'escape' && root.dataset.bgonly) { setBgOnly(false); return; }
   if (k === 's') { document.getElementById('skin-btn').click(); return; }

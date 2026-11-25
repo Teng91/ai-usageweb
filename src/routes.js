@@ -1,10 +1,13 @@
 // 路由：公開 API、SSE、管理 API、ACCESS_KEY 檢查；其餘 GET 交給靜態檔
 import { logInfo } from './log.js';
 import { serveStatic } from './static.js';
+import { validSubscription } from './push.js';
 import { sendJson, setSecurityHeaders, readBody, safeEqual, checkBearer, parseCookies } from './respond.js';
 
 /** 依 app 的各元件建立 request handler（async，錯誤由呼叫端處理） */
-export function createHandler({ cfg, poller, hub, snapshot, creds, providers, rankings, publicDir }) {
+export function createHandler({ cfg, poller, hub, snapshot, creds, providers, rankings, push, publicDir }) {
+  let lastTestAt = 0;
+
   async function handle(req, res) {
     const url = new URL(req.url, 'http://localhost');
     const p = url.pathname;
@@ -18,6 +21,16 @@ export function createHandler({ cfg, poller, hub, snapshot, creds, providers, ra
 
     if (p.startsWith('/admin/')) return handleAdmin(req, res, url);
 
+    // 排程喚醒：抓一輪、判斷要不要推播；有自己的 token，不經 ACCESS_KEY，也不算「有人在看」
+    if (p === '/api/push/tick' && req.method === 'POST') {
+      if (!cfg.pushTickToken || !checkBearer(req.headers.authorization, cfg.pushTickToken)) {
+        return sendJson(res, 401, { error: 'unauthorized' });
+      }
+      await poller.pollOnce();
+      const sent = await push.evaluate();
+      return sendJson(res, 200, { ok: true, sent });
+    }
+
     if (cfg.accessKey && !checkAccess(req, res, url)) return;
 
     if (p === '/api/usage' && req.method === 'GET') {
@@ -30,6 +43,8 @@ export function createHandler({ cfg, poller, hub, snapshot, creds, providers, ra
       return sendJson(res, 200, (await rankings.get()) || { updatedAt: null, views: null }, { 'Cache-Control': 'no-store' });
     }
 
+    if (p.startsWith('/api/push/')) return handlePush(req, res, p);
+
     if (p === '/api/stream' && req.method === 'GET') {
       return hub.add(req, res, snapshot.snapshot());
     }
@@ -37,6 +52,47 @@ export function createHandler({ cfg, poller, hub, snapshot, creds, providers, ra
     if (req.method === 'GET' || req.method === 'HEAD') return serveStatic(req, res, p, publicDir);
 
     sendJson(res, 405, { error: 'method not allowed' });
+  }
+
+  async function handlePush(req, res, p) {
+    if (p === '/api/push/config' && req.method === 'GET') {
+      return sendJson(res, 200, { enabled: push.enabled, publicKey: push.enabled ? cfg.vapidPublicKey : null }, { 'Cache-Control': 'no-store' });
+    }
+    if (!push.enabled) return sendJson(res, 404, { error: '推播未啟用' });
+    if (req.method !== 'POST') return sendJson(res, 405, { error: 'method not allowed' });
+    let body;
+    try {
+      body = JSON.parse(await readBody(req, 4096));
+    } catch {
+      return sendJson(res, 400, { error: 'body 必須是 JSON 物件' });
+    }
+    if (!body || typeof body !== 'object') return sendJson(res, 400, { error: 'body 必須是 JSON 物件' });
+
+    if (p === '/api/push/subscribe') {
+      // 訂閱或改設定要推播密碼；其餘操作只要知道自己的 endpoint（無法猜到）
+      if (!checkBearer(req.headers.authorization, cfg.pushKey)) return sendJson(res, 403, { error: '推播密碼不對' });
+      const sub = validSubscription(body.subscription);
+      if (!sub) return sendJson(res, 400, { error: '訂閱資料格式不對' });
+      const prefs = push.subscribe(sub, body.prefs);
+      logInfo('push subscribed');
+      return sendJson(res, 200, { ok: true, prefs });
+    }
+    const endpoint = typeof body.endpoint === 'string' ? body.endpoint : '';
+    if (p === '/api/push/status') {
+      const prefs = push.prefs(endpoint);
+      return sendJson(res, 200, { subscribed: Boolean(prefs), prefs });
+    }
+    if (p === '/api/push/unsubscribe') {
+      push.unsubscribe(endpoint);
+      return sendJson(res, 200, { ok: true });
+    }
+    if (p === '/api/push/test') {
+      if (Date.now() - lastTestAt < 30_000) return sendJson(res, 429, { error: '測試通知 30 秒內只能送一次' });
+      lastTestAt = Date.now();
+      const ok = await push.test(endpoint);
+      return sendJson(res, ok ? 200 : 502, ok ? { ok: true } : { error: '送不出去，可能要重新訂閱' });
+    }
+    sendJson(res, 404, { error: 'not found' });
   }
 
   async function handleAdmin(req, res, url) {

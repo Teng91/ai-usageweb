@@ -1,0 +1,26 @@
+name: push-tick
+
+# 沒人開網頁時機器會 suspend、輪詢也停了；每 15 分鐘叫醒一次，抓一輪並判斷要不要推播。
+# 需要 repo secret PUSH_TICK_TOKEN（npm run gen-vapid 產生，跟 fly secrets 的同一個值）。
+# 網址不是預設的話，設 repo variable APP_URL。
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: 叫醒伺服器
+        env:
+          TOKEN: ${{ secrets.PUSH_TICK_TOKEN }}
+          APP_URL: ${{ vars.APP_URL || 'https://ai-usageweb.fly.dev' }}
+        run: |
+          if [ -z "$TOKEN" ]; then
+            echo "PUSH_TICK_TOKEN 還沒設定，略過"
+            exit 0
+          fi
+          curl -fsS --max-time 90 --retry 2 --retry-delay 10 -X POST \
+            -H "Authorization: Bearer $TOKEN" "$APP_URL/api/push/tick"

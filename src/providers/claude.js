@@ -7,11 +7,12 @@ const USAGE_URL = process.env.CLAUDE_USAGE_URL || 'https://api.anthropic.com/api
 const TOKEN_URL = process.env.CLAUDE_TOKEN_URL || 'https://console.anthropic.com/v1/oauth/token';
 const CLIENT_ID = process.env.CLAUDE_CLIENT_ID || '9d1c250a-e61b-44d9-88ed-5944d1962f5e';
 
+const HOUR = 3600;
 const WINDOWS = [
-  ['five_hour', '5h', '5 小時'],
-  ['seven_day', '7d', '每週'],
-  ['seven_day_opus', '7d_opus', '每週 Opus'],
-  ['seven_day_sonnet', '7d_sonnet', '每週 Sonnet'],
+  ['five_hour', '5h', '5 小時', 5 * HOUR],
+  ['seven_day', '7d', '每週', 7 * 24 * HOUR],
+  ['seven_day_opus', '7d_opus', '每週 Opus', 7 * 24 * HOUR],
+  ['seven_day_sonnet', '7d_sonnet', '每週 Sonnet', 7 * 24 * HOUR],
 ];
 
 /**
@@ -31,12 +32,12 @@ export function parsePlanExpiry(raw) {
 export function parseClaude(data) {
   if (!data || typeof data !== 'object') throw new ProviderError('parse', '回傳不是物件');
   const windows = [];
-  for (const [key, id, label] of WINDOWS) {
+  for (const [key, id, label, periodSec] of WINDOWS) {
     const w = data[key];
     if (!w || w.utilization === null || w.utilization === undefined) continue;
     const usedPct = clampPct(w.utilization);
     if (usedPct === null) continue;
-    windows.push({ id, label, usedPct, resetsAt: toIso(w.resets_at) });
+    windows.push({ id, label, usedPct, resetsAt: toIso(w.resets_at), periodSec });
   }
   if (!windows.some((w) => w.id === '5h' || w.id === '7d')) {
     throw new ProviderError('parse', '回傳缺少欄位 five_hour / seven_day');

@@ -106,7 +106,7 @@ test('copilot: 新版回傳', () => {
   const r = parseCopilot(fixture('copilot-new.json'));
   assert.equal(r.plan, 'Free');
   assert.equal(r.windows.length, 2); // premium unlimited 不顯示
-  assert.deepEqual(r.windows[0], { id: 'chat', label: 'Chat', usedPct: 24, resetsAt: '2026-12-01T00:00:00.000Z', used: 12, limit: 50 });
+  assert.deepEqual(r.windows[0], { id: 'chat', label: 'Chat', usedPct: 24, resetsAt: '2026-12-01T00:00:00.000Z', periodSec: 30 * 86400, used: 12, limit: 50 });
   assert.equal(r.windows[1].used, 500);
   assert.equal(r.windows[1].limit, 2000);
 });
@@ -149,7 +149,7 @@ test('copilot: 被拒時帶編輯器標頭重試', async () => {
 // ---------- Claude ----------
 test('claude: 解析時間窗', () => {
   const w = parseClaude(fixture('claude-usage.json'));
-  assert.deepEqual(w.map((x) => [x.id, x.usedPct]), [['5h', 3], ['7d', 93], ['7d_sonnet', 40]]);
+  assert.deepEqual(w.map((x) => [x.id, x.usedPct, x.periodSec]), [['5h', 3, 18000], ['7d', 93, 604800], ['7d_sonnet', 40, 604800]]);
   assert.equal(w[0].resetsAt, '2026-11-23T12:19:00.000Z');
 });
 
@@ -250,7 +250,7 @@ test('codex: 解析 primary / secondary', () => {
   const now = Date.parse('2026-11-23T08:00:00Z');
   const r = parseCodex(fixture('codex-usage.json'), now);
   assert.equal(r.plan, 'Free');
-  assert.deepEqual(r.windows.map((w) => [w.id, w.label, w.usedPct]), [['primary', '5 小時', 12.5], ['secondary', '每週', 61]]);
+  assert.deepEqual(r.windows.map((w) => [w.id, w.label, w.usedPct, w.periodSec]), [['primary', '5 小時', 12.5, 18000], ['secondary', '每週', 61, 604800]]);
   assert.equal(r.windows[0].resetsAt, '2026-11-23T09:00:00.000Z');
   assert.equal(r.windows[1].resetsAt, new Date(1795500000 * 1000).toISOString());
 });

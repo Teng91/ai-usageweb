@@ -5,6 +5,7 @@ import { renderAll, renderCard, renderEmpty, renderChrome, startTicker } from '.
 import { initRankings, refreshRankingsIfStale } from './ui/rankings.js';
 import { initThemeToggle } from './ui/theme-toggle.js';
 import { initPwa } from './ui/pwa.js';
+import { initPush } from './ui/push.js';
 
 // 即時連線（SSE）失敗時改用輪詢；伺服器每 2 分鐘抓一次，輪詢 30 秒一次就不會晚太多
 const FALLBACK_POLL_MS = 30_000;
@@ -166,6 +167,7 @@ window.addEventListener('offline', () => { state.offline = true; renderChrome();
 // ---------- 啟動 ----------
 initThemeToggle();
 initPwa();
+initPush();
 initRankings();
 startTicker();
 start();

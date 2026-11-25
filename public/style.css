@@ -164,6 +164,84 @@ button {
 
 .theme-btn:hover { color: var(--text); border-color: var(--accent); }
 
+/* 通知鈴鐺：沒啟用推播時隱藏；已訂閱時亮起來 */
+.push-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--text-2);
+}
+
+.push-btn[hidden] { display: none; }
+.push-btn:hover { color: var(--text); border-color: var(--accent); }
+.push-btn.on { color: var(--accent); border-color: var(--accent); }
+
+/* ---------- 通知設定對話框 ---------- */
+.push-dialog {
+  width: min(420px, calc(100vw - 32px));
+  padding: 18px 18px 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--panel);
+  color: var(--text);
+}
+
+.push-dialog::backdrop { background: rgba(0, 0, 0, 0.5); }
+.push-dialog h2 { margin: 0 0 12px; font-size: 1rem; }
+
+.push-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin: 8px 0;
+  font-size: 0.86rem;
+}
+
+.push-row[hidden] { display: none; }
+.push-row input[type="checkbox"] { margin-top: 3px; accent-color: var(--accent); }
+.push-row span { display: flex; flex-direction: column; gap: 2px; }
+.push-row small { color: var(--muted); font-size: 0.76rem; }
+.push-main { font-weight: 600; }
+
+#push-key-row { align-items: center; }
+
+#push-key {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: var(--panel-2);
+  color: var(--text);
+  font: inherit;
+}
+
+.push-kinds { margin: 10px 0 0; padding: 4px 0 0; border: 0; border-top: 1px solid var(--line); }
+.push-note { margin: 8px 0 0; color: var(--muted); font-size: 0.76rem; }
+.push-msg { min-height: 1.2em; margin: 8px 0 0; color: var(--text-2); font-size: 0.8rem; }
+.push-msg.warn { color: var(--warn); }
+
+.push-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+
+.push-actions button {
+  border: 1px solid var(--line-strong);
+  background: var(--panel-2);
+  border-radius: 6px;
+  padding: 5px 14px;
+  font: inherit;
+  font-size: 0.8rem;
+  color: var(--text);
+}
+
+.push-actions button:hover:not(:disabled) { border-color: var(--accent); }
+.push-actions button:disabled { opacity: 0.5; }
+
 /* 風格切換鈕（簡約／冒險） */
 .skin-btn {
   display: inline-flex;

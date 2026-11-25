@@ -31,6 +31,8 @@ const server = http.createServer((req, res) => {
   const json = (o) => { res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify(o)); };
   if (u.pathname === '/api/usage') return json({ version: 1, pollIntervalSec: 60, providers: providers(30) });
   if (u.pathname === '/api/rankings') return json(rankings);
+  if (u.pathname === '/api/push/config') return json({ enabled: true, publicKey: 'BP4z9KsN6nGRTbVYI_c7VJSPQTBtkgcy27mlmlMoZIIgDll6e3vCYLocInmYWAmS6TlzAC8wEqKK6PBru3jl7A8' });
+  if (u.pathname === '/api/push/status') return json({ subscribed: false, prefs: null });
   if (u.pathname === '/api/stream') {
     res.writeHead(200, { 'content-type': 'text/event-stream' });
     res.write(`event: snapshot\ndata: ${JSON.stringify({ pollIntervalSec: 60, providers: providers(30) })}\n\n`);
@@ -143,6 +145,19 @@ async function main() {
     const r = await ev(`(() => { const b = document.getElementById('bg-exit').getBoundingClientRect(); return [b.top, b.bottom, innerHeight]; })()`);
     check('手機：「顯示用量」在畫面內', r && r[0] >= 0 && r[1] <= r[2], JSON.stringify(r));
     await ev(`document.getElementById('bg-exit').click()`);
+
+    // 通知設定
+    check('推播啟用時顯示鈴鐺', (await ev(`!document.getElementById('push-btn').hidden`)) === true);
+    await ev(`document.getElementById('push-btn').click()`);
+    await sleep(300);
+    check('點鈴鐺打開通知設定', (await ev(`document.getElementById('push-dialog').open`)) === true);
+    const skinBefore = await ev(`document.documentElement.dataset.skin`);
+    await key('s');
+    check('通知設定開著時不吃快捷鍵', (await ev(`document.documentElement.dataset.skin`)) === skinBefore);
+    const d = await ev(`(() => { const b = document.getElementById('push-dialog').getBoundingClientRect(); return [b.left, b.right, innerWidth]; })()`);
+    check('手機：通知設定在畫面內', d && d[0] >= 0 && d[1] <= d[2], JSON.stringify(d));
+    await ev(`document.getElementById('push-close').click()`);
+    check('按「關閉」收起通知設定', (await ev(`document.getElementById('push-dialog').open`)) === false);
 
     check('沒有 JS 錯誤', errors.length === 0, errors.join(' | '));
   } finally {

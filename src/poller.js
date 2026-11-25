@@ -123,6 +123,23 @@ export class Poller {
     this.tick();
   }
 
+  /**
+   * 排程喚醒用（POST /api/push/tick）：各家抓一輪並等它們抓完，不算「有人在看」。
+   * 仍遵守 minIntervalSec 與退避；剛抓過的就不再抓。
+   */
+  async pollOnce() {
+    const now = this.now();
+    const jobs = [];
+    for (const p of this.providers) {
+      const s = this.state[p.id];
+      if (s.inflight) { jobs.push(s.inflight); continue; }
+      if (s.forbidden) continue;
+      if (now < s.nextAt || now < s.lastAttemptAt + this.minInterval(p) * 1000) continue;
+      jobs.push(this.run(p));
+    }
+    await Promise.allSettled(jobs);
+  }
+
   /** 憑證換新後：解除 auth 封鎖並盡快重抓 */
   credentialsChanged(id) {
     const p = this.providers.find((x) => x.id === id);
