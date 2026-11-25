@@ -234,7 +234,11 @@
 }
 
 /* 史萊姆：原地彈跳 */
-.mon-slime, .mon-slime-pink { animation: sc-bounce 1.3s ease-in-out infinite; }
+.mon-slime, .mon-slime-pink {
+  --sheet: 200%;
+  --frames: mon-frames2 1.3s steps(1) infinite;
+  animation: sc-bounce 1.3s ease-in-out infinite;
+}
 .mon-slime { --sprite: url(/pixel/slime.svg); }
 .mon-slime-pink { --sprite: url(/pixel/slime-pink.svg); animation-delay: -0.6s; }
 
@@ -310,6 +314,37 @@
 @keyframes mon-side {
   0%, 100% { transform: translateX(0); }
   50% { transform: translateX(-70px); }
+}
+
+/* 紫光小菇靈：左右巡步、輕輕彈跳 */
+.mon-sporeling {
+  --sprite: url(/pixel/sporeling.svg);
+  --sheet: 200%;
+  --frames: mon-frames2 0.75s steps(1) infinite;
+  animation: mon-spore 8s ease-in-out infinite;
+}
+
+@keyframes mon-spore {
+  0% { transform: translate(0, 0) scaleX(1); }
+  23% { transform: translate(42px, -6px) scaleX(1); }
+  46% { transform: translate(84px, 0) scaleX(1); }
+  50% { transform: translate(84px, 0) scaleX(-1); }
+  73% { transform: translate(42px, -6px) scaleX(-1); }
+  96% { transform: translate(0, 0) scaleX(-1); }
+  100% { transform: translate(0, 0) scaleX(1); }
+}
+
+/* 露珠水精靈：輕盈波紋浮動 */
+.mon-dewdrop {
+  --sprite: url(/pixel/dewdrop.svg);
+  --sheet: 200%;
+  --frames: mon-frames2 0.9s steps(1) infinite;
+  animation: mon-dew 2.4s ease-in-out infinite;
+}
+
+@keyframes mon-dew {
+  0%, 100% { transform: translateY(0) scale(1.04, 0.96); }
+  50% { transform: translateY(-14px) scale(0.96, 1.04); }
 }
 
 /* ---- 小勇者與傳送點 ---- */

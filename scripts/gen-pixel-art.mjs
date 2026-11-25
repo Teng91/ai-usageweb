@@ -77,27 +77,45 @@ svg('hero', [
   [...heroTop, '....kBBkkBBk....', '.....kBBBBk.....', '.....kk..kk.....', '................'],
 ]);
 
-// 史萊姆（綠、粉）
+// 史萊姆（綠、粉，兩格：一般／Q 彈眨眼）
 const slime = (c, d) => [
   '................',
   '................',
   '................',
   '......kkkk......',
-  '....kk' + c + c + c + c + 'kk....',
-  '...k' + c + c + c + c + c + c + c + c + 'k...',
-  '..k' + c + 'ww' + c + c + c + c + c + c + c + 'k..',
-  '..k' + c + 'w' + c + c + c + c + c + c + c + c + 'k..',
-  '..k' + c + c + 'k' + c + c + c + c + 'k' + c + c + 'k..',
-  '..k' + c + c + 'k' + c + c + c + c + 'k' + c + c + 'k..',
-  '..k' + c + c + c + c + 'kk' + c + c + c + c + 'k..',
-  '..k' + d + c + c + c + c + c + c + c + c + d + 'k..',
-  '...k' + d + d + c + c + c + c + d + d + 'k...',
+  '....kk' + c.repeat(4) + 'kk....',
+  '...k' + c.repeat(8) + 'k...',
+  '..k' + c + 'ww' + c.repeat(7) + 'k..',
+  '..k' + c + 'w' + c.repeat(8) + 'k..',
+  '..k' + c + c + 'k' + c.repeat(4) + 'k' + c + c + 'k..',
+  '..k' + c + c + 'k' + c.repeat(4) + 'k' + c + c + 'k..',
+  '..k' + c.repeat(4) + 'kk' + c.repeat(4) + 'k..',
+  '..k' + d + c.repeat(8) + d + 'k..',
+  '...k' + d + d + c.repeat(4) + d + d + 'k...',
   '....kkkkkkkk....',
   '................',
   '................',
 ];
-svg('slime', [slime('g', 'G')]);
-svg('slime-pink', [slime('p', 'P')]);
+const slimeSquish = (c, d) => [
+  '................',
+  '................',
+  '................',
+  '................',
+  '................',
+  '.....kkkkkk.....',
+  '...kk' + c.repeat(6) + 'kk...',
+  '..k' + c + 'ww' + c.repeat(7) + 'k..',
+  '.k' + c + c + 'w' + c.repeat(9) + 'k.',
+  '.k' + c + c + 'kk' + c.repeat(4) + 'kk' + c + c + 'k.',
+  '.k' + c.repeat(5) + 'kk' + c.repeat(5) + 'k.',
+  '.k' + d + c.repeat(10) + d + 'k.',
+  '..k' + d + d + c.repeat(6) + d + d + 'k..',
+  '...kkkkkkkkkk...',
+  '................',
+  '................',
+];
+svg('slime', [slime('g', 'G'), slimeSquish('g', 'G')]);
+svg('slime-pink', [slime('p', 'P'), slimeSquish('p', 'P')]);
 
 
 // 樹
@@ -274,6 +292,63 @@ const crabBody = [
 svg('crab', [
   ['.kk..........kk.', 'krrk........krrk', 'krRk........kRrk', ...crabBody],
   ['kk............kk', 'krk..........krk', '.kk..........kk.', ...crabBody],
+]);
+
+// 紫光小菇靈（兩格：孢子浮動＋走路換腳＋微笑）
+const sporeCap = [
+  '.......kvvVk....',
+  '.....kkvvvVVk...',
+  '....kvqvvvvVVk..',
+  '...kvvvvvvqVVVk.',
+  '..kvvvqvvvvVVVVk',
+  '..kVVVVVVVVVVVVk',
+  '...kkkkkkkkkkkk.',
+  '....kcccccccck..',
+  '....kcckcckcck..',
+];
+svg('sporeling', [
+  ['.........kk.....', '..q.....kvVk....', ...sporeCap, '....kcpccccpck..', '....kCccccccCk..', '.....kkCCCCkk...', '.....kk....kk...', '................'],
+  ['...q.....kk.....', '........kvVk....', ...sporeCap, '....kcpckkcpck..', '....kCccccccCk..', '.....kkCCCCkk...', '......kk..kk....', '................'],
+]);
+
+// 露珠水精靈（兩格：泡泡上升＋水波裙擺晃動）
+svg('dewdrop', [
+  [
+    '................',
+    '............w...',
+    '.......kk..wW...',
+    '......keek......',
+    '.....kweeek.....',
+    '....kweeeeek....',
+    '...kwWeeeeeek...',
+    '..kweeeeeeeeek..',
+    '..keekeeeekeek..',
+    '..keWeeeeeeWek..',
+    '..kEeeeeeeeeEk..',
+    '..kEEeeeeeeEEk..',
+    '..kEEkEEEEkEEk..',
+    '...kk.kkkk.kk...',
+    '................',
+    '................',
+  ],
+  [
+    '............w...',
+    '................',
+    '................',
+    '.......kk.......',
+    '......keek......',
+    '.....kweeek.....',
+    '....kweeeeek....',
+    '...kwWeeeeeek...',
+    '..kweeeeeeeeek..',
+    '..keekeeeekeek..',
+    '..keWeeeeeeWek..',
+    '..kEeeeeeeeeEk..',
+    '.kEEEeeeeeeEEEk.',
+    '.kkEEkkEEkkEEkk.',
+    '...kk..kk..kk...',
+    '................',
+  ],
 ]);
 
 // 傳送點（橢圓漩渦，程式算出來）

@@ -361,6 +361,7 @@ test('antigravity: 續期 → loadCodeAssist → fetchAvailableModels', async ()
     [':retrieveUserQuotaSummary', (req) => {
       assert.equal(JSON.parse(req.body).project, 'fluent-cat-123abc');
       assert.ok(req.headers['user-agent'].startsWith('antigravity/cli/'), '要用 CLI 的 User-Agent 才拿得到 Gemini 組');
+      assert.ok(req.url.startsWith('https://daily-cloudcode-pa.googleapis.com/'), 'cloudcode-pa 的 Gemini 用量不會更新，要用 daily');
       return { json: fixture('antigravity-summary.json') };
     }],
   ]);

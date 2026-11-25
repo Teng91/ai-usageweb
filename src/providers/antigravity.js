@@ -2,8 +2,9 @@ import { requestJson, toIso } from '../http.js';
 import { ProviderError } from '../errors.js';
 import { refreshToken, REFRESH_SKEW_MS } from '../oauth.js';
 
-// 需實測：內部端點，可用環境變數覆寫
-const BASE = process.env.ANTIGRAVITY_BASE_URL || 'https://cloudcode-pa.googleapis.com/v1internal';
+// 內部端點，可用環境變數覆寫。跟 agy CLI 一樣用 daily-cloudcode-pa：
+// cloudcode-pa 回的 Gemini 組額度永遠是 100%（重置時間也一直往後推），daily 的才是實際用量（2026-11 實測）
+const BASE = process.env.ANTIGRAVITY_BASE_URL || 'https://daily-cloudcode-pa.googleapis.com/v1internal';
 const TOKEN_URL = process.env.ANTIGRAVITY_TOKEN_URL || 'https://oauth2.googleapis.com/token';
 // 要用 agy CLI 的格式：retrieveUserQuotaSummary 看到 CLI 才會連 Gemini 組的額度一起回（只寫 antigravity 只有 Claude/GPT 組）
 const USER_AGENT = process.env.ANTIGRAVITY_USER_AGENT || 'antigravity/cli/1.5.15';

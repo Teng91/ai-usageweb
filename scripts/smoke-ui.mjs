@@ -133,6 +133,7 @@ async function main() {
     await sleep(800);
     check('切到冒險風格', (await ev(`document.documentElement.dataset.skin`)) === 'adventure');
     check('四張地圖建立', (await ev(`document.querySelectorAll('.scene .map').length`)) === 4);
+    check('新原創怪物（紫光小菇靈／露珠水精靈）存在於場景', (await ev(`!!document.querySelector('.scene .mon-sporeling') && !!document.querySelector('.scene .mon-dewdrop')`)) === true);
     check('從春天開始', (await ev(`document.documentElement.dataset.map`)) === 'spring');
     const maps = [];
     for (let i = 0; i < 4; i++) { await key('m'); await sleep(2300); maps.push(await ev(`document.documentElement.dataset.map`)); }
