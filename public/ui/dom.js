@@ -49,3 +49,14 @@ export function readStore(key) {
 export function writeStore(key, value) {
   try { localStorage.setItem(key, value); } catch { /* 不能存就只在這次有效 */ }
 }
+
+export function removeStore(key) {
+  try { localStorage.removeItem(key); } catch { /* 忽略 */ }
+}
+
+/** iPhone／iPad（iPadOS 會偽裝成 Mac，用觸控點數分辨） */
+export const isIos = () => /iphone|ipad|ipod/i.test(navigator.userAgent)
+  || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+/** 從主畫面（PWA）打開的 */
+export const isStandalone = () => navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;

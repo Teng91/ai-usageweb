@@ -306,6 +306,11 @@ test('推播 API：訂閱要密碼、tick 要 token 且不算有人在看', asyn
     assert.equal(ok.status, 200);
     assert.deepEqual((await ok.json()).prefs, { usage: true, reset: false });
     assert.deepEqual(await (await post('/api/push/status', { endpoint: SUB.endpoint })).json(), { subscribed: true, prefs: { usage: true, reset: false } });
+    // 改通知種類不需要密碼，但只能改已訂閱的
+    const pr = await post('/api/push/prefs', { endpoint: SUB.endpoint, prefs: { usage: false } });
+    assert.equal(pr.status, 200);
+    assert.deepEqual((await pr.json()).prefs, { usage: false, reset: false });
+    assert.equal((await post('/api/push/prefs', { endpoint: 'https://push.example.test/nope', prefs: { usage: false } })).status, 404);
     await post('/api/push/unsubscribe', { endpoint: SUB.endpoint });
     assert.equal((await (await post('/api/push/status', { endpoint: SUB.endpoint })).json()).subscribed, false);
 

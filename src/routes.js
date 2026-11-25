@@ -69,7 +69,7 @@ export function createHandler({ cfg, poller, hub, snapshot, creds, providers, ra
     if (!body || typeof body !== 'object') return sendJson(res, 400, { error: 'body 必須是 JSON 物件' });
 
     if (p === '/api/push/subscribe') {
-      // 訂閱或改設定要推播密碼；其餘操作只要知道自己的 endpoint（無法猜到）
+      // 新增訂閱要推播密碼；查狀態、改通知種類、退訂、測試只要知道自己的 endpoint（無法猜到）
       if (!checkBearer(req.headers.authorization, cfg.pushKey)) return sendJson(res, 403, { error: '推播密碼不對' });
       const sub = validSubscription(body.subscription);
       if (!sub) return sendJson(res, 400, { error: '訂閱資料格式不對' });
@@ -81,6 +81,10 @@ export function createHandler({ cfg, poller, hub, snapshot, creds, providers, ra
     if (p === '/api/push/status') {
       const prefs = push.prefs(endpoint);
       return sendJson(res, 200, { subscribed: Boolean(prefs), prefs });
+    }
+    if (p === '/api/push/prefs') {
+      const prefs = push.updatePrefs(endpoint, body.prefs);
+      return prefs ? sendJson(res, 200, { ok: true, prefs }) : sendJson(res, 404, { error: '這台裝置沒有訂閱' });
     }
     if (p === '/api/push/unsubscribe') {
       push.unsubscribe(endpoint);

@@ -27,7 +27,8 @@
                 credentials.js（環境變數＋AES-256-GCM 加密 volume）
 
 抓到新資料 ──▶ push.js（累積樣本、alerts.js 判斷）──▶ webpush.js ──▶ 手機
-GitHub Actions 每 15 分鐘 ──POST /api/push/tick──▶ 機器沒人看時也會抓一輪並判斷
+Google Apps Script 每 15 分鐘 ──POST /api/push/tick──▶ 機器沒人看時也會抓一輪並判斷
+（GitHub Actions 的排程當備援，常延遲好幾小時）
 ```
 
 | 路徑 | 說明 | 權限 |
@@ -38,8 +39,8 @@ GitHub Actions 每 15 分鐘 ──POST /api/push/tick──▶ 機器沒人看�
 | `GET /api/rankings` | OpenRouter 全站模型排行（每天／每週／每月，免費與付費各前 10 名，依 token 用量；付費附每百萬 token 輸入／輸出價格）；資料來自 OpenRouter 排行榜頁面的非官方端點，每小時最多抓一次 | 公開（或 `ACCESS_KEY`） |
 | `GET /healthz` | 健康檢查，不觸發輪詢 | 公開 |
 | `GET /api/push/config` | 推播是否啟用與 VAPID 公鑰 | 公開（或 `ACCESS_KEY`） |
-| `POST /api/push/subscribe` | 訂閱或更新通知設定（body：`subscription`、`prefs`） | `PUSH_KEY` |
-| `POST /api/push/status`、`/unsubscribe`、`/test` | 查狀態、退訂、送測試通知（body：`endpoint`；測試 30 秒一次） | 知道自己的 endpoint |
+| `POST /api/push/subscribe` | 新增訂閱（body：`subscription`、`prefs`） | `PUSH_KEY` |
+| `POST /api/push/status`、`/prefs`、`/unsubscribe`、`/test` | 查狀態、改通知種類（body 加 `prefs`）、退訂、送測試通知（body：`endpoint`；測試 30 秒一次） | 知道自己的 endpoint |
 | `POST /api/push/tick` | 排程喚醒：各家抓一輪並判斷推播，不算「有人在看」 | `PUSH_TICK_TOKEN` |
 | `POST /admin/refresh` | 立刻重抓（仍受每家最短間隔限制） | `ADMIN_TOKEN` |
 | `PUT /admin/credentials/:provider` | 替換某一家的憑證（JSON body） | `ADMIN_TOKEN` |
@@ -189,8 +190,14 @@ curl.exe -X PUT https://ai-usageweb.fly.dev/admin/credentials/claude -H "Authori
    npm run gen-vapid
    ```
 
-2. GitHub repo 的 Settings → Secrets and variables → Actions，新增 secret `PUSH_TICK_TOKEN`（同上）。`.github/workflows/push-tick.yml` 每 15 分鐘叫醒機器抓一輪，沒開網頁也能判斷（每天也會呼叫 GitHub API 重新啟用自己，避免 repo 60 天沒 commit 時排程被停用）；網址不是 `https://ai-usageweb.fly.dev` 的話再設 variable `APP_URL`。
-3. 手機打開網站（iPhone 要先「加入主畫面」，再從主畫面打開），點頂列的鈴鐺，輸入 `PUSH_KEY`、開啟通知，按「送測試通知」確認收得到。
+2. 設定排程喚醒，讓沒開網頁時也能判斷。主要用 **Google Apps Script**（準時，誤差通常在幾分鐘內）：
+   1. 到 [script.google.com](https://script.google.com) 建立專案，把 `google_apps_script/Code.gs` 整個貼上；網址不是 `https://ai-usageweb.fly.dev` 的話改開頭的 `APP_URL`。
+   2. **專案設定 → 指令碼屬性**，新增 `PUSH_TICK_TOKEN`（跟 fly secrets 的同一個值）。
+   3. 手動執行一次 `tick`（第一次會要求授權），在「執行項目」看到 `{"ok":true,"sent":0}` 就是通了。
+   4. 執行 `installTrigger`：建立每 15 分鐘一次的觸發器（可以重複執行，會先清掉舊的）。
+
+   備援是 GitHub Actions 的 `.github/workflows/push-tick.yml`（GitHub repo 的 Settings → Secrets and variables → Actions 新增 secret `PUSH_TICK_TOKEN`；網址不同再設 variable `APP_URL`）。GitHub 的排程常常延遲好幾小時、尖峰時段甚至整次跳過，只靠它推播會很不準；跟 Apps Script 同時跑不會重複推播（伺服器會去重、也有每家最短抓取間隔）。它每天也會呼叫 GitHub API 重新啟用自己，避免 repo 60 天沒 commit 時排程被停用。
+3. 手機打開網站（iPhone 要先「加入主畫面」，再從主畫面打開），點頂列的鈴鐺，輸入 `PUSH_KEY`、開啟通知，按「送測試通知」確認收得到。推播密碼只在開啟時用一次，不會存在瀏覽器裡；之後改通知種類、關閉都不用再輸入，關掉再重新開啟時才要再輸入。
 
 通知規則：
 
@@ -201,7 +208,7 @@ curl.exe -X PUT https://ai-usageweb.fly.dev/admin/credentials/claude -H "Authori
 
 - 00:00–08:00 不發（`PUSH_QUIET`，時區 `PUSH_TZ`）；「快重置」會落在勿擾時段的提醒，提前到 22:00 後發。
 - 網頁開著時不推播；同一類合成一則，新的蓋掉舊的；每家每天最多 4 則（超過上限或送失敗的不算發過，之後還會再判斷）。
-- 機器每 15 分鐘被叫醒一次、抓完約幾分鐘後又 suspend，執行時間大約多三分之一，費用每月不到 1 美元。
+- 機器每 15 分鐘被叫醒一次（Apps Script 不保證固定在哪一分鐘）、抓完約幾分鐘後又 suspend，執行時間大約多三分之一，費用每月不到 1 美元。
 
 ## 畫面
 
@@ -267,4 +274,5 @@ scripts/pixel-art/        像素圖產生器：lib（調色盤、點陣轉 SVG�
 docs/TECHNICAL.md         技術文件（設計細節）
 docs/TODO.md              之後可以做的事
 test/                     node:test＋假 fetch＋fixtures
+google_apps_script/Code.gs  推播排程喚醒（Apps Script 觸發器的原始碼副本）
 ```

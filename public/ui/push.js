@@ -1,12 +1,10 @@
 // 推播通知設定：頂列的鈴鐺 → 對話框（開關、兩種通知、測試）；訂閱交給 service worker 的 pushManager
-import { $, withKey, readStore, writeStore } from './dom.js';
+// 推播密碼只在開啟通知時用一次，不存起來；之後改設定、退訂、測試都靠這台裝置的訂閱 endpoint
+import { $, withKey, removeStore, isIos, isStandalone } from './dom.js';
 
-const KEY_STORE = 'pushKey';
 let publicKey = null;
 
 const supported = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
-const isIos = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-const isStandalone = () => navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
 
 function b64uToBytes(s) {
   const b = atob(s.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - (s.length % 4)) % 4));
@@ -39,9 +37,8 @@ function prefsFromForm() {
 /** 依目前訂閱狀態更新對話框 */
 async function refresh() {
   const on = $('push-on');
-  const needKey = !readStore(KEY_STORE);
-  $('push-key-row').hidden = !needKey;
   if (!supported()) {
+    $('push-key-row').hidden = true;
     on.disabled = true;
     $('push-test').disabled = true;
     setMsg(isIos() && !isStandalone()
@@ -61,6 +58,8 @@ async function refresh() {
     }
   }
   on.checked = subscribed;
+  // 已經開啟就不必再輸入密碼
+  $('push-key-row').hidden = subscribed;
   $('push-test').disabled = !subscribed;
   $('push-btn').classList.toggle('on', subscribed);
   if (Notification.permission === 'denied') setMsg('通知權限被封鎖了，要到瀏覽器的網站設定裡打開', true);
@@ -68,7 +67,7 @@ async function refresh() {
 }
 
 async function enable() {
-  const key = readStore(KEY_STORE) || $('push-key').value.trim();
+  const key = $('push-key').value.trim();
   if (!key) { setMsg('先輸入推播密碼', true); $('push-on').checked = false; return; }
   if (await Notification.requestPermission() !== 'granted') {
     $('push-on').checked = false;
@@ -88,10 +87,8 @@ async function enable() {
   const r = await api('/api/push/subscribe', { subscription: sub.toJSON(), prefs: prefsFromForm() }, key);
   if (!r.ok) {
     await sub.unsubscribe().catch(() => {});
-    if (r.status === 403) writeStore(KEY_STORE, '');
     throw new Error(r.data.error || `訂閱失敗（${r.status}）`);
   }
-  writeStore(KEY_STORE, key);
   $('push-key').value = '';
 }
 
@@ -104,9 +101,8 @@ async function disable() {
 
 async function savePrefs() {
   const sub = await currentSub().catch(() => null);
-  const key = readStore(KEY_STORE);
-  if (!sub || !key || !$('push-on').checked) return;
-  const r = await api('/api/push/subscribe', { subscription: sub.toJSON(), prefs: prefsFromForm() }, key);
+  if (!sub || !$('push-on').checked) return;
+  const r = await api('/api/push/prefs', { endpoint: sub.endpoint, prefs: prefsFromForm() });
   setMsg(r.ok ? '已儲存' : (r.data.error || '儲存失敗'), !r.ok);
 }
 
@@ -128,6 +124,7 @@ async function busy(fn, okMsg) {
 }
 
 export async function initPush() {
+  removeStore('pushKey'); // 舊版會把推播密碼存在 localStorage，清掉
   let cfg;
   try {
     const res = await fetch(withKey('/api/push/config'), { cache: 'no-store' });

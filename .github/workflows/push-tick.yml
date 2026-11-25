@@ -1,6 +1,8 @@
 name: push-tick
 
 # 沒人開網頁時機器會 suspend、輪詢也停了；每 15 分鐘叫醒一次，抓一輪並判斷要不要推播。
+# 這是備援：GitHub 的排程常延遲好幾小時、尖峰會整次跳過，主要的喚醒由 Google Apps Script（google_apps_script/Code.gs）負責。
+# 兩邊同時打不會重複推播（伺服器會去重，也有每家最短抓取間隔）。
 # 需要 repo secret PUSH_TICK_TOKEN（npm run gen-vapid 產生，跟 fly secrets 的同一個值）。
 # 網址不是預設的話，設 repo variable APP_URL。
 on:

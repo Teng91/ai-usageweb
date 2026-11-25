@@ -72,6 +72,15 @@ export class PushService {
     if (this.state.subs.length !== n) this.save();
   }
 
+  /** 改已訂閱裝置的通知種類；沒訂閱回 null（只改 prefs，不能新增訂閱，所以不需要推播密碼） */
+  updatePrefs(endpoint, prefs) {
+    const sub = this.state.subs.find((s) => s.endpoint === endpoint);
+    if (!sub) return null;
+    sub.prefs = { ...DEFAULT_PREFS, ...sub.prefs, ...cleanPrefs(prefs) };
+    this.save();
+    return sub.prefs;
+  }
+
   prefs(endpoint) {
     return this.state.subs.find((s) => s.endpoint === endpoint)?.prefs || null;
   }

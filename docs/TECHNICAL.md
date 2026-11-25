@@ -65,7 +65,8 @@ flowchart LR
     P --> PS[push.js<br/>alerts.js]
     PS --> WP[webpush.js]
   end
-  GH[GitHub Actions<br/>每 15 分鐘] -- POST /api/push/tick --> R
+  GAS[Google Apps Script<br/>每 15 分鐘] -- POST /api/push/tick --> R
+  GH[GitHub Actions 排程<br/>備援] -. POST /api/push/tick .-> R
   WP -- Web Push --> PHONE[(手機)]
   UI -- GET /api/usage --> R
   H -- SSE /api/stream --> UI
@@ -79,7 +80,7 @@ flowchart LR
 2. 第一個觀看者出現時 `poller` 開始排程，每家每 2 分鐘抓一次；每抓到一家就透過 SSE 推給所有人。
 3. 觀看者全部離開 90 秒後停止輪詢；fly.io 偵測到沒有連線，幾分鐘後把機器 **suspend**（保留記憶體快照，下次喚醒只要幾百毫秒）。
 4. 每家 adapter 輸出統一格式 `{ plan, planExpiresAt?, windows: [{ id, label, usedPct, resetsAt, periodSec?, used?, limit? }], balance, note }`，前端只認這個格式，新增服務不必改畫面。`usedPct` 一律是「已用」0–100；`periodSec` 是窗口長度（推播靠它分辨週／月額度）；`used`／`limit` 是次數制額度（Copilot）的實際次數。
-5. 每抓到新資料，`push.js` 記一筆樣本並判斷要不要推播；沒人看時由 GitHub Actions 定時喚醒抓一輪。
+5. 每抓到新資料，`push.js` 記一筆樣本並判斷要不要推播；沒人看時由 Google Apps Script 定時喚醒抓一輪（GitHub Actions 排程當備援）。
 
 **後端模組**
 
@@ -110,7 +111,7 @@ flowchart LR
 | `ui/pwa.js` | Service Worker、安裝、iOS 提示 |
 | `ui/push.js` | 通知設定對話框（訂閱、開關、送測試通知） |
 | `ui/format.js` | 金額、時間、倒數的格式化 |
-| `ui/dom.js` | 共用的取元素函式、狀態、localStorage、存取碼網址；卡片順序與過期門檻都跟伺服器快照拿 |
+| `ui/dom.js` | 共用的取元素函式、狀態、localStorage、存取碼網址、裝置判斷（iOS／從主畫面打開）；卡片順序與過期門檻都跟伺服器快照拿 |
 | `scene.js` / `scene-maps.js` | 冒險風格的場景邏輯與四季地圖資料 |
 
 ## 4. 技術選擇與取捨
@@ -184,7 +185,8 @@ flowchart LR
 - 伺服器每小時最多抓一次並存檔，冷啟動也有資料；存檔帶格式版本，欄位改變時舊檔自動丟掉重抓。
 
 ### 5.8 推播通知（Web Push）
-- **沒人看也要能判斷**：機器沒人看就 suspend、輪詢也停，所以由 GitHub Actions 每 15 分鐘呼叫 `POST /api/push/tick`（自己的 token，不算「有人在看」），各家抓一輪（仍受 `minIntervalSec` 限制）後判斷。
+- **沒人看也要能判斷**：機器沒人看就 suspend、輪詢也停，所以由 Google Apps Script 的觸發器每 15 分鐘呼叫 `POST /api/push/tick`（自己的 token，不算「有人在看」），各家抓一輪（仍受 `minIntervalSec` 限制）後判斷。
+- **為什麼不只用 GitHub Actions**：原本用 GitHub 的 `schedule`，實測 15 小時只跑了 1 次（排程常延遲好幾小時、尖峰會整次跳過）。Apps Script 準時得多，GitHub 的排程留著當備援；兩邊同時打也不會重複推播（`sent` 去重＋每家最短抓取間隔）。
 - **兩種通知**（`src/alerts.js`，純函式）：
   - 用量警告：用最近 90 分鐘的樣本算消耗速度，預估在重置前用完才發，而不是固定門檻；95% 保底。避免「重置前 10 分鐘剛好過 80%」這種沒意義的通知。
   - 快重置還有剩：只看週期 ≥ 3 天的窗口（adapter 帶 `periodSec`），24h／40%、12h／20%、6h／10% 三階，發了緊的就把鬆的一起記下，不會倒回去；最近一小時用量有漲就不發。
@@ -193,14 +195,14 @@ flowchart LR
 - **重置週期的判斷**：重置時間每次回傳可能差幾秒，差 30 分鐘以上、時間已過、或用量突然下降才算新週期；去重的 key 是「服務：窗口：週期：階段」。
 - **勿擾**：00–08 不發；22–24 時把勿擾期間才會碰到的「快重置」提醒提前發。用量警告在勿擾後重新判斷（95% 仍會發）。
 - **零相依**：VAPID 用 `crypto.sign`（ES256、ieee-p1363），內容加密照 RFC 8291（ECDH＋HKDF＋AES-128-GCM），單元測試直接比對 RFC 附錄的範例輸出。
-- **只有自己能訂閱**：訂閱要 `PUSH_KEY`；其他操作憑 endpoint（無法猜到）。推播內容只有百分比與重置時間。失效的訂閱（404／410）自動刪除。
+- **只有自己能訂閱**：新增訂閱要 `PUSH_KEY`；查狀態、改通知種類（`/api/push/prefs`）、退訂、測試憑 endpoint（無法猜到）。前端不保存推播密碼，只在開啟通知時用一次。推播內容只有百分比與重置時間。失效的訂閱（404／410）自動刪除。
 
 ## 6. 測試與 CI
 
 | 層級 | 工具 | 內容 |
 | --- | --- | --- |
 | 單元／整合 | `node:test`（90 項） | 每家 adapter 用 fixture 驗證轉換、輪詢排程與退避、憑證加密與續期鎖、快照、排行解析、HTTP 路由、逾時分類、推播加密（RFC 8291 範例）與規則 |
-| 前端 smoke test | 自寫的 Chrome DevTools Protocol 腳本（30 項） | 用假資料起本機伺服器、開 headless Chrome 實際操作：卡片、排行與價格、亮暗與風格切換、四季地圖輪替、點怪物、跳數字、只看風景、手機版按鈕位置、通知設定對話框、沒有 JS 錯誤 |
+| 前端 smoke test | 自寫的 Chrome DevTools Protocol 腳本（32 項） | 用假資料起本機伺服器、開 headless Chrome 實際操作：卡片、排行與價格、亮暗與風格切換、四季地圖輪替、點怪物、跳數字、只看風景、手機版按鈕位置、通知設定對話框、沒有 JS 錯誤 |
 | CI | GitHub Actions | 推到 `main` 時兩種測試都通過才部署到 fly.io |
 
 前端 smoke test 同樣**不需要任何套件**：直接啟動本機的 Chrome／Edge，透過 Node 22 內建的 `WebSocket` 跟 DevTools Protocol 溝通。
@@ -222,6 +224,8 @@ flowchart LR
 | 舊格式的排行存檔沒有價格 | 存檔要等一小時過期才重抓 | 存檔加上格式版本，不符就丟掉 |
 | Windows PowerShell 5.1 讀中文腳本亂碼 | 無 BOM 的 UTF-8 被當成系統碼頁 | 腳本加上 UTF-8 BOM |
 | iPhone 上「只看風景」回不去 | 返回按鈕被狀態列蓋住 | 用 `env(safe-area-inset-*)` 避開，手機版移到下方，並支援點兩下背景返回 |
+| 沒開網頁時幾乎收不到推播 | GitHub Actions 的 `schedule` 15 小時只跑了 1 次 | 改由 Google Apps Script 觸發器每 15 分鐘打 `/api/push/tick`，GitHub 排程留著當備援 |
+| 第一次打開網頁會自己重整一次 | Service worker 第一次接手（`clients.claim`）也會觸發 `controllerchange` | 只有按了「重新載入」才重整 |
 | 平台上的怪物被卡片擋住 | 位置用畫面寬度百分比計算 | 改用卡片區兩側剩餘寬度計算，放不下就隱藏 |
 
 ## 9. 專案數據
@@ -231,7 +235,7 @@ flowchart LR
 | 後端程式 | 約 2,600 行 |
 | 前端 JavaScript | 約 1,500 行 |
 | CSS | 約 2,000 行（簡約、冒險卡片、場景三個檔） |
-| 測試 | 90 項單元／整合 + 30 項前端 smoke test |
+| 測試 | 90 項單元／整合 + 32 項前端 smoke test |
 | 原創像素圖 | 32 張（全部由產生器產生） |
 | 相依套件 | 0 |
 

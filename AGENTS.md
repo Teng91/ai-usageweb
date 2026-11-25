@@ -16,11 +16,12 @@ ai-usageweb：顯示 Claude、Codex、Antigravity、Copilot 額度與 OpenRouter
 - 卡片順序只在 `src/providers/index.js` 定義，前端照快照順序；不要在前端再寫一份。
 - `/healthz` 與 `/api/push/tick` 不能算「有人在看」。
 - 推播：規則在 `src/alerts.js`（純函式）、服務在 `src/push.js`、加密在 `src/webpush.js`。推播內容只放百分比與重置時間。改規則要更新 `test/push.test.js` 與 README 的規則表。之後要做的事記在 `docs/TODO.md`。
+- 推播的排程喚醒主要靠 Google Apps Script（`google_apps_script/Code.gs`，repo 裡只是副本），GitHub Actions 的 `push-tick.yml` 是備援。前端不保存推播密碼。
 - 存檔格式（例如 `rankings.json`）改了欄位就把該檔的 `FORMAT_VERSION` +1，讓舊檔被丟掉。
 
 ## 前端
 - 改了 `public/` 的檔案要把 `public/sw.js` 的 `CACHE` 版本號 +1；新增要離線可用的檔案要加進 `SHELL`。新的 `/api/*` 不經 service worker（加進 `sw.js` 的略過清單）。
-- 前端模組分工：`app.js` 資料與連線、`ui/cards.js` 卡片與頂列、`ui/rankings.js` 排行、`ui/effects.js` 冒險風格效果、`ui/theme-toggle.js` 亮暗與風格切換、`ui/pwa.js` 離線／安裝、`ui/push.js` 通知設定、`ui/format.js` 格式化、`ui/dom.js` 共用的取元素函式、狀態與 localStorage。不要再把東西塞回 `app.js`。`public/theme.js` 是畫面出現前套用主題的小腳本（非模組），跟 `ui/theme-toggle.js` 不同。
+- 前端模組分工：`app.js` 資料與連線、`ui/cards.js` 卡片與頂列、`ui/rankings.js` 排行、`ui/effects.js` 冒險風格效果、`ui/theme-toggle.js` 亮暗與風格切換、`ui/pwa.js` 離線／安裝、`ui/push.js` 通知設定、`ui/format.js` 格式化、`ui/dom.js` 共用的取元素函式、狀態、localStorage 與裝置判斷（`isIos`、`isStandalone`）。不要再把東西塞回 `app.js`。`public/theme.js` 是畫面出現前套用主題的小腳本（非模組），跟 `ui/theme-toggle.js` 不同。
 - CSP 不允許內嵌 script 與 HTML 裡的 `style=""`；要動態樣式用 JS 設 `element.style`。
 - 兩種風格：簡約（`style.css`）與冒險（`skin-adventure.css` 卡片、按鈕與遊戲介面；`scene.css` 場景）。冒險風格的規則一律限定在 `[data-skin="adventure"]` 底下，不能影響簡約風格。
 - 冒險風格的場景：地圖資料在 `public/scene-maps.js`，邏輯在 `public/scene.js`。平台與天上的怪物只放卡片兩側（`side: true`），不要放在會被卡片擋住的地方。
