@@ -68,7 +68,10 @@ async function main() {
   const url = `http://127.0.0.1:${server.address().port}/`;
   const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'aiu-smoke-'));
   const port = 9400 + Math.floor(Math.random() * 400);
-  const chrome = spawn(chromePath, ['--headless=new', '--disable-gpu', `--remote-debugging-port=${port}`, `--user-data-dir=${profile}`, 'about:blank'], { stdio: 'ignore' });
+  const chromeArgs = ['--headless=new', '--disable-gpu', `--remote-debugging-port=${port}`, `--user-data-dir=${profile}`];
+  // CI（GitHub Actions 的 Linux）裡 Chrome 的 sandbox 可能用不了
+  if (process.env.CI) chromeArgs.push('--no-sandbox', '--disable-dev-shm-usage');
+  const chrome = spawn(chromePath, [...chromeArgs, 'about:blank'], { stdio: 'ignore' });
 
   try {
     let list;

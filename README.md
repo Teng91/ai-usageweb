@@ -8,6 +8,8 @@
 - 前端是純 HTML＋CSS＋原生 JS，沒有打包
 - 只讀不寫：只打各家「查用量」端點，不發模型請求
 
+架構、設計取捨、測試與遇到的問題整理在 [docs/TECHNICAL.md](docs/TECHNICAL.md)。
+
 > ⚠ 除了 OpenRouter，其他四家用的都是官方工具自己在用的**內部端點**，隨時可能改，也可能牴觸服務條款。端點、欄位與 client id 都標為「需實測」，可以用環境變數覆寫（見 `.env.example`）。上線前請自己讀過各家條款。
 
 ## 架構
@@ -110,7 +112,7 @@ powershell -ExecutionPolicy Bypass -File scripts\setup-antigravity.ps1
 node scripts/extract-credentials.js --gen-keys --gh
 ```
 
-`server-*` 目錄與 `server-antigravity.json` 已在 `.gitignore`，用完就刪掉。
+`server-*` 目錄已在 `.gitignore`，用完就刪掉。
 
 ## 部署到 fly.io
 
@@ -134,7 +136,7 @@ fly deploy
 
 打開 `https://ai-usageweb.fly.dev`，`fly logs` 會看到每家一行 JSON 抓取紀錄（續期成功會多一行「憑證已續期並寫入」）。關掉網頁等 5–10 分鐘，`fly machine list` 應該是 `suspended`；部署或主機搬移後的第一次喚醒仍是一般冷啟動。
 
-自動部署：`fly tokens create deploy` 產生 token，存成 GitHub repo secret `FLY_API_TOKEN`，之後推到 `main` 會先跑 `npm test` 再 `fly deploy`。
+自動部署：`fly tokens create deploy` 產生 token，存成 GitHub repo secret `FLY_API_TOKEN`，之後推到 `main` 會先跑 `npm test` 與前端 smoke test（`npm run test:ui`，用 runner 內建的 Chrome），兩個都過才 `fly deploy`。
 
 ### 憑證的保存與重設
 
@@ -173,9 +175,12 @@ curl.exe -X PUT https://ai-usageweb.fly.dev/admin/credentials/claude -H "Authori
 ## 專案結構
 
 ```
-server.js                 HTTP、SSE、靜態檔、管理 API
+server.js                 進入點：組裝各元件並啟動 HTTP 伺服器
 src/poller.js             觀看者計數、每家排程、退避、共用 in-flight Promise
 src/snapshot.js           記憶體快照、/data/snapshot.json 原子寫入
+src/routes.js             路由：公開 API、SSE、管理 API、ACCESS_KEY
+src/static.js             靜態檔（擋路徑穿越、快取標頭）
+src/respond.js            回應與驗證的共用小工具（JSON、安全標頭、固定時間比較）
 src/rankings.js           OpenRouter 模型排行（每小時最多抓一次）
 src/credentials.js        環境變數＋加密 volume、每家續期鎖
 src/sse.js                SSE 連線、ping、廣播、連線上限 30 分鐘
@@ -191,6 +196,6 @@ public/scene.css          冒險風格的場景（天空、地形、怪物、勇
 public/scene.js           場景邏輯：建立地圖、勇者走到傳送點換季、怪物互動、只看風景、快捷鍵
 public/scene-maps.js      四季地圖資料（加地圖改這裡）
 public/pixel/             原創像素圖（由 scripts/gen-pixel-art.mjs 產生）
-scripts/                  extract-credentials.js、antigravity-login.js、setup-antigravity.ps1、gen-pixel-art.mjs、smoke-ui.mjs
+scripts/                  extract-credentials.js、setup-antigravity.ps1、gen-pixel-art.mjs、smoke-ui.mjs
 test/                     node:test＋假 fetch＋fixtures
 ```

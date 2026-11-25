@@ -1,6 +1,6 @@
 {
   "name": "ai-usageweb",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "description": "跨平台 AI 用量觀測 PWA：Claude、Codex、Antigravity、Copilot 額度與 OpenRouter 餘額",
   "type": "module",
@@ -12,7 +12,6 @@
     "dev": "node --env-file-if-exists=.env.local --watch server.js",
     "test": "node --test",
     "extract-credentials": "node scripts/extract-credentials.js",
-    "antigravity-login": "node --env-file-if-exists=.env.local scripts/antigravity-login.js",
     "test:ui": "node scripts/smoke-ui.mjs"
   },
   "license": "MIT"

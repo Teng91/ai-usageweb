@@ -15,8 +15,18 @@ jobs:
           node-version: 22
       - run: npm test
 
+  # 前端 smoke test：用假資料起本機伺服器、開 runner 內建的 Chrome 實際操作畫面
+  ui-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm run test:ui
+
   deploy:
-    needs: test
+    needs: [test, ui-test]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     concurrency: deploy

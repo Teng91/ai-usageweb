@@ -10,7 +10,7 @@
  * 讀取來源（都可以不存在）：
  *   ./server-claude/.credentials.json   CLAUDE_CONFIG_DIR=./server-claude claude 之後 /login 產生
  *   ./server-codex/auth.json            CODEX_HOME=./server-codex codex login 產生
- *   ./server-antigravity.json           scripts/antigravity-login.js 產生
+ *   Antigravity 用 scripts/setup-antigravity.ps1 直接設到 fly；這裡只轉印環境變數裡已有的值
  *   環境變數 OPENROUTER_API_KEY、GITHUB_COPILOT_TOKEN、CLAUDE_OAUTH_TOKEN（setup-token）
  *
  * ⚠ 輸出含有 token：只在自己的終端機執行，不要貼到任何地方或存進 repo。
@@ -65,12 +65,11 @@ if (codex?.tokens?.refresh_token) {
   set('CODEX_ACCOUNT_ID', codex.tokens.account_id);
 }
 
-// Antigravity
-const ag = readJson('./server-antigravity.json');
-set('ANTIGRAVITY_REFRESH_TOKEN', ag?.refresh_token || process.env.ANTIGRAVITY_REFRESH_TOKEN);
-set('ANTIGRAVITY_CLIENT_ID', ag?.client_id || process.env.ANTIGRAVITY_CLIENT_ID);
-set('ANTIGRAVITY_CLIENT_SECRET', ag?.client_secret || process.env.ANTIGRAVITY_CLIENT_SECRET);
-set('ANTIGRAVITY_PROJECT_ID', ag?.project_id || process.env.ANTIGRAVITY_PROJECT_ID);
+// Antigravity（通常用 scripts/setup-antigravity.ps1 直接設到 fly，這裡只轉印環境變數）
+set('ANTIGRAVITY_REFRESH_TOKEN', process.env.ANTIGRAVITY_REFRESH_TOKEN);
+set('ANTIGRAVITY_CLIENT_ID', process.env.ANTIGRAVITY_CLIENT_ID);
+set('ANTIGRAVITY_CLIENT_SECRET', process.env.ANTIGRAVITY_CLIENT_SECRET);
+set('ANTIGRAVITY_PROJECT_ID', process.env.ANTIGRAVITY_PROJECT_ID);
 
 if (args.has('--gen-keys')) {
   set('CREDENTIALS_KEY', crypto.randomBytes(32).toString('base64'));

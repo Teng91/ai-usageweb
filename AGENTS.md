@@ -26,5 +26,7 @@ ai-usageweb：顯示 Claude、Codex、Antigravity、Copilot 額度與 OpenRouter
 - 用 Node 腳本改檔案時，`String.replace` 的取代字串裡 `$` 有特殊意義（`` $` `` 會插入比對前的整段文字），含 `$` 的內容改用 `split().join()` 或直接寫檔。
 
 ## 測試
+- 後端分工：`server.js` 只組裝、`src/routes.js` 路由、`src/static.js` 靜態檔、`src/respond.js` 回應小工具。新 API 加在 `routes.js`。
+- 推到 `main` 會跑 `npm test` 與 `npm run test:ui`，兩個都過才部署。
 - 改 adapter 時一併更新 `test/fixtures/` 與 `test/providers.test.js`，`npm test` 必須通過（自動部署前也會跑）。
 - 介面文字用繁體中文。
