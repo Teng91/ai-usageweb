@@ -90,6 +90,8 @@ export function renderCard(p) {
   body.replaceChildren();
 
   body.classList.toggle('or-body', p.id === 'openrouter');
+  // 超過兩條額度就排成兩欄（左 5 小時、右每週），卡片高度跟只有兩條的一樣
+  body.classList.toggle('win-grid', !p.balance && (p.windows?.length || 0) > 2);
   if (p.balance) {
     const bal = document.createElement('div');
     bal.className = 'balance';
@@ -151,6 +153,7 @@ function renderBalance(b) {
 function renderWindow(w) {
   const wrap = document.createElement('div');
   wrap.className = 'win';
+  if (w.periodSec) wrap.dataset.period = w.periodSec < 86400 ? 'short' : 'long';
   const pct = Math.round(w.usedPct);
   const level = w.usedPct >= 90 ? 'danger' : w.usedPct >= 70 ? 'warn' : '';
 
@@ -185,7 +188,11 @@ function renderWindow(w) {
 /** 每秒更新：倒數、X 分鐘前、狀態 */
 function tickCard(el, p, now = Date.now()) {
   for (const sub of el.querySelectorAll('.win-sub')) {
-    sub.textContent = resetText(sub.dataset.resetsAt, now);
+    const full = resetText(sub.dataset.resetsAt, now);
+    // 兩欄時寬度不夠，只顯示倒數，完整時間放在提示
+    const short = sub.closest('.win-grid') ? full.replace(/（.*）$/, '') : full;
+    sub.textContent = short;
+    if (short !== full) sub.title = full; else sub.removeAttribute('title');
   }
   const st = effectiveStatus(p, now);
   const updating = isUpdating(p, now);

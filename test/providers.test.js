@@ -7,7 +7,7 @@ import openrouter from '../src/providers/openrouter.js';
 import copilot, { parseCopilot } from '../src/providers/copilot.js';
 import claude, { parseClaude, parsePlanExpiry } from '../src/providers/claude.js';
 import codex, { parseCodex } from '../src/providers/codex.js';
-import antigravity, { parseModels, tierName, _resetCache } from '../src/providers/antigravity.js';
+import antigravity, { parseModels, parseSummary, mergeWindows, tierName, _resetCache } from '../src/providers/antigravity.js';
 import { ProviderError } from '../src/errors.js';
 import { parseRankings, parseModelCatalog, RankingsService } from '../src/rankings.js';
 
@@ -298,6 +298,42 @@ test('antigravity: 一組全部缺 remainingFraction → 那組不顯示', () =>
   assert.deepEqual(w.map((x) => x.id), ['gemini']);
 });
 
+test('antigravity: summary 的 5 小時與每週額度；不認得的窗口略過', () => {
+  const s = parseSummary(fixture('antigravity-summary.json'));
+  assert.deepEqual(Object.keys(s), ['claude_gpt']);
+  assert.deepEqual(s.claude_gpt['5h'], { id: 'claude_gpt', label: 'Claude/GPT 5 小時', usedPct: 50, resetsAt: '2026-11-25T12:36:12.000Z', periodSec: 18000 });
+  assert.deepEqual(s.claude_gpt.weekly, { id: 'claude_gpt_week', label: 'Claude/GPT 每週', usedPct: 25, resetsAt: '2026-12-02T07:36:12.000Z', periodSec: 604800 });
+  assert.deepEqual(parseSummary({}), {});
+});
+
+test('antigravity: 合併 → 每組 5 小時在前、每週在後；模型清單 5 小時內重置就標成 5 小時', () => {
+  const now = Date.parse('2026-11-25T08:00:00Z');
+  const models = [
+    { id: 'gemini', label: 'Gemini', usedPct: 10, resetsAt: '2026-11-25T12:30:00.000Z' },
+    { id: 'claude_gpt', label: 'Claude/GPT', usedPct: 99, resetsAt: '2026-11-25T12:30:00.000Z' },
+  ];
+  const w = mergeWindows(models, parseSummary(fixture('antigravity-summary.json')), now);
+  assert.deepEqual(w.map((x) => [x.id, x.label, x.usedPct, x.periodSec]), [
+    ['gemini', 'Gemini 5 小時', 10, 18000],
+    ['claude_gpt', 'Claude/GPT 5 小時', 50, 18000],
+    ['claude_gpt_week', 'Claude/GPT 每週', 25, 604800],
+  ]);
+  // 免費方案：沒有 summary、一週才重置 → 維持原樣，不標長度
+  const free = mergeWindows([{ id: 'gemini', label: 'Gemini', usedPct: 0, resetsAt: '2026-12-01T00:00:00.000Z' }], {}, now);
+  assert.deepEqual(free, [{ id: 'gemini', label: 'Gemini', usedPct: 0, resetsAt: '2026-12-01T00:00:00.000Z' }]);
+});
+
+test('antigravity: summary 失敗不影響主要額度', async () => {
+  mock = mockFetch([
+    ['oauth2.googleapis.com', () => ({ json: { access_token: 'g1', expires_in: 3599 } })],
+    [':loadCodeAssist', () => ({ json: fixture('antigravity-load.json') })],
+    [':fetchAvailableModels', () => ({ json: fixture('antigravity-models.json') })],
+    [':retrieveUserQuotaSummary', () => ({ status: 404, json: {} })],
+  ]);
+  const r = await antigravity.fetch(ctxFor({ antigravity: { refreshToken: 'rt', clientId: 'cid', clientSecret: 'cs' } }));
+  assert.deepEqual(r.windows.map((x) => x.id), ['gemini', 'claude_gpt']);
+});
+
 test('antigravity: 續期 → loadCodeAssist → fetchAvailableModels', async () => {
   mock = mockFetch([
     ['oauth2.googleapis.com', (req) => {
@@ -312,10 +348,14 @@ test('antigravity: 續期 → loadCodeAssist → fetchAvailableModels', async ()
       assert.equal(req.headers.authorization, 'Bearer g1');
       return { json: fixture('antigravity-models.json') };
     }],
+    [':retrieveUserQuotaSummary', (req) => {
+      assert.equal(JSON.parse(req.body).project, 'fluent-cat-123abc');
+      return { json: fixture('antigravity-summary.json') };
+    }],
   ]);
   const r = await antigravity.fetch(ctxFor({ antigravity: { refreshToken: 'rt', clientId: 'cid', clientSecret: 'cs' } }));
   assert.equal(r.plan, 'Free');
-  assert.equal(r.windows.length, 2);
+  assert.deepEqual(r.windows.map((x) => x.id), ['gemini', 'claude_gpt', 'claude_gpt_week']);
 });
 
 test('antigravity: 方案名稱整理成 Free／Pro／Ultra，付費方案優先', () => {

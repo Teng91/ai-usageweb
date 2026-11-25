@@ -3,7 +3,7 @@
 export const $ = (id) => document.getElementById(id);
 
 // 卡片固定順序
-export const ORDER = ['claude', 'codex', 'antigravity', 'copilot', 'openrouter'];
+export const ORDER = ['claude', 'antigravity', 'codex', 'copilot', 'openrouter'];
 // 超過幾個更新週期沒新資料就算過期
 export const STALE_INTERVALS = 3;
 // 打開頁面後這段時間內，舊資料視為「更新中」而不是「過期」（伺服器剛喚醒正在抓）

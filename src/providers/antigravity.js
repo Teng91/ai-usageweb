@@ -65,9 +65,63 @@ export function parseModels(data) {
   return windows;
 }
 
+function usedOf(frac) {
+  return Math.round(Math.min(1, Math.max(0, 1 - frac)) * 1000) / 10;
+}
+
 function toWindow(id, label, g) {
-  const usedPct = Math.round(Math.min(1, Math.max(0, 1 - g.frac)) * 1000) / 10;
-  return { id, label, usedPct, resetsAt: toIso(g.resetTime) };
+  return { id, label, usedPct: usedOf(g.frac), resetsAt: toIso(g.resetTime) };
+}
+
+const HOUR = 3600;
+const PERIODS = { '5h': [5 * HOUR, '5 小時', ''], weekly: [7 * 24 * HOUR, '每週', '_week'] };
+const FAMILIES = [['gemini', 'Gemini'], ['claude_gpt', 'Claude/GPT']];
+
+/**
+ * retrieveUserQuotaSummary：每組模型的 5 小時與每週額度（付費方案才有；目前只有 Claude/GPT 組）。
+ * 回傳 { gemini: { '5h': win, weekly: win }, claude_gpt: {...} }，沒有的就不放。
+ */
+export function parseSummary(data) {
+  const out = {};
+  for (const g of Array.isArray(data?.groups) ? data.groups : []) {
+    // 先看組名，組名認不出來才看說明（說明裡會列出組內模型）
+    const fam = family(g.displayName || '') || family(g.description || '');
+    if (!fam) continue;
+    const [id, name] = FAMILIES[fam === 'gemini' ? 0 : 1];
+    for (const b of Array.isArray(g.buckets) ? g.buckets : []) {
+      const p = PERIODS[b?.window];
+      const frac = Number(b?.remainingFraction);
+      if (!p || b.remainingFraction === undefined || b.remainingFraction === null || !Number.isFinite(frac)) continue;
+      (out[id] ||= {})[b.window] = {
+        id: id + p[2], label: `${name} ${p[1]}`, usedPct: usedOf(frac), resetsAt: toIso(b.resetTime), periodSec: p[0],
+      };
+    }
+  }
+  return out;
+}
+
+/**
+ * 合併兩個來源：每組先放 5 小時（summary 有就用 summary，否則用模型清單的），再放每週。
+ * 模型清單的窗口若 5 小時內就重置，視為 5 小時額度（付費方案），標上長度。
+ */
+export function mergeWindows(modelWins, summary, now = Date.now()) {
+  const out = [];
+  for (const [id, name] of FAMILIES) {
+    const s = summary[id] || {};
+    let short = s['5h'];
+    if (!short) {
+      const m = modelWins.find((w) => w.id === id);
+      if (m) {
+        const left = Date.parse(m.resetsAt) - now;
+        short = left > 0 && left <= 5 * HOUR * 1000 + 5 * 60_000
+          ? { ...m, label: `${name} 5 小時`, periodSec: 5 * HOUR }
+          : m;
+      }
+    }
+    if (short) out.push(short);
+    if (s.weekly) out.push(s.weekly);
+  }
+  return out;
 }
 
 /** 方案名稱整理成 Free／Pro／Ultra；認不得的照原樣顯示 */
@@ -143,8 +197,18 @@ async function fetchOnce(ctx, token) {
     cache.planAt = Date.now();
   }
   if (!projectId) throw new ProviderError('parse', '回傳缺少 project id');
-  const { data } = await post('fetchAvailableModels', token, { project: projectId }, ctx.signal);
-  const windows = parseModels(data);
+  // 每週額度只在 summary 裡；summary 拿不到（免費方案、端點變了）就只顯示模型清單的
+  const [models, summary] = await Promise.all([
+    post('fetchAvailableModels', token, { project: projectId }, ctx.signal),
+    post('retrieveUserQuotaSummary', token, { project: projectId }, ctx.signal).then(
+      (r) => parseSummary(r.data),
+      (err) => {
+        if (err instanceof ProviderError && err.kind === 'auth') throw err;
+        return {};
+      },
+    ),
+  ]);
+  const windows = mergeWindows(parseModels(models.data), summary);
   return {
     plan: cache.plan,
     windows,
@@ -155,7 +219,7 @@ async function fetchOnce(ctx, token) {
 
 export default {
   id: 'antigravity',
-  name: 'Antigravity',
+  name: 'Gemini',
   minIntervalSec: 60,
   isConfigured(creds) {
     const c = creds.antigravity;

@@ -433,6 +433,20 @@ button {
 /* 額度條 */
 .win + .win { margin-top: 14px; }
 
+/* 三條以上：兩欄，短窗口靠左、長窗口靠右（同一組排在同一列） */
+.win-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 16px;
+  row-gap: 14px;
+  align-content: start;
+}
+.win-grid .win + .win { margin-top: 0; }
+.win-grid .win[data-period="short"] { grid-column: 1; }
+.win-grid .win[data-period="long"] { grid-column: 2; }
+.win-grid .win-row > span:first-child,
+.win-grid .win-sub { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 .win-row {
   display: flex;
   justify-content: space-between;
