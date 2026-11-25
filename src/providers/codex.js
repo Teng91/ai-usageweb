@@ -1,6 +1,6 @@
 import { requestJson, clampPct, toIso } from '../http.js';
 import { ProviderError } from '../errors.js';
-import { refreshToken, jwtExpiryMs, REFRESH_SKEW_MS } from '../oauth.js';
+import { jwtExpiryMs, refreshAndSave, callWithRefresh } from '../oauth.js';
 
 // 需實測：內部端點，可用環境變數覆寫
 const USAGE_URL = process.env.CODEX_USAGE_URL || 'https://chatgpt.com/backend-api/wham/usage';
@@ -58,30 +58,17 @@ export function parseCodex(data, now = Date.now()) {
   };
 }
 
-async function doRefresh(ctx, current) {
-  return ctx.withLock(async () => {
-    const data = await refreshToken({
-      url: TOKEN_URL,
-      body: {
-        client_id: CLIENT_ID,
-        grant_type: 'refresh_token',
-        refresh_token: current.refreshToken,
-        scope: 'openid profile email',
-      },
-      signal: ctx.signal,
-      label: 'Codex 續期 ',
-    });
-    const patch = {
-      accessToken: data.access_token,
-      refreshToken: data.refresh_token || current.refreshToken,
-      expiresAt: jwtExpiryMs(data.access_token) || Date.now() + 3600 * 1000,
-    };
-    try {
-      await ctx.saveCreds(patch);
-    } catch {
-      throw new ProviderError('upstream', '無法保存續期後的憑證');
-    }
-    return { ...current, ...patch };
+function doRefresh(ctx, current) {
+  return refreshAndSave(ctx, current, {
+    url: TOKEN_URL,
+    body: {
+      client_id: CLIENT_ID,
+      grant_type: 'refresh_token',
+      refresh_token: current.refreshToken,
+      scope: 'openid profile email',
+    },
+    label: 'Codex 續期 ',
+    expiresAt: (data) => jwtExpiryMs(data.access_token) || Date.now() + 3600 * 1000,
   });
 }
 
@@ -103,20 +90,11 @@ export default {
     return Boolean(creds.codex?.refreshToken || creds.codex?.accessToken);
   },
   async fetch(ctx) {
-    let c = ctx.creds.codex;
-    const canRefresh = Boolean(c.refreshToken);
-    const expiresAt = Number(c.expiresAt) || jwtExpiryMs(c.accessToken) || 0;
-    if (canRefresh && (!c.accessToken || (expiresAt && expiresAt - Date.now() < REFRESH_SKEW_MS))) {
-      c = await doRefresh(ctx, c);
-    }
-    try {
-      const { data } = await callUsage(c, ctx.signal);
-      return parseCodex(data);
-    } catch (err) {
-      if (!(err instanceof ProviderError) || err.kind !== 'auth' || !canRefresh) throw err;
-      c = await doRefresh(ctx, c);
-      const { data } = await callUsage(c, ctx.signal);
-      return parseCodex(data);
-    }
+    const c0 = ctx.creds.codex;
+    return callWithRefresh(c0, {
+      expiresAt: Number(c0.expiresAt) || jwtExpiryMs(c0.accessToken) || 0,
+      refresh: (c) => doRefresh(ctx, c),
+      call: async (c) => parseCodex((await callUsage(c, ctx.signal)).data),
+    });
   },
 };

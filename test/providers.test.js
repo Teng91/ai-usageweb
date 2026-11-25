@@ -369,6 +369,19 @@ test('antigravity: 換了憑證（換帳號）就不沿用舊帳號的 token 與
   assert.deepEqual(tokens, [['Bearer at-rt1', 'proj-rt1'], ['Bearer at-rt2', 'proj-rt2']]);
 });
 
+test('antigravity: 拿到新 refresh token 但存不進去 → upstream，不使用這次的 token', async () => {
+  _resetCache();
+  let modelCalls = 0;
+  mock = mockFetch([
+    ['oauth2.googleapis.com', () => ({ json: { access_token: 'g-new', refresh_token: 'rt-new', expires_in: 3599 } })],
+    [':loadCodeAssist', () => ({ json: { cloudaicompanionProject: 'p1' } })],
+    [':fetchAvailableModels', () => { modelCalls += 1; return { json: fixture('antigravity-models.json') }; }],
+  ]);
+  const ctx = ctxFor({ antigravity: { refreshToken: 'rt', clientId: 'cid', clientSecret: 'cs' } }, { onSave: () => { throw new Error('disk'); } });
+  await assert.rejects(antigravity.fetch(ctx), (e) => e instanceof ProviderError && e.kind === 'upstream');
+  assert.equal(modelCalls, 0);
+});
+
 test('antigravity: 沒有 client id/secret 視為未設定', () => {
   assert.equal(antigravity.isConfigured({ antigravity: { refreshToken: 'rt' } }), false);
 });

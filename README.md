@@ -157,7 +157,7 @@ curl.exe -X PUT https://ai-usageweb.fly.dev/admin/credentials/claude -H "Authori
 
 ### 不想完全公開
 
-設 `ACCESS_KEY`，第一次用 `https://ai-usageweb.fly.dev/?k=<ACCESS_KEY>` 打開，之後記在 cookie。
+設 `ACCESS_KEY`，第一次用 `https://ai-usageweb.fly.dev/?k=<ACCESS_KEY>` 打開，之後記在 cookie（HttpOnly）；載入成功後網址上的 `?k=` 會自動拿掉，不會留在瀏覽紀錄。
 
 ## 手機通知（Web Push）
 
@@ -219,7 +219,7 @@ src/webpush.js            Web Push：VAPID 簽名與 RFC 8291 加密（只用內
 src/credentials.js        環境變數＋加密 volume、每家續期鎖
 src/sse.js                SSE 連線、ping、廣播、連線上限 30 分鐘
 src/http.js               對外請求、錯誤分類、Cloudflare 偵測
-src/oauth.js              refresh_token 續期、讀 JWT 到期時間
+src/oauth.js              refresh_token 續期、先存再用、401 續期重試（Claude／Codex 共用）
 src/config.js             環境變數設定
 src/errors.js             ProviderError（錯誤種類）、Retry-After 解析
 src/fsutil.js、log.js     原子寫檔、一行一筆 JSON log

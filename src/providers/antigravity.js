@@ -98,15 +98,18 @@ async function accessToken(ctx) {
       signal: ctx.signal,
       label: 'Antigravity 續期 ',
     });
+    // 少數情況 Google 也會給新的 refresh token：先 await 存檔成功才使用這次續期的結果
+    if (data.refresh_token && data.refresh_token !== c.refreshToken) {
+      try {
+        await ctx.saveCreds({ refreshToken: data.refresh_token });
+      } catch {
+        throw new ProviderError('upstream', '無法保存續期後的憑證');
+      }
+      // 下一輪讀到的是新 refresh token，owner 跟著換，避免被當成換帳號而清掉快取
+      cache.owner = `${c.clientId}\n${data.refresh_token}`;
+    }
     cache.accessToken = data.access_token;
     cache.expiresAt = Date.now() + (Number(data.expires_in) || 3600) * 1000;
-    // 少數情況 Google 也會給新的 refresh token，存起來
-    if (data.refresh_token && data.refresh_token !== c.refreshToken) {
-      // 存成功後下一輪讀到的是新 refresh token，owner 跟著換，避免被當成換帳號而清掉快取
-      await ctx.saveCreds({ refreshToken: data.refresh_token })
-        .then(() => { cache.owner = `${c.clientId}\n${data.refresh_token}`; })
-        .catch(() => {});
-    }
     return cache.accessToken;
   });
 }

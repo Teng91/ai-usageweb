@@ -26,8 +26,10 @@ const rank = (prefix, paid) => Array.from({ length: 10 }, (_, i) => ({ rank: i +
 const rankings = { version: 2, updatedAt: iso(-60e3), views: Object.fromEntries(['day', 'week', 'month'].map((v) => [v, { free: rank('free', false), paid: rank('paid', true) }])) };
 
 const sseClients = new Set();
+const seenKey = {}; // 各 API 收到的 ?k=，檢查存取碼只在第一次帶
 const server = http.createServer((req, res) => {
   const u = new URL(req.url, 'http://x');
+  if (u.pathname.startsWith('/api/')) (seenKey[u.pathname] ||= []).push(u.searchParams.get('k'));
   const json = (o) => { res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify(o)); };
   if (u.pathname === '/api/usage') return json({ version: 1, pollIntervalSec: 60, providers: providers(30) });
   if (u.pathname === '/api/rankings') return json(rankings);
@@ -95,10 +97,12 @@ async function main() {
 
     await send('Runtime.enable');
     await viewport(1916, 908);
-    await send('Page.navigate', { url });
+    await send('Page.navigate', { url: `${url}?k=smoke` });
     await sleep(2500);
 
     // ---- 簡約風格 ----
+    check('存取碼：第一次 /api/usage 有帶 ?k=', seenKey['/api/usage']?.[0] === 'smoke', JSON.stringify(seenKey['/api/usage']));
+    check('存取碼：成功後從網址拿掉，SSE 不再帶', (await ev(`location.search`)) === '' && seenKey['/api/stream']?.every((k) => k === null), JSON.stringify(seenKey['/api/stream']));
     check('五張卡片都畫出來', (await ev(`document.querySelectorAll('.card').length`)) === 5);
     check('SSE 連上顯示「即時」', (await ev(`document.getElementById('conn-text').textContent`)) === '即時');
     check('排行榜免費／付費各 10 名', (await ev(`[...document.querySelectorAll('.rank-list')].map((l) => l.children.length).join(',')`)) === '10,10');

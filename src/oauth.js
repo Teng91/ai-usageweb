@@ -39,3 +39,41 @@ export function jwtExpiryMs(token) {
 }
 
 export const REFRESH_SKEW_MS = 5 * 60 * 1000;
+
+/**
+ * 續期並寫回：在 withLock 裡呼叫 refresh 端點，先 await saveCreds 成功才回傳新憑證；
+ * 寫入失敗就丟 upstream，不使用新 token。expiresAt(data) 算出新的到期時間（毫秒）。
+ */
+export function refreshAndSave(ctx, current, { url, body, label, expiresAt }) {
+  return ctx.withLock(async () => {
+    const data = await refreshToken({ url, body, signal: ctx.signal, label });
+    const patch = {
+      accessToken: data.access_token,
+      refreshToken: data.refresh_token || current.refreshToken,
+      expiresAt: expiresAt(data),
+    };
+    try {
+      await ctx.saveCreds(patch);
+    } catch {
+      throw new ProviderError('upstream', '無法保存續期後的憑證');
+    }
+    return { ...current, ...patch };
+  });
+}
+
+/**
+ * 帶續期的呼叫：有 refresh token 且 access token 沒有或快到期就先續期；
+ * call 回 401（auth）時續期一次再重試一次。沒有 refresh token（長效 token）就不續期。
+ */
+export async function callWithRefresh(c, { expiresAt, refresh, call }) {
+  const canRefresh = Boolean(c.refreshToken);
+  if (canRefresh && (!c.accessToken || (expiresAt && expiresAt - Date.now() < REFRESH_SKEW_MS))) {
+    c = await refresh(c);
+  }
+  try {
+    return await call(c);
+  } catch (err) {
+    if (!(err instanceof ProviderError) || err.kind !== 'auth' || !canRefresh) throw err;
+    return call(await refresh(c));
+  }
+}

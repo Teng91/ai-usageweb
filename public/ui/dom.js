@@ -26,8 +26,18 @@ export const state = {
   offline: !navigator.onLine,
 };
 
-const accessKey = new URLSearchParams(location.search).get('k');
+// ?k=<ACCESS_KEY> 只在第一次需要：伺服器收到後會設 HttpOnly cookie，之後靠 cookie
+let accessKey = new URLSearchParams(location.search).get('k');
 export const withKey = (url) => (accessKey ? `${url}?k=${encodeURIComponent(accessKey)}` : url);
+
+/** API 帶著 ?k= 成功回應後呼叫：存取碼從網址列與瀏覽紀錄拿掉，之後的請求不再帶 */
+export function keyAccepted() {
+  if (!accessKey) return;
+  accessKey = null;
+  const u = new URL(location.href);
+  u.searchParams.delete('k');
+  history.replaceState(history.state, '', `${u.pathname}${u.search}${u.hash}`);
+}
 
 /** 沒設定憑證的服務不顯示 */
 export const visible = (p) => Boolean(p) && p.status !== 'disabled';

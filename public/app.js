@@ -1,6 +1,6 @@
 // AI 用量 — 前端進入點：資料與連線（fetch 快照 → SSE 即時更新；SSE 被擋時改輪詢）
 // 畫面在 ui/cards.js，其他功能各自在 ui/ 底下的模組
-import { state, withKey } from './ui/dom.js';
+import { state, withKey, keyAccepted } from './ui/dom.js';
 import { renderAll, renderCard, renderEmpty, renderChrome, startTicker } from './ui/cards.js';
 import { initRankings, refreshRankingsIfStale } from './ui/rankings.js';
 import { initThemeToggle } from './ui/theme-toggle.js';
@@ -22,7 +22,10 @@ async function loadSnapshot() {
     const res = await fetch(withKey('/api/usage'), { cache: 'no-store' });
     if (!res.ok) throw new Error(String(res.status));
     applySnapshot(await res.json());
-    state.offline = res.headers.get('x-from-cache') === '1' || !navigator.onLine;
+    const fromCache = res.headers.get('x-from-cache') === '1';
+    // 伺服器真的回應了（不是 service worker 的快取），cookie 已經設好
+    if (!fromCache) keyAccepted();
+    state.offline = fromCache || !navigator.onLine;
   } catch {
     state.offline = true;
   }

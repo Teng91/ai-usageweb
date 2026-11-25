@@ -1,6 +1,6 @@
 import { requestJson, clampPct, toIso } from '../http.js';
 import { ProviderError } from '../errors.js';
-import { refreshToken, REFRESH_SKEW_MS } from '../oauth.js';
+import { refreshAndSave, callWithRefresh } from '../oauth.js';
 
 // 需實測：網域與 client id 可能更動，可用環境變數覆寫
 const USAGE_URL = process.env.CLAUDE_USAGE_URL || 'https://api.anthropic.com/api/oauth/usage';
@@ -45,26 +45,12 @@ export function parseClaude(data) {
   return windows;
 }
 
-async function doRefresh(ctx, current) {
-  return ctx.withLock(async () => {
-    const data = await refreshToken({
-      url: TOKEN_URL,
-      body: { grant_type: 'refresh_token', refresh_token: current.refreshToken, client_id: CLIENT_ID },
-      signal: ctx.signal,
-      label: 'Claude 續期 ',
-    });
-    const patch = {
-      accessToken: data.access_token,
-      refreshToken: data.refresh_token || current.refreshToken,
-      expiresAt: Date.now() + (Number(data.expires_in) || 3600) * 1000,
-    };
-    try {
-      // 先寫回 volume 才使用新 token；寫入失敗就不要用
-      await ctx.saveCreds(patch);
-    } catch {
-      throw new ProviderError('upstream', '無法保存續期後的憑證');
-    }
-    return { ...current, ...patch };
+function doRefresh(ctx, current) {
+  return refreshAndSave(ctx, current, {
+    url: TOKEN_URL,
+    body: { grant_type: 'refresh_token', refresh_token: current.refreshToken, client_id: CLIENT_ID },
+    label: 'Claude 續期 ',
+    expiresAt: (data) => Date.now() + (Number(data.expires_in) || 3600) * 1000,
   });
 }
 
@@ -94,23 +80,13 @@ export default {
     // 方案名稱直接讀環境變數：憑證存進 volume 後會蓋過環境變數，改 fly secrets 才會生效
     const plan = process.env.CLAUDE_PLAN || c0.plan || 'Pro';
     const planExpiresAt = parsePlanExpiry(process.env.CLAUDE_PLAN_EXPIRES_AT);
-    let c = c0;
-    const canRefresh = Boolean(c.refreshToken);
-    const expiresAt = Number(c.expiresAt) || 0;
-
-    if (canRefresh && (!c.accessToken || (expiresAt && expiresAt - Date.now() < REFRESH_SKEW_MS))) {
-      c = await doRefresh(ctx, c);
-    }
-
-    try {
-      const { data } = await callUsage(c.accessToken, ctx.signal);
-      return { plan, planExpiresAt, windows: parseClaude(data), balance: null };
-    } catch (err) {
-      if (!(err instanceof ProviderError) || err.kind !== 'auth' || !canRefresh) throw err;
-      // 401：續期一次再重試一次
-      c = await doRefresh(ctx, c);
-      const { data } = await callUsage(c.accessToken, ctx.signal);
-      return { plan, planExpiresAt, windows: parseClaude(data), balance: null };
-    }
+    return callWithRefresh(c0, {
+      expiresAt: Number(c0.expiresAt) || 0,
+      refresh: (c) => doRefresh(ctx, c),
+      call: async (c) => {
+        const { data } = await callUsage(c.accessToken, ctx.signal);
+        return { plan, planExpiresAt, windows: parseClaude(data), balance: null };
+      },
+    });
   },
 };

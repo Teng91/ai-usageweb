@@ -183,7 +183,7 @@ flowchart LR
 
 | 層級 | 工具 | 內容 |
 | --- | --- | --- |
-| 單元／整合 | `node:test`（77 項） | 每家 adapter 用 fixture 驗證轉換、輪詢排程與退避、憑證加密與續期鎖、快照、排行解析、HTTP 路由、逾時分類、推播加密（RFC 8291 範例）與規則 |
+| 單元／整合 | `node:test`（78 項） | 每家 adapter 用 fixture 驗證轉換、輪詢排程與退避、憑證加密與續期鎖、快照、排行解析、HTTP 路由、逾時分類、推播加密（RFC 8291 範例）與規則 |
 | 前端 smoke test | 自寫的 Chrome DevTools Protocol 腳本（23 項） | 用假資料起本機伺服器、開 headless Chrome 實際操作：卡片、排行與價格、亮暗與風格切換、四季地圖輪替、點怪物、跳數字、只看風景、手機版按鈕位置、通知設定對話框、沒有 JS 錯誤 |
 | CI | GitHub Actions | 推到 `main` 時兩種測試都通過才部署到 fly.io |
 
