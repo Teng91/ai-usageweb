@@ -18,8 +18,9 @@ const base = { status: 'ok', fetchedAt: iso(-10_000), nextFetchAt: iso(50_000), 
 const providers = (claude5h) => [
   { ...base, id: 'claude', name: 'Claude', plan: 'Pro', planExpiresAt: '2027-11-04', windows: [{ id: '5h', label: '5 小時', usedPct: claude5h, resetsAt: iso(3600e3) }, { id: '7d', label: '每週', usedPct: 20, resetsAt: iso(5 * 86400e3) }] },
   { ...base, id: 'antigravity', name: 'Gemini', plan: 'Pro', windows: [
-    { id: 'gemini', label: 'Gemini 5 小時', usedPct: 0, resetsAt: iso(4 * 3600e3), periodSec: 18000 },
-    { id: 'claude_gpt', label: 'Claude/GPT 5 小時', usedPct: 12, resetsAt: iso(4 * 3600e3), periodSec: 18000 },
+    { id: 'gemini', label: 'Gemini 5h', usedPct: 0, resetsAt: iso(4 * 3600e3), periodSec: 18000 },
+    { id: 'gemini_week', label: 'Gemini 每週', usedPct: 1, resetsAt: iso(6 * 86400e3), periodSec: 604800 },
+    { id: 'claude_gpt', label: 'Claude/GPT 5h', usedPct: 12, resetsAt: iso(4 * 3600e3), periodSec: 18000 },
     { id: 'claude_gpt_week', label: 'Claude/GPT 每週', usedPct: 3, resetsAt: iso(6 * 86400e3), periodSec: 604800 },
   ] },
   { ...base, id: 'codex', name: 'Codex', plan: 'Free', windows: [{ id: 'primary', label: '每月', usedPct: 95, resetsAt: iso(9 * 3600e3) }] },
@@ -115,7 +116,10 @@ async function main() {
     check('簡約風格不建立場景地圖', (await ev(`document.querySelectorAll('.scene .map').length`)) === 0);
     check('卡片順序：Claude、Gemini、Codex', (await ev(`[...document.querySelectorAll('.card')].slice(0, 3).map((c) => c.querySelector('.card-name').textContent).join(',')`)) === 'Claude,Gemini,Codex');
     const rows = await ev(`(() => { const b = document.querySelector('.card[data-id="antigravity"] .card-body'); const wins = [...b.querySelectorAll('.win')]; const c = document.querySelector('.card[data-id="claude"] .card-body'); const bottom = (el) => Math.max(...[...el.children].map((x) => x.getBoundingClientRect().bottom)) - el.getBoundingClientRect().top; return { rows: new Set(wins.map((w) => w.offsetTop)).size, h: bottom(b), ch: bottom(c), sx: wins.every((w) => w.scrollWidth <= w.clientWidth + 1) }; })()`);
-    check('三條額度排成兩列，不比兩條的卡片高、不溢出', rows?.rows === 2 && rows.h <= rows.ch + 1 && rows.sx, JSON.stringify(rows));
+    check('分區：付費 Claude、Gemini；免費 Codex、Copilot；OpenRouter 自己一區', (await ev(`[...document.querySelectorAll('.group')].map((g) => (g.querySelector('.group-title')?.textContent || '-') + ':' + [...g.querySelectorAll('.card')].map((c) => c.dataset.id).join('+')).join(' | ')`)) === '付費 AI 用量:claude+antigravity | 免費 AI 用量:codex+copilot | -:openrouter');
+    const gt = await ev(`[...document.querySelectorAll('.group[data-group="paid"], .group[data-group="free"]')].map((g) => g.getBoundingClientRect().top)`);
+    check('寬螢幕：付費與免費並排', gt?.length === 2 && Math.abs(gt[0] - gt[1]) < 1, JSON.stringify(gt));
+    check('四條額度排成兩列，不比兩條的卡片高、不溢出', rows?.rows === 2 && rows.h <= rows.ch + 1 && rows.sx, JSON.stringify(rows));
     check('Claude 到期日', /2027\/11\/4 到期/.test(await ev(`document.querySelector('.card[data-id="claude"] .plan-exp').textContent`)));
 
     // ---- 亮暗切換 ----

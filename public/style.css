@@ -356,6 +356,30 @@ button {
   .cards { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 
+/* 分區（付費／免費／OpenRouter）：沿用外層的欄（subgrid），寬螢幕上付費和免費並排 */
+.group {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: subgrid;
+  grid-template-rows: min-content; /* 標題不被拉高；卡片列會撐滿，並排時兩區的卡片等高 */
+  row-gap: 12px;
+  min-width: 0;
+}
+
+@media (min-width: 1440px) {
+  .group { grid-column: span var(--span, 4); }
+  .group[data-group="or"] { grid-column: 1 / -1; }
+}
+
+.group-title {
+  grid-column: 1 / -1;
+  margin: 4px 0 -4px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+}
+
 .empty {
   color: var(--muted);
   text-align: center;

@@ -5,7 +5,7 @@
 ## 推播
 
 - **OpenRouter 餘額提醒**：餘額低於門檻（例如 `PUSH_OPENROUTER_MIN=5`）時通知一次，儲值回到門檻以上才會再通知。目前沒在儲值所以先不做；規則加在 `src/alerts.js`，`kind` 可以用 `balance`，前端對話框多一個開關。
-- **Antigravity（卡片名 Gemini）免費方案的窗口長度**：付費方案從 `retrieveUserQuotaSummary` 拿到 5 小時／每週並填了 `periodSec`；免費方案只有 `fetchAvailableModels`，沒給長度，所以不會發「快重置還有剩」。確認免費方案的重置週期後在 `mergeWindows` 補上。另外 Google 目前只給 Claude/GPT 組的每週額度，哪天出現 Gemini 組會自動顯示。
+- **Antigravity（卡片名 Gemini）免費方案的窗口長度**：付費方案從 `retrieveUserQuotaSummary` 拿到 Gemini、Claude/GPT 兩組的 5 小時／每週並填了 `periodSec`（要用 agy CLI 格式的 User-Agent 才會給 Gemini 組）；免費方案只有 `fetchAvailableModels`，沒給長度，所以不會發「快重置還有剩」。確認免費方案的重置週期後在 `mergeWindows` 補上。
 - **在網頁上調整勿擾時段與門檻**：目前勿擾時段用環境變數 `PUSH_QUIET`，門檻寫在 `RULES`。要的話存進每個訂閱的 `prefs`。
 - **更準的喚醒**：GitHub Actions 的排程常晚 5–15 分鐘。若不夠用可以改用 fly 的排程機器或外部 cron 服務。
 - **確認排程續命有效**：`push-tick.yml` 每天呼叫 enable API，用來避免「60 天沒 commit 自動停用」。GitHub 沒有文件保證這會重設計時；若哪天還是被停用（會收到 GitHub 的信），改用外部 cron 服務。

@@ -5,7 +5,8 @@ import { refreshToken, REFRESH_SKEW_MS } from '../oauth.js';
 // 需實測：內部端點，可用環境變數覆寫
 const BASE = process.env.ANTIGRAVITY_BASE_URL || 'https://cloudcode-pa.googleapis.com/v1internal';
 const TOKEN_URL = process.env.ANTIGRAVITY_TOKEN_URL || 'https://oauth2.googleapis.com/token';
-const USER_AGENT = process.env.ANTIGRAVITY_USER_AGENT || 'antigravity';
+// 要用 agy CLI 的格式：retrieveUserQuotaSummary 看到 CLI 才會連 Gemini 組的額度一起回（只寫 antigravity 只有 Claude/GPT 組）
+const USER_AGENT = process.env.ANTIGRAVITY_USER_AGENT || 'antigravity/cli/1.5.15';
 
 // Google 的 access token 只放記憶體（1 小時），refresh token 不輪換
 const cache = { owner: null, accessToken: null, expiresAt: 0, projectId: null, plan: null, planAt: 0 };
@@ -74,11 +75,11 @@ function toWindow(id, label, g) {
 }
 
 const HOUR = 3600;
-const PERIODS = { '5h': [5 * HOUR, '5 小時', ''], weekly: [7 * 24 * HOUR, '每週', '_week'] };
+const PERIODS = { '5h': [5 * HOUR, '5h', ''], weekly: [7 * 24 * HOUR, '每週', '_week'] };
 const FAMILIES = [['gemini', 'Gemini'], ['claude_gpt', 'Claude/GPT']];
 
 /**
- * retrieveUserQuotaSummary：每組模型的 5 小時與每週額度（付費方案才有；目前只有 Claude/GPT 組）。
+ * retrieveUserQuotaSummary：每組模型（Gemini、Claude/GPT）的 5 小時與每週額度（付費方案才有）。
  * 回傳 { gemini: { '5h': win, weekly: win }, claude_gpt: {...} }，沒有的就不放。
  */
 export function parseSummary(data) {
@@ -114,7 +115,7 @@ export function mergeWindows(modelWins, summary, now = Date.now()) {
       if (m) {
         const left = Date.parse(m.resetsAt) - now;
         short = left > 0 && left <= 5 * HOUR * 1000 + 5 * 60_000
-          ? { ...m, label: `${name} 5 小時`, periodSec: 5 * HOUR }
+          ? { ...m, label: `${name} 5h`, periodSec: 5 * HOUR }
           : m;
       }
     }

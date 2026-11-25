@@ -14,7 +14,41 @@ export function renderAll() {
   // 移除不該出現的卡片
   for (const el of cardsEl.querySelectorAll('.card')) if (!ids.includes(el.dataset.id)) el.remove();
   for (const id of ids) renderCard(state.providers.get(id));
+  syncGroups();
   renderEmpty();
+}
+
+// 分區：付費（有付費方案）、免費（方案名有 Free）、OpenRouter（餘額＋排行，自己一區、不加標題）
+const GROUPS = [['paid', '付費 AI 用量'], ['free', '免費 AI 用量'], ['or', '']];
+const groupOf = (p) => (p.id === 'openrouter' ? 'or' : /free/i.test(p.plan || '') ? 'free' : 'paid');
+
+function groupEl(key) {
+  let g = cardsEl.querySelector(`.group[data-group="${key}"]`);
+  if (g) return g;
+  const [, title] = GROUPS.find(([k]) => k === key);
+  g = document.createElement('section');
+  g.className = 'group';
+  g.dataset.group = key;
+  if (title) {
+    const h = document.createElement('h2');
+    h.className = 'group-title';
+    h.textContent = title;
+    g.append(h);
+    g.setAttribute('aria-label', title);
+  }
+  const order = GROUPS.map(([k]) => k);
+  const next = [...cardsEl.querySelectorAll('.group')].find((x) => order.indexOf(x.dataset.group) > order.indexOf(key));
+  cardsEl.insertBefore(g, next || null);
+  return g;
+}
+
+/** 空的分區拿掉；寬螢幕上每區佔「卡片數」欄，付費和免費可以並排 */
+function syncGroups() {
+  for (const g of cardsEl.querySelectorAll('.group')) {
+    const n = g.querySelectorAll(':scope > .card').length;
+    if (!n) g.remove();
+    else g.style.setProperty('--span', String(Math.min(n, 4)));
+  }
 }
 
 export function renderEmpty() {
@@ -43,16 +77,17 @@ export function renderEmpty() {
   empty.textContent = state.offline ? '離線中，還沒有任何資料' : '尚未設定任何服務的憑證';
 }
 
-function cardFor(id) {
-  let el = cardsEl.querySelector(`.card[data-id="${CSS.escape(id)}"]`);
+function cardFor(p) {
+  let el = cardsEl.querySelector(`.card[data-id="${CSS.escape(p.id)}"]`);
   if (!el) {
     el = tpl.content.firstElementChild.cloneNode(true);
-    el.dataset.id = id;
-    // 依固定順序插入
-    const idx = ORDER.indexOf(id);
-    const after = [...cardsEl.querySelectorAll('.card')].find((c) => ORDER.indexOf(c.dataset.id) > idx);
-    cardsEl.insertBefore(el, after || null);
+    el.dataset.id = p.id;
   }
+  // 放進該在的分區（方案變了會換區），區內依固定順序
+  const g = groupEl(groupOf(p));
+  const idx = ORDER.indexOf(p.id);
+  const after = [...g.querySelectorAll(':scope > .card')].find((c) => c !== el && ORDER.indexOf(c.dataset.id) > idx) || null;
+  if (el.parentElement !== g || el.nextElementSibling !== after) g.insertBefore(el, after);
   return el;
 }
 
@@ -80,9 +115,11 @@ function isUpdating(p, now = Date.now()) {
 export function renderCard(p) {
   if (!visible(p)) {
     cardsEl.querySelector(`.card[data-id="${CSS.escape(p.id)}"]`)?.remove();
+    syncGroups();
     return;
   }
-  const el = cardFor(p.id);
+  const el = cardFor(p);
+  syncGroups();
   el.querySelector('.card-name').textContent = p.name;
   el.querySelector('.plan').textContent = p.plan || '';
   renderPlanExpiry(el.querySelector('.plan-exp'), p.planExpiresAt);
