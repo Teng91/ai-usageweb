@@ -50,6 +50,16 @@ test('路徑穿越被擋', async () => {
   assert.equal(res.status, 404);
 });
 
+test('壞掉的 URL 編碼回 400，不是 500', async () => {
+  const res = await realFetch(`${base}/%E0`);
+  assert.equal(res.status, 400);
+});
+
+test('parseCookies：壞掉的 cookie 值不會丟錯', async () => {
+  const { parseCookies } = await import('../src/respond.js');
+  assert.deepEqual(parseCookies('a=%E0; k=x%20y'), { a: '%E0', k: 'x y' });
+});
+
 test('GET /api/usage 回快照，並喚醒輪詢；未設定的服務標 disabled', async () => {
   const res = await realFetch(`${base}/api/usage`);
   const snap = await res.json();

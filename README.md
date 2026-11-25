@@ -25,6 +25,9 @@
                               │ 續期時
                               ▼
                 credentials.js（環境變數＋AES-256-GCM 加密 volume）
+
+抓到新資料 ──▶ push.js（累積樣本、alerts.js 判斷）──▶ webpush.js ──▶ 手機
+GitHub Actions 每 15 分鐘 ──POST /api/push/tick──▶ 機器沒人看時也會抓一輪並判斷
 ```
 
 | 路徑 | 說明 | 權限 |
@@ -34,13 +37,17 @@
 | `GET /api/stream` | SSE：先送 `snapshot`，之後每家 `provider`；25 秒 `: ping` | 公開（或 `ACCESS_KEY`） |
 | `GET /api/rankings` | OpenRouter 全站模型排行（每天／每週／每月，免費與付費各前 10 名，依 token 用量；付費附每百萬 token 輸入／輸出價格）；資料來自 OpenRouter 排行榜頁面的非官方端點，每小時最多抓一次 | 公開（或 `ACCESS_KEY`） |
 | `GET /healthz` | 健康檢查，不觸發輪詢 | 公開 |
+| `GET /api/push/config` | 推播是否啟用與 VAPID 公鑰 | 公開（或 `ACCESS_KEY`） |
+| `POST /api/push/subscribe` | 訂閱或更新通知設定（body：`subscription`、`prefs`） | `PUSH_KEY` |
+| `POST /api/push/status`、`/unsubscribe`、`/test` | 查狀態、退訂、送測試通知（body：`endpoint`；測試 30 秒一次） | 知道自己的 endpoint |
+| `POST /api/push/tick` | 排程喚醒：各家抓一輪並判斷推播，不算「有人在看」 | `PUSH_TICK_TOKEN` |
 | `POST /admin/refresh` | 立刻重抓（仍受每家最短間隔限制） | `ADMIN_TOKEN` |
 | `PUT /admin/credentials/:provider` | 替換某一家的憑證（JSON body） | `ADMIN_TOKEN` |
 | `GET /admin/status` | 各家錯誤種類、下次抓取、token 到期時間（不含 token） | `ADMIN_TOKEN` |
 
 SSE 被擋時（例如公司 proxy 會卡住串流），前端 6 秒內沒連上就改成每 30 秒輪詢 `/api/usage`，右上角顯示「自動更新」。
 
-錯誤處理：429 依 `Retry-After` 或 60→120→240→最多 900 秒退避（卡片保留舊數字並標「更新放慢」）；401 先續期再重試一次；續期失敗標「需要重新登入」並停止那一家；403／Cloudflare 這次觀看期間不再試；網路／5xx 退避最多 300 秒；格式變了每 300 秒試一次。
+錯誤處理：429 依 `Retry-After` 或 240→480→最多 900 秒退避（卡片保留舊數字並標「更新放慢」）；401 先續期再重試一次；續期失敗標「需要重新登入」並停止那一家；403／Cloudflare 這次觀看期間不再試；網路／5xx 退避最多 300 秒；格式變了每 300 秒試一次。
 
 ## 本機開發
 
@@ -212,7 +219,11 @@ src/webpush.js            Web Push：VAPID 簽名與 RFC 8291 加密（只用內
 src/credentials.js        環境變數＋加密 volume、每家續期鎖
 src/sse.js                SSE 連線、ping、廣播、連線上限 30 分鐘
 src/http.js               對外請求、錯誤分類、Cloudflare 偵測
-src/providers/*.js        五家 adapter（統一輸出 { plan, windows, balance, note }）
+src/oauth.js              refresh_token 續期、讀 JWT 到期時間
+src/config.js             環境變數設定
+src/errors.js             ProviderError（錯誤種類）、Retry-After 解析
+src/fsutil.js、log.js     原子寫檔、一行一筆 JSON log
+src/providers/*.js        五家 adapter（統一輸出 { plan, planExpiresAt?, windows, balance, note }）
 public/                   PWA（index.html、style.css、sw.js、manifest、icons）
 public/app.js             前端進入點：資料與連線（快照、SSE、SSE 被擋時改輪詢）
 public/ui/                前端模組：cards（卡片）、rankings（排行）、effects（冒險效果）、
@@ -224,6 +235,7 @@ public/scene.js           場景邏輯：建立地圖、勇者走到傳送點換
 public/scene-maps.js      四季地圖資料（加地圖改這裡）
 public/pixel/             原創像素圖（由 scripts/gen-pixel-art.mjs 產生）
 scripts/                  extract-credentials.js、setup-antigravity.ps1、gen-pixel-art.mjs、smoke-ui.mjs、gen-vapid.mjs
+docs/TECHNICAL.md         技術文件（設計細節）
 docs/TODO.md              之後可以做的事
 test/                     node:test＋假 fetch＋fixtures
 ```

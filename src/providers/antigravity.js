@@ -8,16 +8,25 @@ const TOKEN_URL = process.env.ANTIGRAVITY_TOKEN_URL || 'https://oauth2.googleapi
 const USER_AGENT = process.env.ANTIGRAVITY_USER_AGENT || 'antigravity';
 
 // Google 的 access token 只放記憶體（1 小時），refresh token 不輪換
-const cache = { accessToken: null, expiresAt: 0, projectId: null, plan: null, planAt: 0 };
+const cache = { owner: null, accessToken: null, expiresAt: 0, projectId: null, plan: null, planAt: 0 };
 // 方案（訂閱）會變，定期重查；機器 suspend 時記憶體不會清掉，不能只在啟動時查一次
 const PLAN_TTL_MS = 6 * 3600 * 1000;
 
 export function _resetCache() {
+  cache.owner = null;
   cache.accessToken = null;
   cache.expiresAt = 0;
   cache.projectId = null;
   cache.plan = null;
   cache.planAt = 0;
+}
+
+/** 憑證換了（管理 API 換帳號）就丟掉舊帳號的 token、project 與方案 */
+function syncCacheOwner(c) {
+  const owner = `${c.clientId}\n${c.refreshToken}`;
+  if (cache.owner === owner) return;
+  _resetCache();
+  cache.owner = owner;
 }
 
 function family(name) {
@@ -93,7 +102,10 @@ async function accessToken(ctx) {
     cache.expiresAt = Date.now() + (Number(data.expires_in) || 3600) * 1000;
     // 少數情況 Google 也會給新的 refresh token，存起來
     if (data.refresh_token && data.refresh_token !== c.refreshToken) {
-      await ctx.saveCreds({ refreshToken: data.refresh_token }).catch(() => {});
+      // 存成功後下一輪讀到的是新 refresh token，owner 跟著換，避免被當成換帳號而清掉快取
+      await ctx.saveCreds({ refreshToken: data.refresh_token })
+        .then(() => { cache.owner = `${c.clientId}\n${data.refresh_token}`; })
+        .catch(() => {});
     }
     return cache.accessToken;
   });
@@ -147,6 +159,7 @@ export default {
     return Boolean(c?.refreshToken && c?.clientId && c?.clientSecret);
   },
   async fetch(ctx) {
+    syncCacheOwner(ctx.creds.antigravity);
     const token = await accessToken(ctx);
     try {
       return await fetchOnce(ctx, token);

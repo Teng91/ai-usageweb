@@ -85,7 +85,8 @@ export class PushService {
   // ---- 資料 ----
   /** 每次某家抓到新資料時呼叫 */
   observe(view) {
-    if (!view || view.status !== 'ok' || !view.fetchedAt) return;
+    // 推播沒啟用就不必累積樣本、也不必每次抓取都寫 push.json
+    if (!this.enabled || !view || view.status !== 'ok' || !view.fetchedAt) return;
     if (this.lastFetched[view.id] === view.fetchedAt) return;
     this.lastFetched[view.id] = view.fetchedAt;
     const now = this.now();

@@ -16,7 +16,12 @@ const MIME = {
 };
 
 export async function serveStatic(req, res, pathname, publicDir) {
-  let rel = decodeURIComponent(pathname);
+  let rel;
+  try {
+    rel = decodeURIComponent(pathname);
+  } catch {
+    return sendJson(res, 400, { error: 'bad path' }); // 例如 /%E0：不該變成 500
+  }
   if (rel === '/') rel = '/index.html';
   const file = path.normalize(path.join(publicDir, rel));
   if (!file.startsWith(publicDir + path.sep)) return sendJson(res, 404, { error: 'not found' });

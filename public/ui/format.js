@@ -63,18 +63,3 @@ function localWhen(t, now) {
   const md = date.toLocaleDateString('zh-TW', { month: 'numeric', day: 'numeric', weekday: 'short' });
   return `${md} ${hm}`;
 }
-
-/** 'YYYY-MM-DD' 往前推 n 天 */
-export function shiftDay(ymd, n) {
-  const [y, m, d] = ymd.split('-').map(Number);
-  return new Date(Date.UTC(y, m - 1, d - n)).toISOString().slice(0, 10);
-}
-
-/** 指定時區的今天 'YYYY-MM-DD' */
-export function todayIn(tz) {
-  try {
-    return new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
-  } catch {
-    return new Date().toISOString().slice(0, 10);
-  }
-}

@@ -350,6 +350,25 @@ test('antigravity: 方案超過 6 小時會重查 loadCodeAssist', async () => {
   assert.equal(loads, 2);
 });
 
+test('antigravity: 換了憑證（換帳號）就不沿用舊帳號的 token 與 project', async () => {
+  _resetCache();
+  const tokens = [];
+  mock = mockFetch([
+    ['oauth2.googleapis.com', (req) => {
+      const rt = new URLSearchParams(req.body).get('refresh_token');
+      return { json: { access_token: `at-${rt}`, expires_in: 3599 } };
+    }],
+    [':loadCodeAssist', (req) => ({ json: { cloudaicompanionProject: `proj-${req.headers.authorization.slice(-3)}` } })],
+    [':fetchAvailableModels', (req) => {
+      tokens.push([req.headers.authorization, JSON.parse(req.body).project]);
+      return { json: fixture('antigravity-models.json') };
+    }],
+  ]);
+  await antigravity.fetch(ctxFor({ antigravity: { refreshToken: 'rt1', clientId: 'cid', clientSecret: 'cs' } }));
+  await antigravity.fetch(ctxFor({ antigravity: { refreshToken: 'rt2', clientId: 'cid', clientSecret: 'cs' } }));
+  assert.deepEqual(tokens, [['Bearer at-rt1', 'proj-rt1'], ['Bearer at-rt2', 'proj-rt2']]);
+});
+
 test('antigravity: 沒有 client id/secret 視為未設定', () => {
   assert.equal(antigravity.isConfigured({ antigravity: { refreshToken: 'rt' } }), false);
 });
