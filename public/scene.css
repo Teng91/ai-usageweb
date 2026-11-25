@@ -203,14 +203,14 @@
 
 /* ---- 原創怪物：外層負責移動，::before 畫圖與換格；點了會跳 ---- */
 .scene .mon {
-  width: 48px;
-  height: 48px;
+  width: 56px;
+  height: 56px;
   pointer-events: auto;
   cursor: pointer;
   transform-origin: 50% 100%;
 }
 
-.scene .mon.small { width: 36px; height: 36px; }
+.scene .mon.small { width: 42px; height: 42px; }
 
 .scene .mon::before {
   content: "";
@@ -220,6 +220,7 @@
   background-size: var(--sheet, 100%) 100%;
   background-repeat: no-repeat;
   image-rendering: pixelated;
+  filter: drop-shadow(0 2px 0 rgba(36, 25, 56, 0.16));
   animation: var(--frames, none);
 }
 
@@ -235,8 +236,8 @@
 
 /* 史萊姆：原地彈跳 */
 .mon-slime, .mon-slime-pink {
-  --sheet: 200%;
-  --frames: mon-frames2 1.3s steps(1) infinite;
+  --sheet: 400%;
+  --frames: mon-frames4 1.3s steps(1) infinite;
   animation: sc-bounce 1.3s ease-in-out infinite;
 }
 .mon-slime { --sprite: url(/pixel/slime.svg); }
@@ -249,11 +250,11 @@
   85% { transform: translateY(0) scale(1.05, 0.95); }
 }
 
-/* 葉子精靈：來回巡邏，邊走邊眨眼 */
+/* 橡果葉小精靈：來回巡邏，邊走邊眨眼 */
 .mon-leafling {
   --sprite: url(/pixel/leafling.svg);
-  --sheet: 200%;
-  --frames: mon-frames2 0.7s steps(1) infinite;
+  --sheet: 400%;
+  --frames: mon-frames4 0.72s steps(1) infinite;
   animation: mon-patrol 9s linear infinite;
 }
 
@@ -265,17 +266,19 @@
   100% { transform: translateX(0) scaleX(1); }
 }
 
-/* 兩格圖：每半個週期換一格 */
-@keyframes mon-frames2 {
-  0%, 49.9% { background-position: 0 0; }
-  50%, 100% { background-position: 100% 0; }
+/* 四格圖：每 1/4 週期換一格 */
+@keyframes mon-frames4 {
+  0%, 24.9% { background-position: 0% 0; }
+  25%, 49.9% { background-position: 33.3333% 0; }
+  50%, 74.9% { background-position: 66.6667% 0; }
+  75%, 100% { background-position: 100% 0; }
 }
 
-/* 蛋殼小雞：小跳步、張嘴叫 */
+/* 奶油絨毛鳥：小跳步、張嘴叫 */
 .mon-chick {
   --sprite: url(/pixel/chick.svg);
-  --sheet: 200%;
-  --frames: mon-frames2 1.2s steps(1) infinite;
+  --sheet: 400%;
+  --frames: mon-frames4 1.2s steps(1) infinite;
   animation: mon-hop 1.2s ease-in-out infinite;
 }
 
@@ -284,13 +287,13 @@
   75% { transform: translateY(-12px); }
 }
 
-/* 嘟嘴雲朵怪：在天上飄 */
+/* 棉花糖星雲獸：在天上飄 */
 .mon-cloudling {
   width: 64px;
   height: 48px;
   --sprite: url(/pixel/cloudling.svg);
-  --sheet: 200%;
-  --frames: mon-frames2 2.4s steps(1) infinite;
+  --sheet: 400%;
+  --frames: mon-frames4 1.8s steps(1) infinite;
   animation: mon-float 5s ease-in-out infinite;
 }
 
@@ -301,13 +304,13 @@
   50% { transform: translate(24px, -14px); }
 }
 
-/* 小螃蟹：橫著走、鉗子開合 */
+/* 珊瑚貝殼蟹：橫著走、鉗子開合 */
 .mon-crab {
   width: 56px;
-  height: 42px;
+  height: 40px;
   --sprite: url(/pixel/crab.svg);
-  --sheet: 200%;
-  --frames: mon-frames2 0.6s steps(1) infinite;
+  --sheet: 400%;
+  --frames: mon-frames4 0.64s steps(1) infinite;
   animation: mon-side 5s ease-in-out infinite;
 }
 
@@ -316,11 +319,11 @@
   50% { transform: translateX(-70px); }
 }
 
-/* 紫光小菇靈：左右巡步、輕輕彈跳 */
+/* 星夜傘菇精：左右巡步、輕輕彈跳 */
 .mon-sporeling {
   --sprite: url(/pixel/sporeling.svg);
-  --sheet: 200%;
-  --frames: mon-frames2 0.75s steps(1) infinite;
+  --sheet: 400%;
+  --frames: mon-frames4 0.84s steps(1) infinite;
   animation: mon-spore 8s ease-in-out infinite;
 }
 
@@ -334,11 +337,11 @@
   100% { transform: translate(0, 0) scaleX(1); }
 }
 
-/* 露珠水精靈：輕盈波紋浮動 */
+/* 琉璃海月靈：輕盈波紋浮動 */
 .mon-dewdrop {
   --sprite: url(/pixel/dewdrop.svg);
-  --sheet: 200%;
-  --frames: mon-frames2 0.9s steps(1) infinite;
+  --sheet: 400%;
+  --frames: mon-frames4 1s steps(1) infinite;
   animation: mon-dew 2.4s ease-in-out infinite;
 }
 
@@ -353,19 +356,19 @@
   bottom: 50px;
   width: 64px;
   height: 64px;
-  background: url(/pixel/hero.svg) 0 0 / 128px 64px no-repeat;
+  background: url(/pixel/hero.svg) 0 0 / 256px 64px no-repeat;
   pointer-events: auto;
   cursor: pointer;
   z-index: 2;
 }
 
-.scene .sc-hero.walking { animation: sc-step 0.5s steps(2) infinite; }
+.scene .sc-hero.walking { animation: sc-step 0.56s steps(4) infinite; }
 .scene .sc-hero.jump { animation: hero-jump 0.5s ease-out; }
 .scene .sc-hero.warp { animation: hero-warp 0.65s ease-in forwards; }
 
 @keyframes sc-step {
   from { background-position: 0 0; }
-  to { background-position: -128px 0; }
+  to { background-position: -256px 0; }
 }
 
 @keyframes hero-jump {
