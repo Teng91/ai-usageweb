@@ -9,24 +9,14 @@ on:
     - cron: '7 0 * * *' # 每天一次：續命＋照常叫醒
   workflow_dispatch:
 
-# 續命那一步要用 GITHUB_TOKEN 重新啟用這個 workflow
-permissions:
-  actions: write
+# 預設不給 GITHUB_TOKEN 任何權限；只有續命那個 job 拿 actions: write
+permissions: {}
 
 jobs:
   tick:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
-      # 公開 repo 連續 60 天沒有 commit，GitHub 會自動停用排程；每天呼叫一次 enable API 重設計時，不必產生假 commit
-      - name: 排程續命（每天一次）
-        if: github.event_name == 'workflow_dispatch' || github.event.schedule == '7 0 * * *'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh api -X PUT "repos/${{ github.repository }}/actions/workflows/push-tick.yml/enable" > /dev/null \
-            && echo "已重新啟用排程" || echo "::warning::重新啟用排程失敗"
-
       - name: 叫醒伺服器
         env:
           TOKEN: ${{ secrets.PUSH_TICK_TOKEN }}
@@ -38,3 +28,19 @@ jobs:
           fi
           curl -fsS --max-time 90 --retry 2 --retry-delay 10 -X POST \
             -H "Authorization: Bearer $TOKEN" "$APP_URL/api/push/tick"
+
+  # 公開 repo 連續 60 天沒有 commit，GitHub 會自動停用排程；每天呼叫一次 enable API 重設計時，不必產生假 commit。
+  # 獨立成一個 job：只有它有 actions: write，而且碰不到 PUSH_TICK_TOKEN；失敗只發 warning，不影響叫醒。
+  keep-schedule-enabled:
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '7 0 * * *'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      actions: write
+    steps:
+      - name: 排程續命
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api -X PUT "repos/${{ github.repository }}/actions/workflows/push-tick.yml/enable" > /dev/null \
+            && echo "已重新啟用排程" || echo "::warning::重新啟用排程失敗"
