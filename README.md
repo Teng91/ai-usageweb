@@ -162,7 +162,7 @@ curl.exe -X PUT https://ai-usageweb.fly.dev/admin/credentials/claude -H "Authori
    npm run gen-vapid
    ```
 
-2. GitHub repo 的 Settings → Secrets and variables → Actions，新增 secret `PUSH_TICK_TOKEN`（同上）。`.github/workflows/push-tick.yml` 每 15 分鐘叫醒機器抓一輪，沒開網頁也能判斷；網址不是 `https://ai-usageweb.fly.dev` 的話再設 variable `APP_URL`。
+2. GitHub repo 的 Settings → Secrets and variables → Actions，新增 secret `PUSH_TICK_TOKEN`（同上）。`.github/workflows/push-tick.yml` 每 15 分鐘叫醒機器抓一輪，沒開網頁也能判斷（每天也會呼叫 GitHub API 重新啟用自己，避免 repo 60 天沒 commit 時排程被停用）；網址不是 `https://ai-usageweb.fly.dev` 的話再設 variable `APP_URL`。
 3. 手機打開網站（iPhone 要先「加入主畫面」，再從主畫面打開），點頂列的鈴鐺，輸入 `PUSH_KEY`、開啟通知，按「送測試通知」確認收得到。
 
 通知規則：

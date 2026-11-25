@@ -1,6 +1,6 @@
 {
   "name": "ai-usageweb",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "description": "跨平台 AI 用量觀測 PWA：Claude、Codex、Antigravity、Copilot 額度與 OpenRouter 餘額",
   "type": "module",
