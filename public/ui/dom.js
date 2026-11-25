@@ -2,17 +2,16 @@
 
 export const $ = (id) => document.getElementById(id);
 
-// 卡片固定順序
-export const ORDER = ['claude', 'antigravity', 'codex', 'copilot', 'openrouter'];
-// 超過幾個更新週期沒新資料就算過期
-export const STALE_INTERVALS = 3;
 // 打開頁面後這段時間內，舊資料視為「更新中」而不是「過期」（伺服器剛喚醒正在抓）
 export const WAKE_WINDOW_MS = 90_000;
 
 /** 資料與連線的共用狀態（app.js 寫、cards.js 讀） */
 export const state = {
+  // 卡片順序就是伺服器快照的順序（src/providers/index.js），前端不另外寫一份
   providers: new Map(),
   pollIntervalSec: 120,
+  // 超過幾個更新週期沒新資料就算過期（伺服器在快照裡給）
+  staleIntervals: 3,
   es: null,
   live: false,
   sseFailures: 0,

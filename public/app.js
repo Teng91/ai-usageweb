@@ -44,6 +44,7 @@ async function paintCached() {
 
 function applySnapshot(snap) {
   state.pollIntervalSec = snap.pollIntervalSec || 120;
+  state.staleIntervals = snap.staleIntervals || state.staleIntervals;
   state.providers.clear();
   for (const p of snap.providers || []) state.providers.set(p.id, p);
   renderAll();

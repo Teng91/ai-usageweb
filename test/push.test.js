@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import { encryptPayload, vapidAuthorization, generateVapidKeys } from '../src/webpush.js';
-import { evaluateAlerts, mergeAlerts, recordSample, parseQuiet, quietState, formatWhen, formatDuration } from '../src/alerts.js';
+import { evaluateAlerts, mergeAlerts, recordSample, parseQuiet, quietState, formatWhen, formatDuration, localParts } from '../src/alerts.js';
 import { PushService, validSubscription } from '../src/push.js';
 import { tmpDir } from './helpers.js';
 
@@ -224,6 +224,46 @@ test('PushService：每家每天最多 4 則', async () => {
     advance(150 * MIN); // 12:00 到 22:00 有 5 輪不在勿擾時段
   }
   assert.equal(calls.length, 4);
+});
+
+test('PushService：被每日上限擋下的不算發過，隔天還會再判斷', async () => {
+  const { svc, calls, feed, advance } = service();
+  svc.subscribe(SUB);
+  const day = localParts(NOON, TZ).dateKey;
+  svc.state.daily.claude = { day, count: 4 };
+  feed(96, 30 * HOUR);
+  assert.equal(await svc.evaluate(), 0);
+  assert.equal(Object.keys(svc.state.sent).length, 0, '沒送出就不記下');
+  advance(20 * HOUR); // 隔天 08:00，勿擾結束
+  feed(97, 10 * HOUR);
+  assert.equal(await svc.evaluate(), 1);
+  assert.equal(calls.length, 1);
+});
+
+test('PushService：送失敗不算發過也不算次數，下次再試', async () => {
+  let fail = true;
+  const sent = [];
+  const { svc, feed, advance } = service({ send: async (sub, payload) => (fail ? { ok: false, gone: false, status: 500 } : (sent.push(payload), { ok: true, status: 201 })) });
+  svc.subscribe(SUB);
+  feed(96);
+  assert.equal(await svc.evaluate(), 0);
+  assert.equal(svc.state.daily.claude, undefined);
+  fail = false;
+  advance(2 * MIN);
+  feed(96);
+  assert.equal(await svc.evaluate(), 1);
+  assert.equal(sent.length, 1);
+  assert.equal(svc.state.daily.claude.count, 1);
+});
+
+test('PushService：沒有訂閱要這一類 → 記下但不算次數', async () => {
+  const { svc, calls, feed } = service();
+  svc.subscribe(SUB, { usage: false });
+  feed(96);
+  assert.equal(await svc.evaluate(), 0);
+  assert.equal(calls.length, 0);
+  assert.ok(Object.keys(svc.state.sent).length > 0);
+  assert.equal(svc.state.daily.claude, undefined);
 });
 
 test('validSubscription 擋掉不合格的訂閱', () => {

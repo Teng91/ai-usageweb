@@ -1,11 +1,10 @@
 import { requestJson, clampPct, toIso } from '../http.js';
 import { ProviderError } from '../errors.js';
 import { refreshAndSave, callWithRefresh } from '../oauth.js';
+import { endpoints, manual } from '../config.js';
 
-// 需實測：網域與 client id 可能更動，可用環境變數覆寫
-const USAGE_URL = process.env.CLAUDE_USAGE_URL || 'https://api.anthropic.com/api/oauth/usage';
-const TOKEN_URL = process.env.CLAUDE_TOKEN_URL || 'https://console.anthropic.com/v1/oauth/token';
-const CLIENT_ID = process.env.CLAUDE_CLIENT_ID || '9d1c250a-e61b-44d9-88ed-5944d1962f5e';
+// 需實測：網域與 client id 可能更動，可用環境變數覆寫（見 config.js）
+const { usageUrl: USAGE_URL, tokenUrl: TOKEN_URL, clientId: CLIENT_ID } = endpoints.claude;
 
 const HOUR = 3600;
 const WINDOWS = [
@@ -17,7 +16,7 @@ const WINDOWS = [
 
 /**
  * 訂閱到期日（API 沒有提供，手動設定 CLAUDE_PLAN_EXPIRES_AT=YYYY-MM-DD）。
- * 直接讀環境變數而不是憑證：憑證存在 volume 後會蓋過環境變數。
+ * 直接讀環境變數（config.js 的 manual）而不是憑證：憑證存在 volume 後會蓋過環境變數。
  * 回傳 'YYYY-MM-DD'（只有日期，避免時區把日子算錯）；格式不對就當沒設定。
  */
 export function parsePlanExpiry(raw) {
@@ -77,9 +76,9 @@ export default {
   },
   async fetch(ctx) {
     const c0 = ctx.creds.claude;
-    // 方案名稱直接讀環境變數：憑證存進 volume 後會蓋過環境變數，改 fly secrets 才會生效
-    const plan = process.env.CLAUDE_PLAN || c0.plan || 'Pro';
-    const planExpiresAt = parsePlanExpiry(process.env.CLAUDE_PLAN_EXPIRES_AT);
+    // 方案名稱與到期日是手動設定，直接讀環境變數（不放進憑證）
+    const plan = manual.claudePlan;
+    const planExpiresAt = parsePlanExpiry(manual.claudePlanExpiresAt);
     return callWithRefresh(c0, {
       expiresAt: Number(c0.expiresAt) || 0,
       refresh: (c) => doRefresh(ctx, c),

@@ -2,10 +2,10 @@ import path from 'node:path';
 import { requestJson } from './http.js';
 import { writeFileAtomic, readFileOrNull } from './fsutil.js';
 import { logWarn } from './log.js';
+import { endpoints } from './config.js';
 
-// OpenRouter 排行榜頁面用的端點（非官方 API，可用環境變數覆寫）；模型名稱來自公開的模型列表
-const RANKINGS_URL = process.env.OPENROUTER_RANKINGS_URL || 'https://openrouter.ai/api/frontend/v1/rankings/models';
-const MODELS_URL = process.env.OPENROUTER_MODELS_URL || 'https://openrouter.ai/api/v1/models';
+// OpenRouter 排行榜頁面用的端點（非官方 API，可用環境變數覆寫，見 config.js）；模型名稱來自公開的模型列表
+const { rankingsUrl: RANKINGS_URL, modelsUrl: MODELS_URL } = endpoints.openrouter;
 
 export const VIEWS = ['day', 'week', 'month'];
 const TOP_N = 10;

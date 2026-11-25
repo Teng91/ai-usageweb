@@ -112,30 +112,44 @@ export class PushService {
     const alerts = evaluateAlerts({ providers, history: this.state.history, sent: this.state.sent, now, tz: this.tz, quiet: this.quiet });
     if (!alerts.length) return 0;
 
-    const watching = this.viewers() > 0;
-    const day = localParts(now, this.tz).dateKey;
-    const toSend = [];
-    for (const a of alerts) {
-      for (const k of a.keys) this.state.sent[k] = now; // 看著網頁時也記下：畫面上已經看到了
-      if (watching) continue;
-      const d = this.state.daily[a.provider];
-      const count = d?.day === day ? d.count : 0;
-      if (count >= DAILY_CAP) continue;
-      this.state.daily[a.provider] = { day, count: count + 1 };
-      toSend.push(a);
+    const markSent = (list) => { for (const a of list) for (const k of a.keys) this.state.sent[k] = now; };
+    if (this.viewers() > 0) {
+      // 看著網頁時只記下不推播：畫面上已經看到了
+      markSent(alerts);
+      this.save();
+      return 0;
     }
-    this.save();
-    if (!toSend.length) return 0;
+
+    // 超過每日上限的先不送也不記下，明天（或額度還沒重置前）還會再判斷，不會整個週期都漏掉
+    const day = localParts(now, this.tz).dateKey;
+    const countOf = (id) => (this.state.daily[id]?.day === day ? this.state.daily[id].count : 0);
+    const planned = {};
+    const toSend = alerts.filter((a) => {
+      if (countOf(a.provider) + (planned[a.provider] || 0) >= DAILY_CAP) return false;
+      planned[a.provider] = (planned[a.provider] || 0) + 1;
+      return true;
+    });
 
     let sent = 0;
-    for (const msg of mergeAlerts(toSend)) {
-      const payload = { title: msg.title, body: msg.body, tag: msg.kind, url: '/' };
-      for (const sub of [...this.state.subs]) {
-        if (sub.prefs?.[msg.kind] === false) continue;
-        if (await this.#deliver(sub, payload, msg.kind === 'usage' ? 'high' : 'normal')) sent++;
+    for (const kind of new Set(toSend.map((a) => a.kind))) {
+      const group = toSend.filter((a) => a.kind === kind);
+      const [msg] = mergeAlerts(group);
+      const payload = { title: msg.title, body: msg.body, tag: kind, url: '/' };
+      const targets = this.state.subs.filter((sub) => sub.prefs?.[kind] !== false);
+      let delivered = 0;
+      for (const sub of targets) {
+        if (await this.#deliver(sub, payload, kind === 'usage' ? 'high' : 'normal')) delivered++;
+      }
+      sent += delivered;
+      // 沒人要這一類：記下但不算次數；全部送失敗：不記，下次再試
+      if (!targets.length) markSent(group);
+      else if (delivered) {
+        markSent(group);
+        for (const a of group) this.state.daily[a.provider] = { day, count: countOf(a.provider) + 1 };
       }
     }
-    logInfo('push sent', { count: sent, kinds: toSend.map((a) => a.kind) });
+    this.save();
+    if (sent) logInfo('push sent', { count: sent, kinds: [...new Set(toSend.map((a) => a.kind))] });
     return sent;
   }
 

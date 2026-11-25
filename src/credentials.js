@@ -18,7 +18,6 @@ export function credsFromEnv(env = process.env) {
       accessToken: env.CLAUDE_ACCESS_TOKEN || env.CLAUDE_OAUTH_TOKEN,
       refreshToken: env.CLAUDE_REFRESH_TOKEN,
       expiresAt: num(env.CLAUDE_EXPIRES_AT),
-      plan: env.CLAUDE_PLAN,
     }),
     codex: pick({
       accessToken: env.CODEX_ACCESS_TOKEN,
@@ -146,8 +145,9 @@ export class CredentialStore {
     logInfo('憑證已續期並寫入', { provider: id });
   }
 
-  /** 管理 API：整份替換某一家的憑證（視為新登入） */
+  /** 管理 API：整份替換某一家的憑證（視為新登入）；正在續期就等它結束，免得續期結果蓋掉新憑證 */
   async replace(id, value) {
+    await this.locks.get(id)?.catch(() => {});
     const prev = this.creds[id];
     this.creds[id] = { ...value };
     try {

@@ -1,5 +1,5 @@
 // 卡片、頂列連線狀態、空畫面；每秒重算倒數與「X 分鐘前」
-import { $, ORDER, STALE_INTERVALS, WAKE_WINDOW_MS, state, visible } from './dom.js';
+import { $, WAKE_WINDOW_MS, state, visible } from './dom.js';
 import { money, ago, resetText } from './format.js';
 import { gameEffects } from './effects.js';
 import { rankingsEl } from './rankings.js';
@@ -9,8 +9,8 @@ const tpl = $('card-tpl');
 const loadingTpl = $('empty').cloneNode(true);
 
 export function renderAll() {
-  const ids = ORDER.filter((id) => visible(state.providers.get(id)));
-  for (const id of state.providers.keys()) if (!ORDER.includes(id) && visible(state.providers.get(id))) ids.push(id);
+  // 順序照伺服器快照（state.providers 依快照順序放入）
+  const ids = [...state.providers.keys()].filter((id) => visible(state.providers.get(id)));
   // 移除不該出現的卡片
   for (const el of cardsEl.querySelectorAll('.card')) if (!ids.includes(el.dataset.id)) el.remove();
   for (const id of ids) renderCard(state.providers.get(id));
@@ -85,8 +85,9 @@ function cardFor(p) {
   }
   // 放進該在的分區（方案變了會換區），區內依固定順序
   const g = groupEl(groupOf(p));
-  const idx = ORDER.indexOf(p.id);
-  const after = [...g.querySelectorAll(':scope > .card')].find((c) => c !== el && ORDER.indexOf(c.dataset.id) > idx) || null;
+  const order = [...state.providers.keys()];
+  const idx = order.indexOf(p.id);
+  const after = [...g.querySelectorAll(':scope > .card')].find((c) => c !== el && order.indexOf(c.dataset.id) > idx) || null;
   if (el.parentElement !== g || el.nextElementSibling !== after) g.insertBefore(el, after);
   return el;
 }
@@ -94,7 +95,7 @@ function cardFor(p) {
 function effectiveStatus(p, now = Date.now()) {
   if (p.status !== 'ok') return p.status;
   const interval = (p.intervalSec || state.pollIntervalSec) * 1000;
-  if (p.fetchedAt && now - Date.parse(p.fetchedAt) > STALE_INTERVALS * interval) return 'stale';
+  if (p.fetchedAt && now - Date.parse(p.fetchedAt) > state.staleIntervals * interval) return 'stale';
   return 'ok';
 }
 
@@ -109,7 +110,7 @@ function isUpdating(p, now = Date.now()) {
   if (!p.fetchedAt) return true;
   if (Date.parse(p.fetchedAt) >= state.sessionStart) return false;
   const interval = (p.intervalSec || state.pollIntervalSec) * 1000;
-  return state.sessionStart - Date.parse(p.fetchedAt) > STALE_INTERVALS * interval;
+  return state.sessionStart - Date.parse(p.fetchedAt) > state.staleIntervals * interval;
 }
 
 export function renderCard(p) {

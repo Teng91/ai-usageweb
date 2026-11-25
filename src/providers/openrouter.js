@@ -1,7 +1,8 @@
 import { requestJson, requireField } from '../http.js';
 import { ProviderError } from '../errors.js';
+import { endpoints } from '../config.js';
 
-const BASE = process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1';
+const BASE = endpoints.openrouter.baseUrl;
 
 const round2 = (n) => Math.round(Number(n) * 100) / 100;
 

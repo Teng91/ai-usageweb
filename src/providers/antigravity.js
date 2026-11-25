@@ -1,35 +1,16 @@
 import { requestJson, toIso } from '../http.js';
 import { ProviderError } from '../errors.js';
 import { refreshToken, REFRESH_SKEW_MS } from '../oauth.js';
+import { endpoints } from '../config.js';
 
-// 內部端點，可用環境變數覆寫。跟 agy CLI 一樣用 daily-cloudcode-pa：
-// cloudcode-pa 回的 Gemini 組額度永遠是 100%（重置時間也一直往後推），daily 的才是實際用量（2026-11 實測）
-const BASE = process.env.ANTIGRAVITY_BASE_URL || 'https://daily-cloudcode-pa.googleapis.com/v1internal';
-const TOKEN_URL = process.env.ANTIGRAVITY_TOKEN_URL || 'https://oauth2.googleapis.com/token';
-// 要用 agy CLI 的格式：retrieveUserQuotaSummary 看到 CLI 才會連 Gemini 組的額度一起回（只寫 antigravity 只有 Claude/GPT 組）
-const USER_AGENT = process.env.ANTIGRAVITY_USER_AGENT || 'antigravity/cli/1.5.15';
+// 內部端點，可用環境變數覆寫（見 config.js；為什麼用 daily-cloudcode-pa 與 CLI 的 User-Agent 也寫在那裡）
+const { baseUrl: BASE, tokenUrl: TOKEN_URL, userAgent: USER_AGENT } = endpoints.antigravity;
 
-// Google 的 access token 只放記憶體（1 小時），refresh token 不輪換
-const cache = { owner: null, accessToken: null, expiresAt: 0, projectId: null, plan: null, planAt: 0 };
 // 方案（訂閱）會變，每小時重查（升級後最慢一小時內更新）；機器 suspend 時記憶體不會清掉，不能只在啟動時查一次
 const PLAN_TTL_MS = 3600 * 1000;
 
-export function _resetCache() {
-  cache.owner = null;
-  cache.accessToken = null;
-  cache.expiresAt = 0;
-  cache.projectId = null;
-  cache.plan = null;
-  cache.planAt = 0;
-}
-
-/** 憑證換了（管理 API 換帳號）就丟掉舊帳號的 token、project 與方案 */
-function syncCacheOwner(c) {
-  const owner = `${c.clientId}\n${c.refreshToken}`;
-  if (cache.owner === owner) return;
-  _resetCache();
-  cache.owner = owner;
-}
+// Google 的 access token 只放記憶體（1 小時），refresh token 不輪換；快取跟著 provider 實例走
+const blankCache = () => ({ owner: null, accessToken: null, expiresAt: 0, projectId: null, plan: null, planAt: 0 });
 
 function family(name) {
   const s = String(name).toLowerCase();
@@ -137,7 +118,7 @@ export function tierName(load) {
   return String(name);
 }
 
-async function accessToken(ctx) {
+async function accessToken(cache, ctx) {
   if (cache.accessToken && cache.expiresAt - Date.now() > REFRESH_SKEW_MS) return cache.accessToken;
   const c = ctx.creds.antigravity;
   if (!c.clientId || !c.clientSecret) throw new ProviderError('auth', '缺少 Antigravity client id／secret');
@@ -185,7 +166,7 @@ function post(path, token, body, signal) {
   });
 }
 
-async function fetchOnce(ctx, token) {
+async function fetchOnce(cache, ctx, token) {
   const c = ctx.creds.antigravity;
   let projectId = c.projectId || cache.projectId;
   if (!projectId || !cache.plan || Date.now() - cache.planAt > PLAN_TTL_MS) {
@@ -219,23 +200,32 @@ async function fetchOnce(ctx, token) {
   };
 }
 
-export default {
-  id: 'antigravity',
-  name: 'Gemini',
-  minIntervalSec: 60,
-  isConfigured(creds) {
-    const c = creds.antigravity;
-    return Boolean(c?.refreshToken && c?.clientId && c?.clientSecret);
-  },
-  async fetch(ctx) {
-    syncCacheOwner(ctx.creds.antigravity);
-    const token = await accessToken(ctx);
-    try {
-      return await fetchOnce(ctx, token);
-    } catch (err) {
-      if (!(err instanceof ProviderError) || err.kind !== 'auth') throw err;
-      cache.accessToken = null;
-      return fetchOnce(ctx, await accessToken(ctx));
-    }
-  },
-};
+/** 建立 provider；每個實例有自己的 token／project／方案快取（測試可以各自建一個） */
+export function createAntigravity() {
+  let cache = blankCache();
+  return {
+    id: 'antigravity',
+    name: 'Gemini',
+    minIntervalSec: 60,
+    isConfigured(creds) {
+      const c = creds.antigravity;
+      return Boolean(c?.refreshToken && c?.clientId && c?.clientSecret);
+    },
+    async fetch(ctx) {
+      // 憑證換了（管理 API 換帳號）就丟掉舊帳號的 token、project 與方案
+      const c = ctx.creds.antigravity;
+      const owner = `${c.clientId}\n${c.refreshToken}`;
+      if (cache.owner !== owner) cache = { ...blankCache(), owner };
+      const token = await accessToken(cache, ctx);
+      try {
+        return await fetchOnce(cache, ctx, token);
+      } catch (err) {
+        if (!(err instanceof ProviderError) || err.kind !== 'auth') throw err;
+        cache.accessToken = null;
+        return fetchOnce(cache, ctx, await accessToken(cache, ctx));
+      }
+    },
+  };
+}
+
+export default createAntigravity();

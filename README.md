@@ -1,6 +1,6 @@
 # AI 用量（ai-usageweb）
 
-一個打開就看得到 AI 服務本期還剩多少的 PWA：**Claude Pro、Codex（ChatGPT）、Antigravity、GitHub Copilot** 的額度，加上 **OpenRouter** 餘額。電腦、手機瀏覽器都能看，手機可以「加到主畫面」當 App。
+一個打開就看得到 AI 服務本期還剩多少的 PWA：**Claude Pro、Codex（ChatGPT）、Antigravity（卡片名稱是 Gemini）、GitHub Copilot** 的額度，加上 **OpenRouter** 餘額。電腦、手機瀏覽器都能看，手機可以「加到主畫面」當 App。
 
 部署在 fly.io：**有人打開才喚醒機器**，開著時每 2 分鐘更新並用 SSE 推到畫面上；沒人看幾分鐘後機器自動暫停（suspend，下次喚醒只要幾百毫秒），不收 CPU／記憶體費用。
 
@@ -46,6 +46,8 @@ GitHub Actions 每 15 分鐘 ──POST /api/push/tick──▶ 機器沒人看�
 | `GET /admin/status` | 各家錯誤種類、下次抓取、token 到期時間（不含 token） | `ADMIN_TOKEN` |
 
 SSE 被擋時（例如公司 proxy 會卡住串流），前端 6 秒內沒連上就改成每 30 秒輪詢 `/api/usage`，右上角顯示「自動更新」。
+
+同時最多 20 條 SSE 連線（`SSE_MAX_CLIENTS`），滿了回 503，前端一樣改用輪詢。
 
 錯誤處理：429 依 `Retry-After` 或 240→480→最多 900 秒退避（卡片保留舊數字並標「更新放慢」）；401 先續期再重試一次；續期失敗標「需要重新登入」並停止那一家；403／Cloudflare 這次觀看期間不再試；網路／5xx 退避最多 300 秒；格式變了每 300 秒試一次。
 
@@ -159,6 +161,24 @@ curl.exe -X PUT https://ai-usageweb.fly.dev/admin/credentials/claude -H "Authori
 
 設 `ACCESS_KEY`，第一次用 `https://ai-usageweb.fly.dev/?k=<ACCESS_KEY>` 打開，之後記在 cookie（HttpOnly）；載入成功後網址上的 `?k=` 會自動拿掉，不會留在瀏覽紀錄。
 
+### 其他可調的環境變數
+
+都有預設值，通常不必設。
+
+| 變數 | 預設 | 說明 |
+| --- | --- | --- |
+| `POLL_INTERVAL_SEC` | `120` | 有人看時每家多久抓一次（Claude 約每 2 分鐘才給查一次，不建議調低） |
+| `IDLE_GRACE_SEC` | `90` | 觀看者全部離開後再等多久才停止輪詢 |
+| `REQUEST_TIMEOUT_MS` | `10000` | 對各家請求的逾時 |
+| `SSE_MAX_AGE_SEC` | `1800` | 單一 SSE 連線最長多久，到了請前端在看得見時重連 |
+| `SSE_PING_SEC` | `25` | SSE 多久送一次 `: ping` |
+| `SSE_MAX_CLIENTS` | `20` | 同時最多幾條 SSE 連線，滿了回 503（前端改輪詢） |
+| `PROVIDERS` | 全部 | 只開部分服務，例如 `openrouter,copilot` |
+| `CLAUDE_PLAN` | `Pro` | Claude 卡片顯示的方案名稱（API 拿不到） |
+| `CLAUDE_PLAN_EXPIRES_AT` | 無 | Claude 訂閱到期日 `YYYY-MM-DD` |
+
+各家端點與 client id 的覆寫（內部端點常變）列在 `.env.example` 最後面，集中在 `src/config.js` 讀取。`CLAUDE_PLAN`、`CLAUDE_PLAN_EXPIRES_AT` 每次都直接讀環境變數、不會存進憑證，改 fly secrets 就會生效。
+
 ## 手機通知（Web Push）
 
 額度快用完、或週／月額度快重置卻還剩很多時，推播到手機。不設定就不會出現鈴鐺按鈕。
@@ -180,11 +200,19 @@ curl.exe -X PUT https://ai-usageweb.fly.dev/admin/credentials/claude -H "Authori
 | 快重置還有剩 | 只看週／月額度，而且最近一小時沒在用：24 小時內剩 ≥ 40%、12 小時內剩 ≥ 20%、6 小時內剩 ≥ 10% 各一次 |
 
 - 00:00–08:00 不發（`PUSH_QUIET`，時區 `PUSH_TZ`）；「快重置」會落在勿擾時段的提醒，提前到 22:00 後發。
-- 網頁開著時不推播；同一類合成一則，新的蓋掉舊的；每家每天最多 4 則。
+- 網頁開著時不推播；同一類合成一則，新的蓋掉舊的；每家每天最多 4 則（超過上限或送失敗的不算發過，之後還會再判斷）。
 - 機器每 15 分鐘被叫醒一次、抓完約幾分鐘後又 suspend，執行時間大約多三分之一，費用每月不到 1 美元。
 
 ## 畫面
 
+- **卡片分三區**：付費 AI 用量、免費 AI 用量（方案名稱有 Free 的）、OpenRouter（餘額＋熱門模型）。方案變了（例如升級 Pro）卡片會自動換區；寬螢幕上付費與免費兩區並排。
+- **每張卡片的額度**：
+  - Claude：5 小時、每週（有的話再加每週 Opus／Sonnet）
+  - Gemini（Antigravity）：Gemini 與 Claude/GPT 兩組各有 5 小時與每週，共四條；三條以上排成兩欄（左 5 小時、右每週），卡片不會變高。免費方案只有模型清單給的兩條
+  - Codex：短窗與每週（依方案）
+  - Copilot：Chat、程式碼補全、Premium 請求（顯示次數，每月重置）
+  - OpenRouter：剩餘餘額與已用金額
+- 70% 變橘、90% 變紅；超過 3 個更新週期沒有新資料標「資料已過期」
 - **兩種風格**（右上角旗子按鈕切換，會記住）：
   - 簡約：深藍細線的資料儀表板風格
   - 冒險：原創的像素 RPG 風格，春夏秋冬四張地圖輪流（小勇者走進右邊的傳送點就換下一季）、會動的原創怪物（點了會跳）、用量上升時卡片跳出「+N%」、額度用到 90% 以上冒「快用完了！」
@@ -194,7 +222,7 @@ curl.exe -X PUT https://ai-usageweb.fly.dev/admin/credentials/claude -H "Authori
 - **OpenRouter 熱門模型**：免費／付費前 10 名（每天／每週／每月），付費附每百萬 token 價格
 - **Claude 到期日**：設 `CLAUDE_PLAN_EXPIRES_AT=YYYY-MM-DD`，剩 30 天內變橘色
 
-冒險風格的像素圖全部是原創點陣，放在 `public/pixel/`，由 `scripts/gen-pixel-art.mjs` 從文字點陣產生；要改角色就改點陣再執行 `node scripts/gen-pixel-art.mjs`。
+冒險風格的像素圖全部是原創點陣，放在 `public/pixel/`，由 `scripts/gen-pixel-art.mjs` 產生；角色在 `scripts/pixel-art/characters.mjs`、場景圖塊在 `scripts/pixel-art/scenery.mjs`，改完執行 `node scripts/gen-pixel-art.mjs`。
 
 ## 加到主畫面
 
@@ -217,13 +245,13 @@ src/alerts.js             推播規則（用量警告、快重置還有剩、勿
 src/push.js               推播服務：訂閱、樣本、去重、每日上限，存 /data/push.json
 src/webpush.js            Web Push：VAPID 簽名與 RFC 8291 加密（只用內建 crypto）
 src/credentials.js        環境變數＋加密 volume、每家續期鎖
-src/sse.js                SSE 連線、ping、廣播、連線上限 30 分鐘
+src/sse.js                SSE 連線、ping、廣播、單一連線最長 30 分鐘、連線數上限
 src/http.js               對外請求、錯誤分類、Cloudflare 偵測
 src/oauth.js              refresh_token 續期、先存再用、401 續期重試（Claude／Codex 共用）
-src/config.js             環境變數設定
+src/config.js             環境變數設定（含各家端點覆寫與手動設定值）
 src/errors.js             ProviderError（錯誤種類）、Retry-After 解析
 src/fsutil.js、log.js     原子寫檔、一行一筆 JSON log
-src/providers/*.js        五家 adapter（統一輸出 { plan, planExpiresAt?, windows, balance, note }）
+src/providers/*.js        五家 adapter（統一輸出 { plan, planExpiresAt?, windows, balance, note }）；顯示順序在 index.js
 public/                   PWA（index.html、style.css、sw.js、manifest、icons）
 public/app.js             前端進入點：資料與連線（快照、SSE、SSE 被擋時改輪詢）
 public/ui/                前端模組：cards（卡片）、rankings（排行）、effects（冒險效果）、
@@ -235,6 +263,7 @@ public/scene.js           場景邏輯：建立地圖、勇者走到傳送點換
 public/scene-maps.js      四季地圖資料（加地圖改這裡）
 public/pixel/             原創像素圖（由 scripts/gen-pixel-art.mjs 產生）
 scripts/                  extract-credentials.js、setup-antigravity.ps1、gen-pixel-art.mjs、smoke-ui.mjs、gen-vapid.mjs
+scripts/pixel-art/        像素圖產生器：lib（調色盤、點陣轉 SVG、畫布 DSL）、characters（勇者與怪物）、scenery（場景與四季換色）
 docs/TECHNICAL.md         技術文件（設計細節）
 docs/TODO.md              之後可以做的事
 test/                     node:test＋假 fetch＋fixtures

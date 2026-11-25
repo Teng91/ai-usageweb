@@ -16,8 +16,6 @@ import { createHandler } from './src/routes.js';
 import { sendJson, safePath } from './src/respond.js';
 import { logInfo, logWarn } from './src/log.js';
 
-export { checkBearer } from './src/respond.js';
-
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.join(ROOT, 'public');
 
@@ -53,6 +51,7 @@ export async function createApp(opts = {}) {
   const hub = new SseHub({
     pingSec: cfg.ssePingSec,
     maxAgeSec: cfg.sseMaxAgeSec,
+    maxClients: cfg.sseMaxClients,
     onJoin: (n) => poller.viewerJoined(n),
     onLeave: (n) => poller.viewerLeft(n),
   });

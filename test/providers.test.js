@@ -7,15 +7,16 @@ import openrouter from '../src/providers/openrouter.js';
 import copilot, { parseCopilot } from '../src/providers/copilot.js';
 import claude, { parseClaude, parsePlanExpiry } from '../src/providers/claude.js';
 import codex, { parseCodex } from '../src/providers/codex.js';
-import antigravity, { parseModels, parseSummary, mergeWindows, tierName, _resetCache } from '../src/providers/antigravity.js';
+import { createAntigravity, parseModels, parseSummary, mergeWindows, tierName } from '../src/providers/antigravity.js';
 import { ProviderError } from '../src/errors.js';
 import { parseRankings, parseModelCatalog, RankingsService } from '../src/rankings.js';
 
 let mock;
+let antigravity = createAntigravity();
 afterEach(() => {
   mock?.restore();
   mock = null;
-  _resetCache();
+  antigravity = createAntigravity();
 });
 
 const jwt = (exp) => `x.${Buffer.from(JSON.stringify({ exp })).toString('base64url')}.y`;
@@ -381,7 +382,7 @@ test('antigravity: 方案名稱整理成 Free／Pro／Ultra，付費方案優先
 });
 
 test('antigravity: 方案超過 1 小時會重查 loadCodeAssist', async () => {
-  _resetCache();
+  antigravity = createAntigravity();
   let loads = 0;
   let tier = { id: 'free-tier', name: 'Antigravity Starter Quota' };
   mock = mockFetch([
@@ -404,7 +405,7 @@ test('antigravity: 方案超過 1 小時會重查 loadCodeAssist', async () => {
 });
 
 test('antigravity: 換了憑證（換帳號）就不沿用舊帳號的 token 與 project', async () => {
-  _resetCache();
+  antigravity = createAntigravity();
   const tokens = [];
   mock = mockFetch([
     ['oauth2.googleapis.com', (req) => {
@@ -423,7 +424,7 @@ test('antigravity: 換了憑證（換帳號）就不沿用舊帳號的 token 與
 });
 
 test('antigravity: 拿到新 refresh token 但存不進去 → upstream，不使用這次的 token', async () => {
-  _resetCache();
+  antigravity = createAntigravity();
   let modelCalls = 0;
   mock = mockFetch([
     ['oauth2.googleapis.com', () => ({ json: { access_token: 'g-new', refresh_token: 'rt-new', expires_in: 3599 } })],

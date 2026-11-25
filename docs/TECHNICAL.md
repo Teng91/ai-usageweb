@@ -36,7 +36,7 @@
 
 | 功能 | 說明 |
 | --- | --- |
-| 五家額度 | 每個額度窗口一條進度條、重置倒數；70%／90% 變色 |
+| 五家額度 | 每個額度窗口一條進度條、重置倒數；70%／90% 變色；卡片分成付費、免費、OpenRouter 三區 |
 | 即時更新 | SSE 推送；SSE 被企業 proxy 擋住時自動改成輪詢 |
 | OpenRouter 熱門模型 | 免費／付費各前 10 名（每天／每週／每月），付費附每百萬 token 價格 |
 | 訂閱到期日 | 手動設定，剩 30 天內提醒 |
@@ -62,7 +62,11 @@ flowchart LR
     P --> AD[providers/*.js]
     AD --> C[credentials.js<br/>AES-256-GCM]
     R --> RK[rankings.js]
+    P --> PS[push.js<br/>alerts.js]
+    PS --> WP[webpush.js]
   end
+  GH[GitHub Actions<br/>每 15 分鐘] -- POST /api/push/tick --> R
+  WP -- Web Push --> PHONE[(手機)]
   UI -- GET /api/usage --> R
   H -- SSE /api/stream --> UI
   AD -- 查用量 / 續期 --> EXT[(Claude / Codex /<br/>Antigravity / Copilot /<br/>OpenRouter)]
@@ -74,7 +78,8 @@ flowchart LR
 1. 瀏覽器打開頁面 → `GET /api/usage` 拿快照，同時開 SSE。
 2. 第一個觀看者出現時 `poller` 開始排程，每家每 2 分鐘抓一次；每抓到一家就透過 SSE 推給所有人。
 3. 觀看者全部離開 90 秒後停止輪詢；fly.io 偵測到沒有連線，幾分鐘後把機器 **suspend**（保留記憶體快照，下次喚醒只要幾百毫秒）。
-4. 每家 adapter 輸出統一格式 `{ plan, windows: [{ id, label, usedPct, resetsAt }], balance, note }`，前端只認這個格式，新增服務不必改畫面。
+4. 每家 adapter 輸出統一格式 `{ plan, planExpiresAt?, windows: [{ id, label, usedPct, resetsAt, periodSec?, used?, limit? }], balance, note }`，前端只認這個格式，新增服務不必改畫面。`usedPct` 一律是「已用」0–100；`periodSec` 是窗口長度（推播靠它分辨週／月額度）；`used`／`limit` 是次數制額度（Copilot）的實際次數。
+5. 每抓到新資料，`push.js` 記一筆樣本並判斷要不要推播；沒人看時由 GitHub Actions 定時喚醒抓一輪。
 
 **後端模組**
 
@@ -87,6 +92,11 @@ flowchart LR
 | `src/credentials.js` | 環境變數 + 加密 volume、每家續期鎖 |
 | `src/snapshot.js` | 記憶體快照、原子寫檔 |
 | `src/rankings.js` | OpenRouter 排行（每小時最多抓一次、存檔格式版本） |
+| `src/push.js` | 推播服務：訂閱、樣本、去重、每日上限，存 `/data/push.json` |
+| `src/alerts.js` | 推播規則（純函式）：用量警告、快重置還有剩、勿擾時段 |
+| `src/webpush.js` | VAPID 簽名與 RFC 8291 內容加密 |
+| `src/sse.js` | SSE 連線、ping、廣播、單一連線最長時間與連線數上限 |
+| `src/config.js` | 環境變數設定，含各家端點覆寫與手動設定值（`CLAUDE_PLAN` 等每次直接讀） |
 
 **前端模組**（原生 ES modules、不打包）
 
@@ -98,6 +108,9 @@ flowchart LR
 | `ui/effects.js` | 冒險風格的跳數字、提醒泡泡 |
 | `ui/theme-toggle.js` | 亮暗與風格切換 |
 | `ui/pwa.js` | Service Worker、安裝、iOS 提示 |
+| `ui/push.js` | 通知設定對話框（訂閱、開關、送測試通知） |
+| `ui/format.js` | 金額、時間、倒數的格式化 |
+| `ui/dom.js` | 共用的取元素函式、狀態、localStorage、存取碼網址；卡片順序與過期門檻都跟伺服器快照拿 |
 | `scene.js` / `scene-maps.js` | 冒險風格的場景邏輯與四季地圖資料 |
 
 ## 4. 技術選擇與取捨
@@ -106,7 +119,7 @@ flowchart LR
 後端只用 Node 22 內建模組（`node:http`、`fetch`、`node:crypto`、`node:test`），前端是原生 JS，沒有打包工具。
 
 - **好處**：沒有供應鏈風險、沒有升級負擔、Docker image 小、啟動快，任何人 `git clone` 就能跑。
-- **代價**：路由、SSE、測試替身都要自己寫。整個後端約 1,900 行，仍在好維護的範圍。
+- **代價**：路由、SSE、Web Push 加密、測試替身都要自己寫。整個後端約 2,600 行，仍在好維護的範圍。
 
 ### 有人看才輪詢
 不做背景排程。只在有觀看者時才查各家 API，沒人看就完全靜止。
@@ -129,6 +142,7 @@ flowchart LR
 | 403／Cloudflare | 這次觀看期間不再試 |
 | 網路／5xx／逾時 | 退避最多 300 秒 |
 | 格式改變 | 每 300 秒試一次 |
+| adapter 程式錯誤 | 當成格式改變處理，log 另記一行 `adapter 例外`：只有錯誤種類與出錯位置（檔案:行），不記訊息內容 |
 
 - 實測發現 Claude 的用量 API 大約每 2 分鐘才允許查一次（每分鐘查會交替收到 429），所以全部統一成 2 分鐘。
 
@@ -160,7 +174,7 @@ flowchart LR
 ### 5.6 原創像素圖產生器
 冒險風格的所有角色與場景（勇者、史萊姆、葉子精靈、蛋殼小雞、雲朵怪、螃蟹、傳送點、四季的樹、平台、海浪、雪地…）都是原創點陣，**不使用任何外部素材**。
 
-- `scripts/gen-pixel-art.mjs` 把文字點陣轉成 SVG，同一列相同顏色合併成一個 `<rect>`，並驗證每列寬度。
+- `scripts/gen-pixel-art.mjs` 是進入點；`scripts/pixel-art/lib.mjs` 把文字點陣（或畫布 DSL 畫出的格子）轉成 SVG，同一列相同顏色合併成一個 `<rect>`，並驗證每列寬度。角色在 `characters.mjs`，場景圖塊在 `scenery.mjs`。
 - 四季的樹、秋天的草用「換色」產生：只換葉子與草的調色盤，樹幹與輪廓不變。
 - 傳送點的漩渦、遠山的山形用程式計算產生。
 - 怪物的外層負責移動、`::before` 負責畫圖與換格，點擊時的跳躍動畫不會打斷巡邏路線。
@@ -174,6 +188,8 @@ flowchart LR
 - **兩種通知**（`src/alerts.js`，純函式）：
   - 用量警告：用最近 90 分鐘的樣本算消耗速度，預估在重置前用完才發，而不是固定門檻；95% 保底。避免「重置前 10 分鐘剛好過 80%」這種沒意義的通知。
   - 快重置還有剩：只看週期 ≥ 3 天的窗口（adapter 帶 `periodSec`），24h／40%、12h／20%、6h／10% 三階，發了緊的就把鬆的一起記下，不會倒回去；最近一小時用量有漲就不發。
+- **不會漏發**：超過每日上限、或全部送失敗的通知不記成「已發」，之後還會再判斷；網頁開著時則只記下不推播。沒有訂閱要那一類時記下但不算次數。
+- **排程喚醒碰到 403**：沒人看時每次喚醒都重新給一次機會，不會因為一次被 Cloudflare 擋下就停到有人打開網頁。
 - **重置週期的判斷**：重置時間每次回傳可能差幾秒，差 30 分鐘以上、時間已過、或用量突然下降才算新週期；去重的 key 是「服務：窗口：週期：階段」。
 - **勿擾**：00–08 不發；22–24 時把勿擾期間才會碰到的「快重置」提醒提前發。用量警告在勿擾後重新判斷（95% 仍會發）。
 - **零相依**：VAPID 用 `crypto.sign`（ES256、ieee-p1363），內容加密照 RFC 8291（ECDH＋HKDF＋AES-128-GCM），單元測試直接比對 RFC 附錄的範例輸出。
@@ -183,8 +199,8 @@ flowchart LR
 
 | 層級 | 工具 | 內容 |
 | --- | --- | --- |
-| 單元／整合 | `node:test`（78 項） | 每家 adapter 用 fixture 驗證轉換、輪詢排程與退避、憑證加密與續期鎖、快照、排行解析、HTTP 路由、逾時分類、推播加密（RFC 8291 範例）與規則 |
-| 前端 smoke test | 自寫的 Chrome DevTools Protocol 腳本（23 項） | 用假資料起本機伺服器、開 headless Chrome 實際操作：卡片、排行與價格、亮暗與風格切換、四季地圖輪替、點怪物、跳數字、只看風景、手機版按鈕位置、通知設定對話框、沒有 JS 錯誤 |
+| 單元／整合 | `node:test`（90 項） | 每家 adapter 用 fixture 驗證轉換、輪詢排程與退避、憑證加密與續期鎖、快照、排行解析、HTTP 路由、逾時分類、推播加密（RFC 8291 範例）與規則 |
+| 前端 smoke test | 自寫的 Chrome DevTools Protocol 腳本（30 項） | 用假資料起本機伺服器、開 headless Chrome 實際操作：卡片、排行與價格、亮暗與風格切換、四季地圖輪替、點怪物、跳數字、只看風景、手機版按鈕位置、通知設定對話框、沒有 JS 錯誤 |
 | CI | GitHub Actions | 推到 `main` 時兩種測試都通過才部署到 fly.io |
 
 前端 smoke test 同樣**不需要任何套件**：直接啟動本機的 Chrome／Edge，透過 Node 22 內建的 `WebSocket` 跟 DevTools Protocol 溝通。
@@ -212,11 +228,11 @@ flowchart LR
 
 | 項目 | 數量 |
 | --- | --- |
-| 後端程式 | 約 1,900 行 |
-| 前端 JavaScript | 約 1,300 行 |
-| CSS | 約 1,800 行（簡約、冒險卡片、場景三個檔） |
-| 測試 | 74 項單元／整合 + 23 項前端 smoke test |
-| 原創像素圖 | 30 張（全部由產生器從點陣產生） |
+| 後端程式 | 約 2,600 行 |
+| 前端 JavaScript | 約 1,500 行 |
+| CSS | 約 2,000 行（簡約、冒險卡片、場景三個檔） |
+| 測試 | 90 項單元／整合 + 30 項前端 smoke test |
+| 原創像素圖 | 32 張（全部由產生器產生） |
 | 相依套件 | 0 |
 
 ## 10. 限制與後續

@@ -1,11 +1,10 @@
 import { requestJson, clampPct, toIso } from '../http.js';
 import { ProviderError } from '../errors.js';
 import { jwtExpiryMs, refreshAndSave, callWithRefresh } from '../oauth.js';
+import { endpoints } from '../config.js';
 
-// 需實測：內部端點，可用環境變數覆寫
-const USAGE_URL = process.env.CODEX_USAGE_URL || 'https://chatgpt.com/backend-api/wham/usage';
-const TOKEN_URL = process.env.CODEX_TOKEN_URL || 'https://auth.openai.com/oauth/token';
-const CLIENT_ID = process.env.CODEX_CLIENT_ID || 'app_EMoamEEZ73f0CkXaXp7hrann';
+// 需實測：內部端點，可用環境變數覆寫（見 config.js）
+const { usageUrl: USAGE_URL, tokenUrl: TOKEN_URL, clientId: CLIENT_ID } = endpoints.codex;
 
 function windowLabel(sec, fallback) {
   const s = Number(sec);

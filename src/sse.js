@@ -1,6 +1,7 @@
-/** SSE 連線管理：ping、廣播、連線上限時間 */
+/** SSE 連線管理：ping、廣播、連線上限時間與連線數上限 */
 export class SseHub {
-  constructor({ pingSec = 25, maxAgeSec = 1800, onJoin = () => {}, onLeave = () => {} } = {}) {
+  constructor({ pingSec = 25, maxAgeSec = 1800, maxClients = 20, onJoin = () => {}, onLeave = () => {} } = {}) {
+    this.maxClients = maxClients;
     this.clients = new Set();
     this.pingSec = pingSec;
     this.maxAgeSec = maxAgeSec;
@@ -14,6 +15,12 @@ export class SseHub {
   }
 
   add(req, res, initialSnapshot) {
+    if (this.clients.size >= this.maxClients) {
+      // 連線太多：不收，前端 SSE 失敗後會改成輪詢 /api/usage
+      res.writeHead(503, { 'Content-Type': 'application/json; charset=utf-8', 'Retry-After': '60' });
+      res.end(JSON.stringify({ error: '連線太多，請稍後再試' }));
+      return false;
+    }
     res.writeHead(200, {
       'Content-Type': 'text/event-stream; charset=utf-8',
       'Cache-Control': 'no-cache, no-transform',
@@ -44,6 +51,7 @@ export class SseHub {
 
     this.startPing();
     this.onJoin(this.clients.size);
+    return true;
   }
 
   send(client, event, data) {

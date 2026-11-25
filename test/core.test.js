@@ -54,6 +54,26 @@ test('credentials: 同一家續期共用同一個 Promise', async () => {
   assert.equal(a, b);
 });
 
+test('credentials: 換憑證時正在續期 → 等續期結束才換，新憑證不會被舊帳號蓋掉', async () => {
+  const s = await new CredentialStore({ dataDir: tmpDir(), keyB64: KEY, env: { CLAUDE_REFRESH_TOKEN: 'old' } }).load();
+  let release;
+  const gate = new Promise((r) => { release = r; });
+  const refreshing = s.withLock('claude', async () => {
+    await gate;
+    await s.save('claude', { accessToken: 'old-a', refreshToken: 'old-r2' });
+  });
+  const replacing = s.replace('claude', { refreshToken: 'new' });
+  release();
+  await Promise.all([refreshing, replacing]);
+  assert.deepEqual(s.get('claude'), { refreshToken: 'new' });
+  assert.equal(s.version('claude'), 2);
+});
+
+test('credentials: CLAUDE_PLAN 不放進憑證', async () => {
+  const s = await new CredentialStore({ dataDir: tmpDir(), keyB64: KEY, env: { CLAUDE_REFRESH_TOKEN: 'r', CLAUDE_PLAN: 'Max' } }).load();
+  assert.equal(s.get('claude').plan, undefined);
+});
+
 test('credentials: 錯的金鑰長度直接報錯', () => {
   assert.throws(() => new CredentialStore({ dataDir: tmpDir(), keyB64: 'c2hvcnQ=', env: {} }));
 });
@@ -206,6 +226,33 @@ test('poller: 403 這次觀看期間不再試', async () => {
   poller.stop();
 });
 
+test('poller: 排程喚醒（沒人在看）時 403 下一次喚醒再試', async () => {
+  let t = 1_000_000;
+  let n = 0;
+  const { poller } = makePoller({ now: () => t, fetchImpl: async () => { n += 1; throw new ProviderError('forbidden', '被 Cloudflare 擋下'); } });
+  await poller.pollOnce();
+  assert.equal(n, 1);
+  t += 15 * 60_000;
+  await poller.pollOnce();
+  assert.equal(n, 2);
+});
+
+test('poller: adapter 的程式錯誤記下種類與位置，不記訊息', async () => {
+  const lines = [];
+  const orig = process.stdout.write;
+  process.stdout.write = (s) => { lines.push(String(s)); return true; };
+  try {
+    const { poller, snapshot } = makePoller({ now: () => 1_000_000, fetchImpl: async () => { throw new TypeError('secret-token-xyz'); } });
+    await poller.pollOnce();
+    assert.equal(snapshot.view('p').error, '處理回傳時出錯');
+  } finally {
+    process.stdout.write = orig;
+  }
+  const warn = lines.map((l) => JSON.parse(l)).find((l) => l.msg === 'adapter 例外');
+  assert.equal(warn.err, 'TypeError');
+  assert.ok(!lines.join('').includes('secret-token-xyz'));
+});
+
 test('poller: 沒設定憑證 → disabled，不呼叫 adapter', async () => {
   let n = 0;
   const { poller, snapshot } = makePoller({ now: () => 1_000_000, creds: {}, fetchImpl: async () => { n += 1; } });
@@ -227,6 +274,31 @@ test('poller: 抓取中再觸發共用同一個 Promise', async () => {
   await a;
   assert.equal(n, 1);
   void p;
+});
+
+test('sse: 連線數到上限就回 503，不算觀看者', async () => {
+  const { SseHub } = await import('../src/sse.js');
+  let joins = 0;
+  const hub = new SseHub({ maxClients: 1, onJoin: () => { joins += 1; } });
+  const fakeRes = () => ({ status: 0, body: '', writeHead(s) { this.status = s; }, write(d) { this.body += d; }, end(d) { if (d) this.body += d; }, on() {} });
+  const fakeReq = { on() {} };
+  const a = fakeRes();
+  assert.equal(hub.add(fakeReq, a, {}), true);
+  const b = fakeRes();
+  assert.equal(hub.add(fakeReq, b, {}), false);
+  assert.equal(b.status, 503);
+  assert.equal(joins, 1);
+  hub.closeAll();
+});
+
+test('snapshot: intervalSec 存檔後讀得回來', async () => {
+  const dir = tmpDir();
+  const providers = [{ id: 'p', name: 'P' }];
+  const s = new SnapshotStore({ dataDir: dir, pollIntervalSec: 60, providers });
+  s.update('p', { status: 'ok', fetchedAt: new Date().toISOString(), intervalSec: 300 });
+  await s.save();
+  const s2 = await new SnapshotStore({ dataDir: dir, pollIntervalSec: 60, providers }).load();
+  assert.equal(s2.view('p').intervalSec, 300);
 });
 
 test('http: 讀回應內容時出錯（例如逾時）算網路錯誤，不是「回傳不是 JSON」', async () => {

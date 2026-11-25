@@ -1,5 +1,5 @@
 import { ProviderError } from './errors.js';
-import { logJson, logInfo } from './log.js';
+import { logJson, logInfo, logWarn } from './log.js';
 
 const MAX_RATE_LIMIT_BACKOFF = 900;
 const MAX_ERROR_BACKOFF = 300;
@@ -126,6 +126,7 @@ export class Poller {
   /**
    * 排程喚醒用（POST /api/push/tick）：各家抓一輪並等它們抓完，不算「有人在看」。
    * 仍遵守 minIntervalSec 與退避；剛抓過的就不再抓。
+   * 沒人在看時每次喚醒都算一次新的「觀看期間」：403 再給一次機會，不然一次被擋就會停到有人打開網頁。
    */
   async pollOnce() {
     const now = this.now();
@@ -133,6 +134,7 @@ export class Poller {
     for (const p of this.providers) {
       const s = this.state[p.id];
       if (s.inflight) { jobs.push(s.inflight); continue; }
+      if (!this.running) s.forbidden = false;
       if (s.forbidden) continue;
       if (now < s.nextAt || now < s.lastAttemptAt + this.minInterval(p) * 1000) continue;
       jobs.push(this.run(p));
@@ -224,6 +226,10 @@ export class Poller {
         nextFetchAt: new Date(s.nextAt).toISOString(),
       });
     } catch (raw) {
+      if (!(raw instanceof ProviderError)) {
+        // 程式本身的錯（例如 TypeError）：只記錯誤種類與出錯位置，不記訊息（可能含回傳內容）
+        logWarn('adapter 例外', { provider: p.id, err: raw?.name || typeof raw, at: errorSite(raw) });
+      }
       const err = raw instanceof ProviderError ? raw : new ProviderError('parse', '處理回傳時出錯');
       httpStatus = err.httpStatus;
       s.failures += 1;
@@ -291,4 +297,14 @@ export class Poller {
     this.broadcast('provider', view);
     this.snapshot.save();
   }
+}
+
+/** 錯誤堆疊裡第一個專案內的位置，例如 "src/providers/codex.js:42:7" */
+export function errorSite(err) {
+  const lines = String(err?.stack || '').split('\n').slice(1);
+  for (const line of lines) {
+    const m = /[\\/]((?:src[\\/][\w\\/.-]+|server)\.js):(\d+):(\d+)/.exec(line);
+    if (m) return `${m[1].replace(/\\/g, '/')}:${m[2]}:${m[3]}`;
+  }
+  return null;
 }

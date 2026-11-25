@@ -1,7 +1,8 @@
 import { requestJson, clampPct, toIso } from '../http.js';
 import { ProviderError } from '../errors.js';
+import { endpoints } from '../config.js';
 
-const URL_USER = process.env.COPILOT_USER_URL || 'https://api.github.com/copilot_internal/user';
+const URL_USER = endpoints.copilot.userUrl;
 
 const LABELS = { chat: 'Chat', completions: '程式碼補全', premium_interactions: 'Premium 請求' };
 const ORDER = ['chat', 'completions', 'premium_interactions'];

@@ -2,7 +2,8 @@ import path from 'node:path';
 import { writeFileAtomic, readFileOrNull } from './fsutil.js';
 import { logWarn } from './log.js';
 
-const STALE_INTERVALS = 3;
+// 超過幾個更新週期沒新資料就算過期；也放進快照給前端用，兩邊不必各寫一份
+export const STALE_INTERVALS = 3;
 
 /** 記憶體快照＋/data/snapshot.json（原子寫入） */
 export class SnapshotStore {
@@ -69,6 +70,7 @@ export class SnapshotStore {
       version: 1,
       generatedAt: new Date(now).toISOString(),
       pollIntervalSec: this.pollIntervalSec,
+      staleIntervals: STALE_INTERVALS,
       providers: this.order.map((id) => this.view(id, now)),
     };
   }
@@ -104,7 +106,7 @@ function blank(p) {
 
 function pickStored(p) {
   const out = {};
-  for (const k of ['plan', 'planExpiresAt', 'status', 'fetchedAt', 'nextFetchAt', 'error', 'note', 'windows', 'balance', 'slowed']) {
+  for (const k of ['plan', 'planExpiresAt', 'status', 'fetchedAt', 'nextFetchAt', 'intervalSec', 'error', 'note', 'windows', 'balance', 'slowed']) {
     if (p[k] !== undefined) out[k] = p[k];
   }
   // 存檔時被判成 stale 的，載回來當 ok，再由 view() 依時間重新判斷
