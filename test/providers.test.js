@@ -322,12 +322,13 @@ test('antigravity: 方案名稱整理成 Free／Pro／Ultra，付費方案優先
   assert.equal(tierName({ currentTier: { id: 'free-tier', name: 'Antigravity Starter Quota' } }), 'Free');
   assert.equal(tierName({ currentTier: { name: 'Antigravity Free' } }), 'Free');
   assert.equal(tierName({ currentTier: { name: 'Free' }, paidTier: { id: 'g1-pro-tier', name: 'Google AI Pro' } }), 'Pro');
+  assert.equal(tierName({ currentTier: { id: 'free-tier', name: 'Antigravity' }, paidTier: { id: 'g1-pro-tier', name: 'Google AI Pro' } }), 'Pro', '實測：升級後 currentTier 仍是 free-tier');
   assert.equal(tierName({ paidTier: { name: 'Google AI Ultra' } }), 'Ultra');
   assert.equal(tierName({ currentTier: { name: 'Enterprise Plus' } }), 'Enterprise Plus');
   assert.equal(tierName({}), null);
 });
 
-test('antigravity: 方案超過 6 小時會重查 loadCodeAssist', async () => {
+test('antigravity: 方案超過 1 小時會重查 loadCodeAssist', async () => {
   _resetCache();
   let loads = 0;
   let tier = { id: 'free-tier', name: 'Antigravity Starter Quota' };
@@ -339,9 +340,9 @@ test('antigravity: 方案超過 6 小時會重查 loadCodeAssist', async () => {
   const ctx = ctxFor({ antigravity: { refreshToken: 'rt', clientId: 'cid', clientSecret: 'cs' } });
   assert.equal((await antigravity.fetch(ctx)).plan, 'Free');
   tier = { id: 'g1-pro-tier', name: 'Google AI Pro' };
-  assert.equal((await antigravity.fetch(ctx)).plan, 'Free', '6 小時內沿用快取');
+  assert.equal((await antigravity.fetch(ctx)).plan, 'Free', '1 小時內沿用快取');
   const realNow = Date.now;
-  Date.now = () => realNow() + 6 * 3600 * 1000 + 1000;
+  Date.now = () => realNow() + 3600 * 1000 + 1000;
   try {
     assert.equal((await antigravity.fetch(ctx)).plan, 'Pro');
   } finally {

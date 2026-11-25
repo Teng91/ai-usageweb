@@ -9,8 +9,8 @@ const USER_AGENT = process.env.ANTIGRAVITY_USER_AGENT || 'antigravity';
 
 // Google 的 access token 只放記憶體（1 小時），refresh token 不輪換
 const cache = { owner: null, accessToken: null, expiresAt: 0, projectId: null, plan: null, planAt: 0 };
-// 方案（訂閱）會變，定期重查；機器 suspend 時記憶體不會清掉，不能只在啟動時查一次
-const PLAN_TTL_MS = 6 * 3600 * 1000;
+// 方案（訂閱）會變，每小時重查（升級後最慢一小時內更新）；機器 suspend 時記憶體不會清掉，不能只在啟動時查一次
+const PLAN_TTL_MS = 3600 * 1000;
 
 export function _resetCache() {
   cache.owner = null;
