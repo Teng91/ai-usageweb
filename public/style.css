@@ -362,11 +362,11 @@ button {
   gap: 12px;
 }
 
-/* 額度卡 2 欄（寬螢幕 4 欄）；OpenRouter（餘額＋排行表）永遠獨佔一整列，不會留空格或把旁邊的卡片拉高 */
+/* 額度卡 2 欄（寬螢幕 4 欄）；底下的熱門模型排行獨佔一整列 */
 @media (min-width: 720px) {
   .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .card[data-id="openrouter"] { grid-column: 1 / -1; }
 }
+.rank-card { grid-column: 1 / -1; }
 
 @media (min-width: 1440px) {
   .cards { grid-template-columns: repeat(4, minmax(0, 1fr)); }
@@ -578,18 +578,6 @@ button {
   color: var(--muted);
   margin: 6px 0 0;
   font-variant-numeric: tabular-nums;
-}
-
-.or-body {
-  display: grid;
-  gap: 16px;
-}
-
-/* 夠寬時餘額在左、排行在右，中間一條分隔線 */
-@media (min-width: 1100px) {
-  .or-body { grid-template-columns: 200px minmax(0, 1fr); gap: 0; }
-  .or-body .balance { padding-right: 20px; }
-  .or-body .rank { padding-left: 20px; border-left: 1px solid var(--line-soft); }
 }
 
 .rank-head {

@@ -47,7 +47,7 @@ export function rankingsEl() {
     head.className = 'rank-head';
     const title = document.createElement('h3');
     title.className = 'rank-title';
-    title.textContent = '熱門模型';
+    title.textContent = 'OpenRouter 熱門模型';
     const seg = document.createElement('div');
     seg.className = 'seg';
     seg.setAttribute('role', 'group');

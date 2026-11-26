@@ -12,15 +12,15 @@ export function renderAll() {
   // 順序照伺服器快照（state.providers 依快照順序放入）
   const ids = [...state.providers.keys()].filter((id) => visible(state.providers.get(id)));
   // 移除不該出現的卡片
-  for (const el of cardsEl.querySelectorAll('.card')) if (!ids.includes(el.dataset.id)) el.remove();
+  for (const el of cardsEl.querySelectorAll('.card[data-id]')) if (!ids.includes(el.dataset.id)) el.remove();
   for (const id of ids) renderCard(state.providers.get(id));
   syncGroups();
   renderEmpty();
 }
 
-// 分區：各家額度一區、OpenRouter（餘額＋排行）自己一區，都不加標題
-const GROUPS = ['ai', 'or'];
-const groupOf = (p) => (p.id === 'openrouter' ? 'or' : 'ai');
+// 分區：各家額度（含 OpenRouter 餘額）一區、底下 OpenRouter 熱門模型排行一區，都不加標題
+const GROUPS = ['ai', 'rank'];
+const groupOf = () => 'ai';
 
 function groupEl(key) {
   let g = cardsEl.querySelector(`.group[data-group="${key}"]`);
@@ -33,8 +33,25 @@ function groupEl(key) {
   return g;
 }
 
+/** 有 OpenRouter 卡片才在底下放排行（排行資料來自 OpenRouter）；排行區塊只建一次，搬來搬去不重設分頁 */
+let rankCard = null;
+function syncRankCard() {
+  if (!cardsEl.querySelector('.card[data-id="openrouter"]')) {
+    rankCard?.remove();
+    return;
+  }
+  if (!rankCard) {
+    rankCard = document.createElement('section');
+    rankCard.className = 'card rank-card';
+    rankCard.append(rankingsEl());
+  }
+  const g = groupEl('rank');
+  if (rankCard.parentElement !== g) g.append(rankCard);
+}
+
 /** 空的分區拿掉 */
 function syncGroups() {
+  syncRankCard();
   for (const g of cardsEl.querySelectorAll('.group')) {
     if (!g.querySelector(':scope > .card')) g.remove();
   }
@@ -116,7 +133,6 @@ export function renderCard(p) {
   const body = el.querySelector('.card-body');
   body.replaceChildren();
 
-  body.classList.toggle('or-body', p.id === 'openrouter');
   // 超過兩條額度就排成兩欄（左 5 小時、右每週），卡片高度跟只有兩條的一樣
   body.classList.toggle('win-grid', !p.balance && (p.windows?.length || 0) > 2);
   if (p.balance) {
@@ -131,7 +147,6 @@ export function renderCard(p) {
   } else if (!p.fetchedAt) {
     body.append(note('等待第一次資料…'));
   }
-  if (p.id === 'openrouter') body.append(rankingsEl());
   gameEffects(el, p);
   tickCard(el, p);
 }
@@ -274,7 +289,7 @@ export function renderChrome(now = Date.now()) {
 export function startTicker() {
   setInterval(() => {
     const now = Date.now();
-    for (const el of cardsEl.querySelectorAll('.card')) {
+    for (const el of cardsEl.querySelectorAll('.card[data-id]')) {
       const p = state.providers.get(el.dataset.id);
       if (p) tickCard(el, p, now);
     }

@@ -6,7 +6,7 @@ import grok from './grok.js';
 import openrouter from './openrouter.js';
 
 // 固定顯示順序
-export const ALL_PROVIDERS = [claude, antigravity, codex, grok, copilot, openrouter];
+export const ALL_PROVIDERS = [claude, antigravity, codex, openrouter, copilot, grok];
 
 export function loadProviders(enabled = []) {
   if (!enabled.length) return ALL_PROVIDERS;

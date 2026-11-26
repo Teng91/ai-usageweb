@@ -22,8 +22,6 @@ const providers = (claude5h) => [
     { id: 'gemini_week', label: '每週', usedPct: 0, resetsAt: null, periodSec: 604800 },
   ] },
   { ...base, id: 'codex', name: 'Codex', plan: 'Free', windows: [{ id: 'primary', label: '每月', usedPct: 95, resetsAt: iso(9 * 3600e3) }] },
-  { ...base, id: 'grok', name: 'Grok', plan: null, status: 'disabled', fetchedAt: null, nextFetchAt: null, windows: [], note: '還沒設定：用電腦到 grok.com 登入，設成 GROK_COOKIE' },
-  { ...base, id: 'copilot', name: 'GitHub Copilot', plan: 'Free', windows: [{ id: 'chat', label: 'Chat', usedPct: 1, used: 2, limit: 200, resetsAt: iso(7 * 86400e3) }] },
   { ...base, id: 'openrouter', name: 'OpenRouter', plan: '預付', windows: [], balance: { currency: 'USD', remaining: -0.2, total: 10, used: 10.2 } },
 ];
 const rank = (prefix, paid) => Array.from({ length: 10 }, (_, i) => ({ rank: i + 1, slug: `${prefix}/m${i}`, name: `${prefix} 模型 ${i + 1}`, tokens: 1e12 / (i + 1), ...(paid ? { price: { input: 0.5, output: 2 } } : {}) }));
@@ -114,7 +112,7 @@ async function main() {
     // ---- 簡約風格 ----
     check('存取碼：第一次 /api/usage 有帶 ?k=', seenKey['/api/usage']?.[0] === 'smoke', JSON.stringify(seenKey['/api/usage']));
     check('存取碼：成功後從網址拿掉，SSE 不再帶', (await ev(`location.search`)) === '' && seenKey['/api/stream']?.every((k) => k === null), JSON.stringify(seenKey['/api/stream']));
-    check('六張卡片都畫出來（含還沒設定的 Grok）', (await ev(`document.querySelectorAll('.card').length`)) === 6);
+    check('四張卡片都畫出來，加上排行卡', (await ev(`document.querySelectorAll('.card[data-id]').length + '|' + document.querySelectorAll('.card.rank-card').length`)) === '4|1');
     check('SSE 連上顯示「即時」', (await ev(`document.getElementById('conn-text').textContent`)) === '即時');
     check('排行榜免費／付費各 10 名', (await ev(`[...document.querySelectorAll('.rank-list')].map((l) => l.children.length).join(',')`)) === '10,10');
     check('付費排行有價格', (await ev(`document.querySelector('.rank-col.paid .rank-list .pr')?.textContent`)) === '$0.5 / $2');
@@ -123,8 +121,9 @@ async function main() {
     check('卡片順序：Claude、Gemini、Codex', (await ev(`[...document.querySelectorAll('.card')].slice(0, 3).map((c) => c.querySelector('.card-name').textContent).join(',')`)) === 'Claude,Gemini,Codex');
     const rows = await ev(`(() => { const b = document.querySelector('.card[data-id="claude"] .card-body'); const wins = [...b.querySelectorAll('.win')]; const c = document.querySelector('.card[data-id="antigravity"] .card-body'); const bottom = (el) => Math.max(...[...el.children].map((x) => x.getBoundingClientRect().bottom)) - el.getBoundingClientRect().top; return { rows: new Set(wins.map((w) => w.offsetTop)).size, h: bottom(b), ch: bottom(c), sx: wins.every((w) => w.scrollWidth <= w.clientWidth + 1) }; })()`);
     check('沒用過也沒有重置時間的額度顯示「用了才開始計時」', (await ev(`document.querySelectorAll('.card[data-id="antigravity"] .win-sub')[1]?.textContent`)) === '還沒用，用了才開始計時');
-    check('還沒設定的 Grok 照樣顯示卡片和設定提示，不顯示更新中', (await ev(`(() => { const c = document.querySelector('.card[data-id="grok"]'); return !!c && /GROK_COOKIE/.test(c.querySelector('.note')?.textContent || '') && !c.classList.contains('updating') && c.querySelector('.card-status').textContent === ''; })()`)) === true);
-    check('分區：各家額度一區、OpenRouter 自己一區，都沒有標題', (await ev(`document.querySelectorAll('.group-title').length + '|' + [...document.querySelectorAll('.group')].map((g) => [...g.querySelectorAll('.card')].map((c) => c.dataset.id).join('+')).join(' | ')`)) === '0|claude+antigravity+codex+grok+copilot | openrouter');
+    check('分區：四張卡片（OpenRouter 餘額在第四張）一區、熱門模型排行自己一區，都沒有標題', (await ev(`document.querySelectorAll('.group-title').length + '|' + [...document.querySelectorAll('.group')].map((g) => [...g.querySelectorAll('.card')].map((c) => c.dataset.id || 'rank').join('+')).join(' | ')`)) === '0|claude+antigravity+codex+openrouter | rank');
+    check('OpenRouter 卡片只放餘額，排行不在卡片裡', (await ev(`(() => { const c = document.querySelector('.card[data-id="openrouter"]'); return !!c.querySelector('.balance') && !c.querySelector('.rank'); })()`)) === true);
+    check('寬螢幕四張卡片排成一列，排行卡在下面佔滿整列', (await ev(`(() => { const cs = [...document.querySelectorAll('.card[data-id]')].map((c) => c.getBoundingClientRect()); const rk = document.querySelector('.rank-card').getBoundingClientRect(); const top = cs[0].top; return cs.every((r) => Math.abs(r.top - top) < 2) && rk.top > cs[0].bottom && Math.abs(rk.left - cs[0].left) < 2 && Math.abs(rk.right - cs[3].right) < 2; })()`)) === true);
     check('四條額度（Claude 加上每週 Opus／Sonnet）排成兩列，不比兩條的卡片高、不溢出', rows?.rows === 2 && rows.h <= rows.ch + 1 && rows.sx, JSON.stringify(rows));
     check('Claude 到期日', /2027\/11\/4 到期/.test(await ev(`document.querySelector('.card[data-id="claude"] .plan-exp').textContent`)));
 

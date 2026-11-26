@@ -229,7 +229,7 @@ curl.exe -X PUT https://ai-usageweb.fly.dev/admin/credentials/claude -H "Authori
 
 ## 畫面
 
-- **卡片分兩區**：各家額度、OpenRouter（餘額＋熱門模型），不加標題。Copilot 目前用 `fly.toml` 的 `PROVIDERS` 關掉，要看再加回去。
+- **卡片分兩區**：上面四張卡片（Claude、Gemini、Codex、OpenRouter 餘額），下面一整列 OpenRouter 熱門模型（免費／付費），不加標題。Copilot、Grok 目前用 `fly.toml` 的 `PROVIDERS` 關掉，要看再加回去。
 - **每張卡片的額度**：
   - Claude：5 小時、每週（有的話再加每週 Opus／Sonnet）
   - Gemini（Antigravity）：跟 Claude 一樣「5 小時」「每週」兩條，只算 Gemini 模型。Antigravity 附送的 Claude/GPT 額度很小（一下就用完、每週大約只有兩個 5 小時），不顯示也不推播；要看的話把 `src/providers/antigravity.js` 的 `SHOWN` 加回 `claude_gpt`。免費方案只有模型清單給的一條

@@ -64,7 +64,7 @@ test('GET /api/usage 回快照，並喚醒輪詢；未設定的服務標 disable
   const res = await realFetch(`${base}/api/usage`);
   const snap = await res.json();
   assert.equal(snap.version, 1);
-  assert.deepEqual(snap.providers.map((p) => p.id), ['copilot', 'openrouter']);
+  assert.deepEqual(snap.providers.map((p) => p.id), ['openrouter', 'copilot']);
   assert.equal(snap.providers[0].status, 'disabled');
   assert.equal(app.poller.running, true);
   // 第一次抓取有 0–2 秒隨機延遲
