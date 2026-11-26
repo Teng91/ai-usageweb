@@ -13,6 +13,16 @@ const inLeft = (w, gap = 16) => `calc(${SIDE} - ${w + gap}px)`;
 const inRight = inLeft;
 const PF_W = 144; // 平台寬度
 
+// 每張地圖共用的雲（大小、高度、速度在 scene.css 的 .sc-cloud）
+const CLOUDS = ['c1', 'c2', 'c3', 'c4'].map((c) => ({ cls: `sc-cloud ${c}` }));
+// 多層遠景：放大後退的山脈＋遠丘＋近丘（四季配色由 hills-<季節> 決定）
+const HILLS = (season, mountains = 'sc-mountains behind') => [
+  ...CLOUDS,
+  { cls: mountains },
+  { cls: `sc-hills-far hills-${season}` },
+  { cls: `sc-hills-near hills-${season}` },
+];
+
 // 春夏秋冬四季輪流；櫻花、楓紅、金黃的樹由產生器換色
 // side: true 的東西放在卡片兩側的空白，螢幕不夠寬時 CSS 會藏起來
 export const MAPS = [
@@ -20,7 +30,7 @@ export const MAPS = [
     id: 'spring',
     name: '春・櫻花村',
     items: [
-      { cls: 'sc-mountains' },
+      ...HILLS('spring'),
       { cls: 'sc-ground ground-grass' },
       { cls: 'sc-house', s: { left: '2.5%', bottom: GROUND } },
       { cls: 'sc-tree blossom', s: { left: 'calc(2.5% + 150px)', bottom: GROUND, width: '80px', height: '95px' } },
@@ -43,7 +53,9 @@ export const MAPS = [
     id: 'summer',
     name: '夏・海邊碼頭',
     items: [
+      ...CLOUDS,
       { cls: 'sc-sun' },
+      { cls: 'sc-hills-far sea-far hills-summer' },
       { cls: 'sc-sea' },
       { cls: 'sc-boat', s: { left: '18%', bottom: '96px' } },
       { cls: 'sc-dock', s: { right: '0', bottom: '104px', width: '34%' } },
@@ -65,7 +77,7 @@ export const MAPS = [
     id: 'autumn',
     name: '秋・楓葉林',
     items: [
-      { cls: 'sc-mountains autumn-hills' },
+      ...HILLS('autumn', 'sc-mountains behind autumn-hills'),
       { cls: 'sc-ground ground-grass autumn-grass' },
       { cls: 'sc-tree maple', s: { left: '2.5%', bottom: GROUND, width: '96px', height: '114px' } },
       { cls: 'sc-tree maple-gold', s: { left: 'calc(2.5% + 90px)', bottom: GROUND, width: '72px', height: '86px' } },
@@ -88,7 +100,7 @@ export const MAPS = [
     id: 'winter',
     name: '冬・雪山小鎮',
     items: [
-      { cls: 'sc-mountains snowy' },
+      ...HILLS('winter', 'sc-mountains behind snowy'),
       { cls: 'sc-ground ground-snow' },
       { cls: 'sc-house snowy-house', s: { left: '2.5%', bottom: GROUND } },
       { cls: 'sc-pine', s: { left: 'calc(2.5% + 150px)', bottom: GROUND, width: '80px', height: '85px' } },

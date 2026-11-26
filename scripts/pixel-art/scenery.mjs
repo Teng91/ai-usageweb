@@ -1,5 +1,5 @@
 // 冒險風格的原創場景圖塊（文字點陣）：樹、屋子、雲、草地、遠山、傳送點、平台、海、雪地，以及四季換色版本。
-import { svg } from './lib.mjs';
+import { svg, makeCanvas, svgFrames } from './lib.mjs';
 
 // 樹
 const TREE = [
@@ -291,3 +291,74 @@ svg('tree-maple', [recolor(TREE, { g: 'u', G: 'U', H: 'x' })]);
 svg('tree-gold', [recolor(TREE, { g: 'l', G: 'L', H: 'd' })]);
 svg('grass-autumn', [recolor(GRASS, { g: 'h', G: 'N', H: 'x' })]);
 svg('platform-autumn', [recolor(PF_GRASS, { g: 'h', G: 'N' })]);
+
+// ---------- 多層遠景（原創，程式算出來）：遠丘＋帶圓樹冠的近丘，四季各一套配色 ----------
+// 寬 128 格、可橫向無縫重複：稜線只用「整數個週期」的正弦波疊出來，樹冠超出右邊界的部分繞回左邊畫
+{
+  const W = 128, H = 40;
+  const TAU = Math.PI * 2;
+  const wave = (x, terms) => terms.reduce((sum, [amp, k, ph]) => sum + amp * Math.sin((TAU * k * x) / W + ph), 0);
+
+  const SEASONS = {
+    spring: { back: '#bfdff0', front: '#a6d8c2', edge: '#cdeedb', base: '#74c46a', tree: '#86d16c', dark: '#5aa850', hi: '#b4e890', accent: ['#f7b6d0', '#e48db3'] },
+    summer: { back: '#a8d4ee', front: '#88ccb0', edge: '#b8e6d0', base: '#4fae55', tree: '#5cbf5a', dark: '#3d9147', hi: '#98df80' },
+    autumn: { back: '#e8d2b6', front: '#d9b78f', edge: '#efd9bb', base: '#c98b45', tree: '#e0843f', dark: '#b45a2b', hi: '#f3b462', accent: ['#ebb83c', '#c98f22'] },
+    winter: { back: '#dde8f4', front: '#c8d8ea', edge: '#f1f6fc', base: '#e8f0f8', tree: '#5f9a7e', dark: '#447a62', hi: '#86bba0', snow: '#ffffff' },
+  };
+
+  // 遠丘：後面一道淡色山稜、前面一道稍深的，前稜頂端一排亮邊
+  const farBack = (x) => 24 + wave(x, [[6, 2, 0.3], [3, 5, 1.1], [1.5, 9, 2.4]]);
+  const farFront = (x) => 15 + wave(x, [[5, 3, 2.0], [2, 7, 0.4], [1, 11, 1.7]]);
+  function farHills(pal) {
+    const c = makeCanvas(W, H);
+    for (let x = 0; x < W; x++) {
+      const b = Math.round(farBack(x));
+      const f = Math.round(farFront(x));
+      for (let y = H - b; y < H; y++) c.px(x, y, pal.back);
+      for (let y = H - f; y < H; y++) c.px(x, y, y === H - f ? pal.edge : pal.front);
+    }
+    return c;
+  }
+
+  // 近丘：緩坡地面＋一排大小不一的圓樹冠（固定的亂數，每次產生都一樣）
+  const nearBase = (x) => 9 + wave(x, [[3, 2, 1.3], [1.5, 5, 0.2]]);
+  let seed = 7;
+  const rand = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+  const TREES = [];
+  for (let x = 4; x < W; x += 9 + Math.floor(rand() * 6)) TREES.push({ x, r: 4 + Math.floor(rand() * 4), tint: rand() });
+
+  function nearHills(pal) {
+    const c = makeCanvas(W, H);
+    // 樹冠：圓心在地面上方，左上亮、右下暗；春秋有一部分換成花色／金黃
+    for (const t of TREES) {
+      const cy = H - nearBase(t.x) - t.r * 0.6;
+      const useAccent = pal.accent && t.tint < 0.35;
+      const [main, shade] = useAccent ? pal.accent : [pal.tree, pal.dark];
+      for (const off of [-W, 0, W]) {
+        for (let y = Math.floor(cy - t.r); y <= cy + t.r; y++) {
+          for (let x = Math.floor(t.x - t.r); x <= t.x + t.r; x++) {
+            const dx = (x - t.x) / t.r, dy = (y - cy) / t.r;
+            const d = Math.hypot(dx, dy);
+            if (d > 1) continue;
+            let col = main;
+            if (dx + dy > 0.55 || d > 0.92) col = shade;
+            else if (dx + dy < -0.9 && d < 0.8) col = pal.hi;
+            if (pal.snow && dy < -0.45 && d < 0.98) col = pal.snow; // 冬天樹頂積雪
+            c.px(x + off, y, col);
+          }
+        }
+      }
+    }
+    // 地面蓋在樹幹位置上，最上面一排亮邊
+    for (let x = 0; x < W; x++) {
+      const g = Math.round(nearBase(x));
+      for (let y = H - g; y < H; y++) c.px(x, y, y === H - g ? (pal.snow || pal.hi) : pal.base);
+    }
+    return c;
+  }
+
+  for (const [name, pal] of Object.entries(SEASONS)) {
+    svgFrames(`hills-far-${name}`, [farHills(pal)]);
+    if (name !== 'summer') svgFrames(`hills-near-${name}`, [nearHills(pal)]); // 夏天是海邊，前面是海不是丘陵
+  }
+}

@@ -64,6 +64,32 @@
   background: url(/pixel/mountains.svg) repeat-x 0 0 / 384px 112px !important;
 }
 
+/* 有遠丘的地圖：山脈放大、往後退，從丘陵後面露出雪頂 */
+.sc-mountains.behind { bottom: 150px; height: 168px; background-size: 576px 168px !important; opacity: 0.6; }
+
+/* ---- 多層遠景：遠丘、近丘（由產生器畫，四季各一套），慢慢橫移做出層次 ---- */
+.sc-hills-far, .sc-hills-near { left: 0; right: 0; background-repeat: repeat-x !important; }
+.sc-hills-far { bottom: 84px; height: 200px; background-size: 640px 200px !important; animation: sc-pan 360s linear infinite; }
+.sc-hills-near { bottom: 58px; height: 160px; background-size: 512px 160px !important; animation: sc-pan-near 240s linear infinite; }
+.sc-hills-far.sea-far { bottom: 128px; height: 140px; background-size: 448px 140px !important; }
+.hills-spring.sc-hills-far { background-image: url(/pixel/hills-far-spring.svg); }
+.hills-spring.sc-hills-near { background-image: url(/pixel/hills-near-spring.svg); }
+.hills-summer.sc-hills-far { background-image: url(/pixel/hills-far-summer.svg); }
+.hills-autumn.sc-hills-far { background-image: url(/pixel/hills-far-autumn.svg); }
+.hills-autumn.sc-hills-near { background-image: url(/pixel/hills-near-autumn.svg); }
+.hills-winter.sc-hills-far { background-image: url(/pixel/hills-far-winter.svg); }
+.hills-winter.sc-hills-near { background-image: url(/pixel/hills-near-winter.svg); }
+
+@keyframes sc-pan { from { background-position: 0 0; } to { background-position: -640px 0; } }
+@keyframes sc-pan-near { from { background-position: 0 0; } to { background-position: -512px 0; } }
+
+/* 每張地圖多幾朵雲：大小、高度、速度都不同 */
+.sc-cloud { left: -220px; background-image: url(/pixel/cloud.svg); animation: sc-drift 220s linear infinite; }
+.sc-cloud.c1 { top: 11%; width: 192px; height: 64px; animation-duration: 200s; animation-delay: -20s; }
+.sc-cloud.c2 { top: 33%; width: 120px; height: 40px; animation-duration: 260s; animation-delay: -150s; opacity: 0.9; }
+.sc-cloud.c3 { top: 19%; width: 168px; height: 56px; animation-duration: 230s; animation-delay: -95s; }
+.sc-cloud.c4 { top: 44%; width: 96px; height: 32px; animation-duration: 300s; animation-delay: -210s; opacity: 0.8; }
+
 .sc-mountains.snowy { filter: saturate(0.35) brightness(1.18); }
 
 .sc-ground { left: 0; right: 0; bottom: 0; height: 76px; }

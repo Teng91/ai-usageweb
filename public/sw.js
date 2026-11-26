@@ -1,5 +1,5 @@
 // 快取名稱帶版本號；改了前端檔案就把版本 +1
-const CACHE = 'app-v38';
+const CACHE = 'app-v39';
 const SHELL = [
   '/',
   '/index.html',
@@ -52,6 +52,13 @@ const SHELL = [
   '/pixel/snow.svg',
   '/pixel/pine.svg',
   '/pixel/snowman.svg',
+  '/pixel/hills-far-spring.svg',
+  '/pixel/hills-near-spring.svg',
+  '/pixel/hills-far-summer.svg',
+  '/pixel/hills-far-autumn.svg',
+  '/pixel/hills-near-autumn.svg',
+  '/pixel/hills-far-winter.svg',
+  '/pixel/hills-near-winter.svg',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
   '/icons/apple-touch-icon.png',
