@@ -57,7 +57,7 @@ export class PushService {
   subscribe(sub, prefs) {
     const i = this.state.subs.findIndex((s) => s.endpoint === sub.endpoint);
     const entry = { endpoint: sub.endpoint, keys: { p256dh: sub.keys.p256dh, auth: sub.keys.auth }, prefs: { ...DEFAULT_PREFS, ...cleanPrefs(prefs) }, createdAt: new Date(this.now()).toISOString() };
-    if (i >= 0) this.state.subs[i] = { ...this.state.subs[i], ...entry, prefs: { ...this.state.subs[i].prefs, ...cleanPrefs(prefs) } };
+    if (i >= 0) this.state.subs[i] = { ...this.state.subs[i], ...entry, createdAt: this.state.subs[i].createdAt || entry.createdAt, prefs: { ...this.state.subs[i].prefs, ...cleanPrefs(prefs) } };
     else {
       this.state.subs.push(entry);
       if (this.state.subs.length > MAX_SUBS) this.state.subs.shift();

@@ -214,10 +214,16 @@ new MutationObserver(() => {
 
 document.addEventListener('visibilitychange', () => { if (!document.hidden) startWalk(); });
 reduceMotion.addEventListener('change', startWalk);
+// 只有寬度變了才重走：手機捲動時網址列伸縮也會觸發 resize（只改高度），不能每次都把勇者拉回起點
 let resizeTimer = null;
+let lastWidth = window.innerWidth;
 window.addEventListener('resize', () => {
   clearTimeout(resizeTimer);
-  resizeTimer = setTimeout(() => { if (!warping) startWalk(); }, 300);
+  resizeTimer = setTimeout(() => {
+    if (window.innerWidth === lastWidth) return;
+    lastWidth = window.innerWidth;
+    if (!warping) startWalk();
+  }, 300);
 });
 
 showMap(0, { announce: false });

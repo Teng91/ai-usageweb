@@ -98,6 +98,8 @@ export function createHandler({ cfg, poller, hub, snapshot, creds, providers, ra
       return sendJson(res, 200, { ok: true });
     }
     if (p === '/api/push/test') {
+      // 沒訂閱的 endpoint 不佔用 30 秒的冷卻，免得別人亂送就讓自己的測試被擋
+      if (!push.prefs(endpoint)) return sendJson(res, 404, { error: '這台裝置沒有訂閱' });
       if (Date.now() - lastTestAt < 30_000) return sendJson(res, 429, { error: '測試通知 30 秒內只能送一次' });
       lastTestAt = Date.now();
       const ok = await push.test(endpoint);

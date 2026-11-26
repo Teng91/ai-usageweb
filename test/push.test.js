@@ -378,6 +378,9 @@ test('推播 API：訂閱要密碼、tick 要 token 且不算有人在看', asyn
     assert.equal(pr.status, 200);
     assert.deepEqual((await pr.json()).prefs, { usage: false, reset: false });
     assert.equal((await post('/api/push/prefs', { endpoint: 'https://push.example.test/nope', prefs: { usage: false } })).status, 404);
+    // 沒訂閱的 endpoint 送測試：404，也不佔用冷卻
+    assert.equal((await post('/api/push/test', { endpoint: 'https://push.example.test/nope' })).status, 404);
+    assert.notEqual((await post('/api/push/test', { endpoint: SUB.endpoint })).status, 429);
     await post('/api/push/unsubscribe', { endpoint: SUB.endpoint });
     assert.equal((await (await post('/api/push/status', { endpoint: SUB.endpoint })).json()).subscribed, false);
 

@@ -134,7 +134,12 @@ async function enable() {
   } catch {
     // 伺服器換過金鑰時舊訂閱會卡住，退訂再試一次
     await (await reg.pushManager.getSubscription())?.unsubscribe();
-    sub = await reg.pushManager.subscribe(opts);
+    try {
+      sub = await reg.pushManager.subscribe(opts);
+    } catch {
+      $('push-on').checked = false;
+      throw new Error('瀏覽器拒絕訂閱推播，稍後再試或重新整理頁面'); // 瀏覽器的錯誤訊息是英文，換成中文
+    }
   }
   const r = await api('/api/push/subscribe', { subscription: sub.toJSON(), prefs: prefsFromForm() }, key);
   if (!r.ok) {
