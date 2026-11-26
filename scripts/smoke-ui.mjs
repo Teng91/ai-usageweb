@@ -24,7 +24,7 @@ const providers = (claude5h) => [
   { ...base, id: 'codex', name: 'Codex', plan: 'Free', windows: [{ id: 'primary', label: '每月', usedPct: 95, resetsAt: iso(9 * 3600e3) }] },
   { ...base, id: 'openrouter', name: 'OpenRouter', plan: '預付', windows: [], balance: { currency: 'USD', remaining: -0.2, total: 10, used: 10.2 } },
 ];
-const rank = (prefix, paid) => Array.from({ length: 10 }, (_, i) => ({ rank: i + 1, slug: `${prefix}/m${i}`, name: `${prefix} 模型 ${i + 1}`, tokens: 1e12 / (i + 1), ...(paid ? { price: { input: 0.5, output: 2 } } : {}) }));
+const rank = (prefix, paid) => Array.from({ length: 10 }, (_, i) => ({ rank: i + 1, slug: `${prefix}/m${i}`, name: `${prefix === 'free' ? '免費' : '付費'}模型 ${'ABCDEFGHIJ'[i]}`, tokens: 1e12 / (i + 1), ...(paid ? { price: { input: 0.5, output: 2 } } : {}) }));
 const rankings = { version: 2, updatedAt: iso(-60e3), views: Object.fromEntries(['day', 'week', 'month'].map((v) => [v, { free: rank('free', false), paid: rank('paid', true) }])) };
 
 const sseClients = new Set();
@@ -102,9 +102,10 @@ async function main() {
     const send = (method, params = {}) => new Promise((r) => { const i = ++id; pend.set(i, r); ws.send(JSON.stringify({ id: i, method, params })); });
     const ev = async (expr) => (await send('Runtime.evaluate', { expression: expr, returnByValue: true }))?.result?.value;
     const key = (k) => ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: '${k}' }))`);
-    // SMOKE_SHOTS=資料夾：順便存截圖，方便看版面（平常不存）
+    // SMOKE_SHOTS=資料夾：順便存截圖（檔名跟 docs/images 一樣，更新文件截圖用；平常不存）
     const shot = async (name) => {
       if (!process.env.SMOKE_SHOTS) return;
+      await sleep(500); // 等場景與動畫畫好
       const d = await send('Page.captureScreenshot', { format: 'png' });
       fs.mkdirSync(process.env.SMOKE_SHOTS, { recursive: true });
       fs.writeFileSync(path.join(process.env.SMOKE_SHOTS, `${name}.png`), Buffer.from(d.data, 'base64'));
@@ -134,13 +135,15 @@ async function main() {
     check('四條額度（Claude 加上每週 Opus／Sonnet）排成兩列，不比兩條的卡片高、不溢出', rows?.rows === 2 && rows.h <= rows.ch + 1 && rows.sx, JSON.stringify(rows));
     const rankHead = `(() => { const rk = document.querySelector('.rank-card'); const cl = document.querySelector('.card[data-id="claude"]'); const off = (c) => c.querySelector('.card-name').getBoundingClientRect().left - c.getBoundingClientRect().left; const body = (c) => c.querySelector('.card-body').getBoundingClientRect().left - c.getBoundingClientRect().left; return rk.querySelector('.card-head .card-name')?.textContent === 'OpenRouter 熱門模型' && !!rk.querySelector('.card-head .seg') && Math.abs(off(rk) - off(cl)) < 1 && Math.abs(body(rk) - body(cl)) < 1; })()`;
     check('排行卡片跟上面四張同樣的標題列（標題、時間切換在標題列，左邊對齊）', (await ev(rankHead)) === true);
-    await shot('simple');
+    const themeNow = () => ev(`document.documentElement.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')`);
+    await shot(`minimal-${await themeNow()}`);
     check('Claude 到期日', /2027\/11\/4 到期/.test(await ev(`document.querySelector('.card[data-id="claude"] .plan-exp').textContent`)));
 
     // ---- 亮暗切換 ----
     const before = await ev(`getComputedStyle(document.body).backgroundColor`);
     await ev(`document.getElementById('theme-btn').click()`);
     await sleep(200);
+    await shot(`minimal-${await themeNow()}`);
     check('亮暗切換會換背景並記住', (await ev(`getComputedStyle(document.body).backgroundColor`)) !== before && ['light', 'dark'].includes(await ev(`localStorage.getItem('theme')`)));
 
     // ---- 冒險風格 ----
@@ -149,7 +152,6 @@ async function main() {
     check('切到冒險風格', (await ev(`document.documentElement.dataset.skin`)) === 'adventure');
     check('「快用完了！」泡泡完整露出在卡片上方（不被卡片裁掉）', await ev(`(() => { const card = document.querySelector('.card[data-id="codex"]'); const b = card.querySelector('.alert-bubble'); const r = b.getBoundingClientRect(); const c = card.getBoundingClientRect(); return getComputedStyle(b).display !== 'none' && r.bottom <= c.top + 4 && getComputedStyle(card).overflow === 'visible'; })()`));
     check('冒險風格：排行卡片的標題列也對齊', (await ev(rankHead)) === true);
-    await shot('adventure');
     check('四張地圖建立', (await ev(`document.querySelectorAll('.scene .map').length`)) === 4);
     check('新原創怪物（紫光小菇靈／露珠水精靈）存在於場景', (await ev(`!!document.querySelector('.scene .mon-sporeling') && !!document.querySelector('.scene .mon-dewdrop')`)) === true);
     check('從春天開始', (await ev(`document.documentElement.dataset.map`)) === 'spring');
@@ -162,7 +164,9 @@ async function main() {
       return ev(`['.sc-moon', '.map.active .sc-town-lights', '.map.active .sc-rainbow'].map((s) => getComputedStyle(document.querySelector(s)).display).concat(getComputedStyle(document.querySelector('.map.active')).filter).join()`);
     };
     check('白天：沒有月亮與燈火，有彩虹', (await nightState('light')) === 'none,none,block,none');
+    await shot('adventure-day');
     check('夜晚：月亮與小鎮燈火亮起、彩虹收起，地圖不整層調暗', (await nightState('dark')) === 'block,block,none,none');
+    await shot('adventure-night');
     await ev(themeBefore ? `document.documentElement.dataset.theme = '${themeBefore}'` : `delete document.documentElement.dataset.theme`);
     const maps = [];
     for (let i = 0; i < 4; i++) { await key('m'); await sleep(2300); maps.push(await ev(`document.documentElement.dataset.map`)); }
@@ -185,6 +189,7 @@ async function main() {
     // 手機：「顯示用量」按鈕要在畫面內
     await viewport(390, 844, true);
     await sleep(400);
+    await shot('mobile');
     await ev(`document.getElementById('bg-btn').click()`);
     await sleep(400);
     const r = await ev(`(() => { const b = document.getElementById('bg-exit').getBoundingClientRect(); return [b.top, b.bottom, innerHeight]; })()`);

@@ -17,7 +17,7 @@
 
 <img src="images/mobile.png" alt="手機版" width="260">
 
-（截圖用的是測試資料。）
+（截圖用的是測試資料；畫面改了就跑 `SMOKE_SHOTS=docs/images npm run test:ui` 重新產生。）
 
 ---
 

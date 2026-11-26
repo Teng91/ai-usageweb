@@ -12,15 +12,16 @@ let failed = false;
 let view = RANK_VIEWS.some(([id]) => id === readStore('rankView')) ? readStore('rankView') : 'week';
 let root = null;
 
+// 排行卡片還沒出現（OpenRouter 沒設定）就不抓，免得白白叫伺服器去抓排行榜
 export function initRankings() {
   setInterval(() => {
-    if (document.visibilityState === 'visible') loadRankings();
+    if (root && document.visibilityState === 'visible') loadRankings();
   }, RANKINGS_POLL_MS);
 }
 
-/** 太久沒更新才重抓（回到前景時呼叫） */
+/** 太久沒更新才重抓（回到前景、排行卡片第一次出現時呼叫） */
 export function refreshRankingsIfStale() {
-  if (Date.now() - loadedAt > RANKINGS_POLL_MS) loadRankings();
+  if (root && Date.now() - loadedAt > RANKINGS_POLL_MS) loadRankings();
 }
 
 async function loadRankings() {
@@ -71,6 +72,7 @@ export function rankingsEl() {
     foot.className = 'card-meta rank-foot';
     root.append(head, cols, foot);
     renderRankings();
+    refreshRankingsIfStale();
   }
   return root;
 }
