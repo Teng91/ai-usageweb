@@ -4,7 +4,6 @@ import { test, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { fixture, mockFetch, ctxFor, tmpDir } from './helpers.js';
 import openrouter from '../src/providers/openrouter.js';
-import copilot, { parseCopilot } from '../src/providers/copilot.js';
 import claude, { parseClaude, parsePlanExpiry } from '../src/providers/claude.js';
 import codex, { parseCodex } from '../src/providers/codex.js';
 import { createAntigravity, parseModels, parseSummary, mergeWindows, tierName } from '../src/providers/antigravity.js';
@@ -100,51 +99,6 @@ test('openrouter 排行榜: 舊格式的存檔丟掉重抓，新格式沿用', a
   assert.equal((await new RankingsService({ dataDir: dir }).load()).data, null, '沒有 version 的舊檔不用');
   fs.writeFileSync(file, JSON.stringify({ version: 2, updatedAt: new Date().toISOString(), views: { week: { free: [], paid: [] } } }));
   assert.ok((await new RankingsService({ dataDir: dir }).load()).data, '目前版本的檔案照用');
-});
-
-// ---------- Copilot ----------
-test('copilot: 新版回傳', () => {
-  const r = parseCopilot(fixture('copilot-new.json'));
-  assert.equal(r.plan, 'Free');
-  assert.equal(r.windows.length, 2); // premium unlimited 不顯示
-  assert.deepEqual(r.windows[0], { id: 'chat', label: 'Chat', usedPct: 24, resetsAt: '2026-12-01T00:00:00.000Z', periodSec: 30 * 86400, used: 12, limit: 50 });
-  assert.equal(r.windows[1].used, 500);
-  assert.equal(r.windows[1].limit, 2000);
-});
-
-test('copilot: individual + free sku 算 Free；額度 0 的項目不顯示', () => {
-  const r = parseCopilot({
-    copilot_plan: 'individual',
-    access_type_sku: 'free_limited_copilot',
-    quota_reset_date: '2026-12-01',
-    quota_snapshots: {
-      chat: { entitlement: 200, remaining: 198, percent_remaining: 99, unlimited: false },
-      premium_interactions: { entitlement: 0, remaining: 0, percent_remaining: 0, unlimited: false },
-    },
-  });
-  assert.equal(r.plan, 'Free');
-  assert.deepEqual(r.windows.map((w) => w.id), ['chat']);
-});
-
-test('copilot: 舊版 Free 回傳', () => {
-  const r = parseCopilot(fixture('copilot-old.json'));
-  assert.equal(r.plan, 'Free');
-  assert.deepEqual(r.windows.map((w) => [w.id, w.used, w.limit, w.usedPct]), [['chat', 12, 50, 24], ['completions', 100, 2000, 5]]);
-});
-
-test('copilot: 形狀不明 → parse', () => {
-  assert.throws(() => parseCopilot({ foo: 1 }), (e) => e.kind === 'parse');
-});
-
-test('copilot: 被拒時帶編輯器標頭重試', async () => {
-  mock = mockFetch([
-    [(r) => r.url.includes('copilot_internal') && !r.headers['editor-version'], () => ({ status: 404, json: {} })],
-    ['copilot_internal', () => ({ json: fixture('copilot-new.json') })],
-  ]);
-  const r = await copilot.fetch(ctxFor({ copilot: { token: 'gho_x' } }));
-  assert.equal(r.windows.length, 2);
-  assert.equal(mock.calls[0].headers.authorization, 'token gho_x');
-  assert.equal(mock.calls[1].headers['editor-version'], 'vscode/1.100.0');
 });
 
 // ---------- Claude ----------

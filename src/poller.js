@@ -320,7 +320,7 @@ const UNSTARTED_TOLERANCE_MS = 10 * 60_000;
 /**
  * 還沒開始的額度：有些服務（Codex、Antigravity）在還沒用時照樣回一個重置時間＝「現在＋整個週期」，
  * 每次抓都往後推，看起來像永遠不會重置。已用 0% 而且重置時間剛好是一整個週期後，就把重置時間拿掉，
- * 前端會顯示「還沒用，用了才開始計時」。固定日期重置的（例如 Copilot 每月 1 號）不會剛好差一整個週期，不受影響。
+ * 前端會顯示「還沒用，用了才開始計時」。固定日期重置的（例如每月 1 號）不會剛好差一整個週期，不受影響。
  */
 export function clearUnstartedResets(windows, now = Date.now()) {
   return windows.map((w) => {

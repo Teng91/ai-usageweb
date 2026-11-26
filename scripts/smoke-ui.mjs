@@ -214,6 +214,10 @@ async function main() {
     await ev(`document.getElementById('push-close').click()`);
     check('按「關閉」收起通知設定', (await ev(`document.getElementById('push-dialog').open`)) === false);
 
+    // 離線：排行跟用量一樣經 service worker 存一份（離線時給這份；模擬離線管不到 service worker，所以只檢查有存）
+    const cached = await send('Runtime.evaluate', { expression: `(async () => { await fetch('/api/rankings'); const c = await caches.open('api-last'); const r = await c.match('/api/rankings'); return !!navigator.serviceWorker.controller && !!r && !!(await r.json()).views; })()`, awaitPromise: true, returnByValue: true });
+    check('排行經 service worker 存一份，離線時用得到', cached?.result?.value === true, JSON.stringify(cached?.result));
+
     check('沒有 JS 錯誤', errors.length === 0, errors.join(' | '));
   } finally {
     chrome.kill();

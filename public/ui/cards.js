@@ -200,7 +200,7 @@ function renderWindow(w) {
   label.textContent = w.label;
   const val = document.createElement('span');
   val.className = 'win-pct';
-  val.textContent = w.limit ? `${w.used} / ${w.limit}（${pct}%）` : `${pct}%`;
+  val.textContent = `${pct}%`;
   row.append(label, val);
 
   const bar = document.createElement('div');

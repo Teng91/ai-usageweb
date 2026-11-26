@@ -8,7 +8,7 @@ import { CredentialStore } from './src/credentials.js';
 import { SnapshotStore } from './src/snapshot.js';
 import { SseHub } from './src/sse.js';
 import { Poller } from './src/poller.js';
-import { loadProviders } from './src/providers/index.js';
+import { ALL_PROVIDERS, loadProviders } from './src/providers/index.js';
 import { RankingsService } from './src/rankings.js';
 import { PushService } from './src/push.js';
 import { parseQuiet } from './src/alerts.js';
@@ -26,6 +26,7 @@ export async function createApp(opts = {}) {
     dataDir: cfg.dataDir,
     keyB64: cfg.credentialsKey,
     reset: cfg.credentialsReset,
+    knownIds: ALL_PROVIDERS.map((p) => p.id),
   }).load();
   const snapshot = await new SnapshotStore({
     dataDir: cfg.dataDir,

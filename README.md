@@ -1,6 +1,6 @@
 # AI 用量（ai-usageweb）
 
-一個打開就看得到 AI 服務本期還剩多少的 PWA：**Claude Pro、Codex（ChatGPT）、Antigravity（卡片名稱是 Gemini）** 的額度，加上 **OpenRouter** 餘額與全站熱門模型。GitHub Copilot 的 adapter 還在，預設不顯示。電腦、手機瀏覽器都能看，手機可以「加到主畫面」當 App。
+一個打開就看得到 AI 服務本期還剩多少的 PWA：**Claude Pro、Codex（ChatGPT）、Antigravity（卡片名稱是 Gemini）** 的額度，加上 **OpenRouter** 餘額與全站熱門模型。電腦、手機瀏覽器都能看，手機可以「加到主畫面」當 App。
 
 部署在 fly.io：**有人打開才喚醒機器**，開著時每 2 分鐘更新並用 SSE 推到畫面上；沒人看幾分鐘後機器自動暫停（suspend，下次喚醒只要幾百毫秒），不收 CPU／記憶體費用。
 
@@ -10,7 +10,7 @@
 
 架構、設計取捨、測試與遇到的問題整理在 [docs/TECHNICAL.md](docs/TECHNICAL.md)。
 
-> ⚠ 除了 OpenRouter，其他四家用的都是官方工具自己在用的**內部端點**，隨時可能改，也可能牴觸服務條款。端點、欄位與 client id 都標為「需實測」，可以用環境變數覆寫（見 `.env.example`）。上線前請自己讀過各家條款。
+> ⚠ 除了 OpenRouter，其他三家用的都是官方工具自己在用的**內部端點**，隨時可能改，也可能牴觸服務條款。端點、欄位與 client id 都標為「需實測」，可以用環境變數覆寫（見 `.env.example`）。上線前請自己讀過各家條款。
 
 ## 架構
 
@@ -21,7 +21,7 @@
                           poller.js（觀看者計數、每家排程、退避）
                               │ 有人看才跑，每 2 分鐘
                               ▼
-         providers/{claude,codex,antigravity,copilot,openrouter}.js
+         providers/{claude,codex,antigravity,openrouter}.js
                               │ 續期時
                               ▼
                 credentials.js（環境變數＋AES-256-GCM 加密 volume）
@@ -89,7 +89,6 @@ npm run test:ui
 | 服務 | 做法 | 環境變數 |
 | --- | --- | --- |
 | OpenRouter | 後台新建一把專用 key（可設額度上限 0）。`/credits` 被拒時會自動改查 `/key` | `OPENROUTER_API_KEY` |
-| Copilot | `gh auth login` 後 `gh auth token`；不行就跑 Copilot 的 OAuth device flow 另拿一個 `gho_` token | `GITHUB_COPILOT_TOKEN` |
 | Claude | 先試 `claude setup-token` 的長效 token 能不能打 usage 端點（填 `CLAUDE_OAUTH_TOKEN`）；不行就用獨立設定目錄登入（見下） | `CLAUDE_REFRESH_TOKEN` 等 |
 | Codex | 獨立 `CODEX_HOME` 登入（見下） | `CODEX_REFRESH_TOKEN`、`CODEX_ACCOUNT_ID` 等 |
 | Antigravity | 先用官方 `agy`（`winget install Google.AntigravityCLI`）以 Google 帳號登入一次，再跑 `scripts\setup-antigravity.ps1`（見下） | `ANTIGRAVITY_*` |
@@ -167,7 +166,6 @@ curl.exe -X PUT https://ai-usageweb.fly.dev/admin/credentials/claude -H "Authori
 | `claude` | **`accessToken` 或 `refreshToken`**、`expiresAt` |
 | `codex` | **`accessToken` 或 `refreshToken`**、`expiresAt`、`accountId` |
 | `antigravity` | **`refreshToken`、`clientId`、`clientSecret`**、`projectId` |
-| `copilot` | **`token`** |
 | `openrouter` | **`apiKey`** |
 
 - 關機（例如部署）時會等正在跑的抓取結束才退出（最多 12 秒，`fly.toml` 的 `kill_timeout` 是 15 秒），續期拿到的新 refresh token 一定會先寫進 volume。
@@ -189,7 +187,7 @@ curl.exe -X PUT https://ai-usageweb.fly.dev/admin/credentials/claude -H "Authori
 | `SSE_MAX_AGE_SEC` | `1800` | 單一 SSE 連線最長多久，到了請前端在看得見時重連 |
 | `SSE_PING_SEC` | `25` | SSE 多久送一次 `: ping` |
 | `SSE_MAX_CLIENTS` | `20` | 同時最多幾條 SSE 連線，滿了回 503（前端改輪詢） |
-| `PROVIDERS` | 全部 | 只開部分服務，例如 `openrouter,copilot` |
+| `PROVIDERS` | 全部 | 只開部分服務，例如 `claude,openrouter` |
 | `CLAUDE_PLAN` | `Pro` | Claude 卡片顯示的方案名稱（API 拿不到） |
 | `CLAUDE_PLAN_EXPIRES_AT` | 無 | Claude 訂閱到期日 `YYYY-MM-DD` |
 
@@ -228,14 +226,13 @@ curl.exe -X PUT https://ai-usageweb.fly.dev/admin/credentials/claude -H "Authori
 
 ## 畫面
 
-- **卡片分兩區**：上面四張卡片（Claude、Gemini、Codex、OpenRouter 餘額），下面一整列 OpenRouter 熱門模型（免費／付費），不加標題。Copilot 目前用 `fly.toml` 的 `PROVIDERS` 關掉，要看再加回去。
+- **卡片分兩區**：上面四張卡片（Claude、Gemini、Codex、OpenRouter 餘額），下面一整列 OpenRouter 熱門模型（免費／付費），不加標題。
 - **每張卡片的額度**：
   - Claude：5 小時、每週（有的話再加每週 Opus／Sonnet）
   - Gemini（Antigravity）：跟 Claude 一樣「5 小時」「每週」兩條，只算 Gemini 模型。Antigravity 附送的 Claude/GPT 額度很小（一下就用完、每週大約只有兩個 5 小時），不顯示也不推播；要看的話把 `src/providers/antigravity.js` 的 `SHOWN` 加回 `claude_gpt`。免費方案只有模型清單給的一條
   - 一張卡片有三條以上額度時（例如 Claude 有每週 Opus／Sonnet）排成兩欄（左 5 小時、右每週），卡片不會變高
   - Codex：短窗與每週（依方案）
-  - Copilot：Chat、程式碼補全、Premium 請求（顯示次數，每月重置）
-  - 還沒開始計時的額度一律顯示「還沒用，用了才開始計時」：已用 0% 而且服務沒給重置時間（例如 Claude 的 5 小時），或給的重置時間剛好是「現在＋整個週期」、每次更新都往後推（例如 Codex 免費版每月、Gemini 的 5 小時）。每月 1 號固定重置的 Copilot 照常顯示倒數
+  - 還沒開始計時的額度一律顯示「還沒用，用了才開始計時」：已用 0% 而且服務沒給重置時間（例如 Claude 的 5 小時），或給的重置時間剛好是「現在＋整個週期」、每次更新都往後推（例如 Codex 免費版每月、Gemini 的 5 小時）
   - OpenRouter：剩餘餘額與已用金額
 - 70% 變橘、90% 變紅；超過 3 個更新週期沒有新資料標「資料已過期」
 - **兩種風格**（右上角旗子按鈕切換，會記住）：
@@ -254,7 +251,7 @@ curl.exe -X PUT https://ai-usageweb.fly.dev/admin/credentials/claude -H "Authori
 - iPhone／iPad：瀏覽器的「分享」→「加入主畫面」（頁面頂端會提示，按「知道了」就不再出現）
 - Android、電腦的 Chrome／Edge：點頁面右上的「安裝」（瀏覽器支援時才會出現）
 
-離線時會顯示上次的數字並標示「離線」。部署新版後頁面頂端會出現「有新版本，點此重新載入」（改前端檔案時記得把 `public/sw.js` 的 `CACHE` 版本號 +1）。
+離線時會顯示上次的數字與熱門模型並標示「離線」。部署新版後頁面頂端會出現「有新版本，點此重新載入」（改前端檔案時記得把 `public/sw.js` 的 `CACHE` 版本號 +1）。
 
 ## 專案結構
 
@@ -276,7 +273,7 @@ src/oauth.js              refresh_token 續期、先存再用、401 續期重試
 src/config.js             環境變數設定（含各家端點覆寫與手動設定值）
 src/errors.js             ProviderError（錯誤種類）、Retry-After 解析
 src/fsutil.js、log.js     原子寫檔、一行一筆 JSON log
-src/providers/*.js        五家 adapter（Copilot 預設關閉）（統一輸出 { plan, planExpiresAt?, windows, balance, note }）；顯示順序在 index.js
+src/providers/*.js        四家 adapter（統一輸出 { plan, planExpiresAt?, windows, balance, note }）；顯示順序在 index.js
 public/                   PWA（index.html、style.css、sw.js、manifest、icons）
 public/app.js             前端進入點：資料與連線（快照、SSE、SSE 被擋時改輪詢）
 public/ui/                前端模組：cards（卡片）、rankings（排行）、effects（冒險效果）、

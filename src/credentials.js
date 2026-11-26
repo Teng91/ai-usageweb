@@ -13,7 +13,6 @@ export function credsFromEnv(env = process.env) {
   const num = (v) => (v === undefined || v === '' ? undefined : Number(v));
   return {
     openrouter: pick({ apiKey: env.OPENROUTER_API_KEY }),
-    copilot: pick({ token: env.GITHUB_COPILOT_TOKEN }),
     claude: pick({
       accessToken: env.CLAUDE_ACCESS_TOKEN || env.CLAUDE_OAUTH_TOKEN,
       refreshToken: env.CLAUDE_REFRESH_TOKEN,
@@ -62,11 +61,13 @@ export function parseKey(b64) {
  *  - 每家一個 in-flight 鎖，避免同時用舊 refresh token 續期兩次
  */
 export class CredentialStore {
-  constructor({ dataDir, keyB64, env = process.env, reset = [] }) {
+  constructor({ dataDir, keyB64, env = process.env, reset = [], knownIds = null }) {
     this.file = path.join(dataDir, 'credentials.enc');
     this.key = parseKey(keyB64);
     this.env = credsFromEnv(env);
     this.reset = new Set(reset);
+    // 有程式的服務；volume 裡其他服務（例如已刪掉的 Grok、Copilot）的憑證在載入時清掉，不再留著
+    this.knownIds = knownIds ? new Set(knownIds) : null;
     this.creds = {};
     this.versions = {};
     this.locks = new Map();
@@ -89,8 +90,14 @@ export class CredentialStore {
       logWarn('未設定 CREDENTIALS_KEY：續期後的 token 只存在記憶體，重開機會遺失');
     }
 
-    const ids = new Set([...Object.keys(this.env), ...Object.keys(stored)]);
     let needWrite = false;
+    const dropped = this.knownIds ? Object.keys(stored).filter((id) => !this.knownIds.has(id)) : [];
+    for (const id of dropped) delete stored[id];
+    if (dropped.length) {
+      needWrite = true;
+      logInfo('清掉已不存在服務的憑證', { providers: dropped });
+    }
+    const ids = new Set([...Object.keys(this.env), ...Object.keys(stored)]);
     for (const id of ids) {
       const fromEnv = this.env[id];
       const fromVol = stored[id];

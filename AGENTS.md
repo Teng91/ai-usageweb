@@ -1,15 +1,15 @@
 # AGENTS.md — 給 AI 助手的專案規則
 
 ## 專案
-ai-usageweb：顯示 Claude、Codex、Antigravity 額度與 OpenRouter 餘額的 PWA（Copilot adapter 保留，預設不顯示），部署在 fly.io，有人看才輪詢（每 2 分鐘），沒人看機器自動 suspend。另外有 OpenRouter 模型排行（`src/rankings.js`）。
+ai-usageweb：顯示 Claude、Codex、Antigravity 額度與 OpenRouter 餘額的 PWA，部署在 fly.io，有人看才輪詢（每 2 分鐘），沒人看機器自動 suspend。另外有 OpenRouter 模型排行（`src/rankings.js`）。
 
 ## 規則
 - **不加相依套件**。只用 Node 22 內建模組；前端是原生 JS（ES modules），不打包、不用框架。
 - **絕不在 log、錯誤訊息、API 回應裡出現 token、完整 header 或原始回應。** 錯誤只留服務名、狀態碼、簡短中文說明。
 - 公開 API 只回傳百分比、剩餘量、重置時間；不回傳 email、帳號 ID、組織名。排行也一樣只存公開資料。
 - repo 是公開的：不要提交 `.env*`、`server-*`、`*.enc`、`data/`。
-- 每家 adapter 輸出統一格式 `{ plan, planExpiresAt?, windows: [{ id, label, usedPct, resetsAt, periodSec?, used?, limit? }], balance, note }`；`usedPct` 一律是「已用」0–100。前端只認這個格式。`periodSec` 是窗口長度（秒），推播靠它分辨週／月額度，知道就要填。
-- 每家 adapter 要宣告 `credentialFields`（管理 API 換憑證時接受的欄位）；憑證多了新欄位就加進去。
+- 每家 adapter 輸出統一格式 `{ plan, planExpiresAt?, windows: [{ id, label, usedPct, resetsAt, periodSec? }], balance, note }`；`usedPct` 一律是「已用」0–100。前端只認這個格式。`periodSec` 是窗口長度（秒），推播靠它分辨週／月額度，知道就要填。
+- 每家 adapter 要宣告 `credentialFields`（管理 API 換憑證時接受的欄位）；憑證多了新欄位就加進去。刪掉一家時連同 `credentials.js` 的環境變數、`config.js` 的端點、fixture 與測試一起刪；volume 裡那家的舊憑證會在啟動時自動清掉。
 - 續期拿到新 refresh token 時：**先 `await saveCreds()` 成功才使用**；續期包在 `withLock` 裡。
 - 對各家的請求不論幾個人在看都不超過每家每 `minIntervalSec` 一次；不要新增公開的「立刻重抓」。OpenRouter 排行最多每小時抓一次。
 - 手動設定的值（`CLAUDE_PLAN`、`CLAUDE_PLAN_EXPIRES_AT`）透過 `config.js` 的 `manual` 每次直接讀環境變數，不要放進憑證：volume 裡的憑證會蓋過環境變數。
@@ -21,7 +21,7 @@ ai-usageweb：顯示 Claude、Codex、Antigravity 額度與 OpenRouter 餘額的
 - 存檔格式（例如 `rankings.json`）改了欄位就把該檔的 `FORMAT_VERSION` +1，讓舊檔被丟掉。例外：`push.json` 只新增選填欄位（例如 `settings`）時不要升版本，升了會把訂閱一起丟掉，手機要重新開啟通知。
 
 ## 前端
-- 改了 `public/` 的檔案要把 `public/sw.js` 的 `CACHE` 版本號 +1；新增要離線可用的檔案要加進 `SHELL`。新的 `/api/*` 不經 service worker（加進 `sw.js` 的略過清單）。
+- 改了 `public/` 的檔案要把 `public/sw.js` 的 `CACHE` 版本號 +1；新增要離線可用的檔案要加進 `SHELL`。新的 `/api/*` 不經 service worker（加進 `sw.js` 的略過清單）；`/api/usage`、`/api/rankings` 走 network-first，離線時給上次存下的。
 - 前端模組分工：`app.js` 資料與連線、`ui/cards.js` 卡片與頂列、`ui/rankings.js` 排行、`ui/effects.js` 冒險風格效果、`ui/theme-toggle.js` 亮暗與風格切換、`ui/pwa.js` 離線／安裝、`ui/push.js` 通知設定、`ui/format.js` 格式化、`ui/dom.js` 共用的取元素函式、狀態、localStorage 與裝置判斷（`isIos`、`isStandalone`）。不要再把東西塞回 `app.js`。`public/theme.js` 是畫面出現前套用主題的小腳本（非模組），跟 `ui/theme-toggle.js` 不同。
 - CSP 不允許內嵌 script 與 HTML 裡的 `style=""`；要動態樣式用 JS 設 `element.style`。
 - 兩種風格：簡約（`style.css`）與冒險（`skin-adventure.css` 卡片、按鈕與遊戲介面；`scene.css` 場景）。冒險風格的規則一律限定在 `[data-skin="adventure"]` 底下，不能影響簡約風格。

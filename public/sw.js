@@ -1,5 +1,5 @@
 // 快取名稱帶版本號；改了前端檔案就把版本 +1
-const CACHE = 'app-v48';
+const CACHE = 'app-v49';
 const SHELL = [
   '/',
   '/index.html',
@@ -124,25 +124,26 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
 
-  // SSE、推播與管理 API 完全不經過 service worker
-  if (url.pathname === '/api/stream' || url.pathname === '/api/rankings' || url.pathname.startsWith('/api/push/') || url.pathname.startsWith('/admin/') || url.pathname === '/healthz') return;
+  // SSE、推播與管理 API 完全不經過 service worker（/api/usage、/api/rankings 走下面的 network-first）
+  if (url.pathname === '/api/stream' || url.pathname.startsWith('/api/push/') || url.pathname.startsWith('/admin/') || url.pathname === '/healthz') return;
 
-  if (url.pathname === '/api/usage') {
-    event.respondWith(networkFirstUsage(req));
+  // 用量與排行：先問伺服器，失敗（離線）才用上次存下的
+  if (url.pathname === '/api/usage' || url.pathname === '/api/rankings') {
+    event.respondWith(networkFirst(req, url.pathname));
     return;
   }
 
   event.respondWith(cacheFirst(req));
 });
 
-async function networkFirstUsage(req) {
+async function networkFirst(req, key) {
   const cache = await caches.open(API_CACHE);
   try {
     const res = await fetch(req);
-    if (res.ok) cache.put('/api/usage', res.clone());
+    if (res.ok) cache.put(key, res.clone());
     return res;
   } catch {
-    const cached = await cache.match('/api/usage');
+    const cached = await cache.match(key);
     if (!cached) return new Response(JSON.stringify({ error: 'offline' }), { status: 503, headers: { 'Content-Type': 'application/json' } });
     // 標記為快取，前端顯示「離線」
     const headers = new Headers(cached.headers);

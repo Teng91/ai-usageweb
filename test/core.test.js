@@ -37,6 +37,18 @@ test('credentials: CREDENTIALS_RESET 以環境變數覆寫 volume', async () => 
   assert.equal(s3.get('claude').refreshToken, 'fresh');
 });
 
+test('credentials: volume 裡已刪掉的服務（例如 grok）載入時清掉並寫回', async () => {
+  const dir = tmpDir();
+  const s1 = await new CredentialStore({ dataDir: dir, keyB64: KEY, env: {} }).load();
+  await s1.replace('grok', { cookie: 'old-cookie' });
+  await s1.replace('openrouter', { apiKey: 'k' });
+  const s2 = await new CredentialStore({ dataDir: dir, keyB64: KEY, env: {}, knownIds: ['openrouter'] }).load();
+  assert.equal(s2.get('grok'), null);
+  assert.equal(s2.get('openrouter').apiKey, 'k');
+  const s3 = await new CredentialStore({ dataDir: dir, keyB64: KEY, env: {} }).load();
+  assert.equal(s3.get('grok'), null, '檔案裡也拿掉了');
+});
+
 test('credentials: 寫入失敗時不採用新值', async () => {
   const dir = tmpDir();
   const s = await new CredentialStore({ dataDir: dir, keyB64: KEY, env: { CLAUDE_REFRESH_TOKEN: 'old' } }).load();
@@ -319,11 +331,11 @@ test('poller: 還沒開始的額度（0%、重置時間＝現在＋整個週期�
   const out = clearUnstartedResets([
     { id: 'codex', usedPct: 0, periodSec: 30 * 86400, resetsAt: at(30 * 86400e3 - 60e3) }, // 還沒用：每次都是 30 天後
     { id: 'used', usedPct: 1, periodSec: 30 * 86400, resetsAt: at(30 * 86400e3 - 60e3) }, // 有用了：保留
-    { id: 'copilot', usedPct: 0, periodSec: 30 * 86400, resetsAt: at(4 * 86400e3) }, // 每月 1 號固定重置：保留
+    { id: 'fixedDate', usedPct: 0, periodSec: 30 * 86400, resetsAt: at(4 * 86400e3) }, // 每月 1 號固定重置：保留
     { id: 'gemini5h', usedPct: 0, periodSec: 18000, resetsAt: at(5 * 3600e3) },
     { id: 'noPeriod', usedPct: 0, resetsAt: at(5 * 3600e3) }, // 不知道週期：保留
   ], now);
-  assert.deepEqual(out.map((w) => [w.id, w.resetsAt === null]), [['codex', true], ['used', false], ['copilot', false], ['gemini5h', true], ['noPeriod', false]]);
+  assert.deepEqual(out.map((w) => [w.id, w.resetsAt === null]), [['codex', true], ['used', false], ['fixedDate', false], ['gemini5h', true], ['noPeriod', false]]);
 });
 
 test('sse: 連線數到上限就回 503，不算觀看者', async () => {

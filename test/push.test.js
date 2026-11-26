@@ -176,12 +176,12 @@ test('同一類的通知合成一則', () => {
   const m = mergeAlerts([
     { kind: 'usage', title: '⚠️ Claude 5 小時 已用 96%', body: '15:00 才重置' },
     { kind: 'usage', title: '⚠️ Codex 5 小時 已用 97%', body: '16:00 才重置' },
-    { kind: 'reset', title: '💡 Copilot Chat 還剩 50%', body: '明天重置' },
+    { kind: 'reset', title: '💡 Gemini 每週 還剩 50%', body: '明天重置' },
   ]);
   assert.equal(m.length, 2);
   assert.equal(m[0].title, '⚠️ 額度警告（2 項）');
   assert.equal(m[0].body, 'Claude 5 小時 已用 96%：15:00 才重置\nCodex 5 小時 已用 97%：16:00 才重置');
-  assert.equal(m[1].title, '💡 Copilot Chat 還剩 50%');
+  assert.equal(m[1].title, '💡 Gemini 每週 還剩 50%');
 });
 
 // ---------- 服務 ----------
@@ -337,7 +337,7 @@ test('推播 API：訂閱要密碼、tick 要 token 且不算有人在看', asyn
   const app = await createApp({
     dataDir: tmpDir(),
     credentialsKey: crypto.randomBytes(32).toString('base64'),
-    enabledProviders: ['copilot'],
+    enabledProviders: ['codex'],
     accessKey: 'ak',
     vapidPublicKey: keys.publicKey,
     vapidPrivateKey: keys.privateKey,
@@ -395,7 +395,7 @@ test('推播 API：訂閱要密碼、tick 要 token 且不算有人在看', asyn
 
 test('沒設定 VAPID／PUSH_KEY 時推播關閉', async () => {
   const { createApp } = await import('../server.js');
-  const app = await createApp({ dataDir: tmpDir(), credentialsKey: crypto.randomBytes(32).toString('base64'), enabledProviders: ['copilot'], accessKey: '', pushKey: '' });
+  const app = await createApp({ dataDir: tmpDir(), credentialsKey: crypto.randomBytes(32).toString('base64'), enabledProviders: ['codex'], accessKey: '', pushKey: '' });
   await new Promise((r) => app.server.listen(0, '127.0.0.1', r));
   const base = `http://127.0.0.1:${app.server.address().port}`;
   try {

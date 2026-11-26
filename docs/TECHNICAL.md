@@ -1,7 +1,7 @@
 # AI 用量（ai-usageweb）技術文件
 
 > 一個打開就看得到「各家 AI 工具本期還剩多少額度」的 PWA。
-> 整合 Claude、Codex（ChatGPT）、Antigravity 的用量，加上 OpenRouter 餘額與全站熱門模型排行（GitHub Copilot 的 adapter 保留，預設不顯示）。
+> 整合 Claude、Codex（ChatGPT）、Antigravity 的用量，加上 OpenRouter 餘額與全站熱門模型排行。
 
 - 網站：https://ai-usageweb.fly.dev
 - 原始碼：https://github.com/Teng91/ai-usageweb
@@ -23,12 +23,12 @@
 
 ## 1. 背景與目標
 
-同時訂閱好幾家 AI 工具時，每家的額度規則都不一樣：Claude 有 5 小時與每週兩個窗口、Codex 依方案是每月或每週、Copilot 算次數、OpenRouter 是預付餘額。要知道「現在還能用多少」，得分別打開各家的網頁或 CLI。
+同時訂閱好幾家 AI 工具時，每家的額度規則都不一樣：Claude 有 5 小時與每週兩個窗口、Codex 依方案是每月或每週、OpenRouter 是預付餘額。要知道「現在還能用多少」，得分別打開各家的網頁或 CLI。
 
 目標是做一個：
 
 1. **一頁看完**：所有服務的額度、重置時間、餘額在同一個畫面。
-2. **手機電腦都能用**：PWA，可以加到主畫面、離線時顯示上次的數字。
+2. **手機電腦都能用**：PWA，可以加到主畫面、離線時顯示上次的數字與熱門模型。
 3. **幾乎不花錢**：沒人看的時候伺服器不跑、不打任何 API。
 4. **安全**：伺服器保管登入憑證，但 log、錯誤訊息與 API 回應絕不出現 token 或帳號資訊。
 
@@ -36,7 +36,7 @@
 
 | 功能 | 說明 |
 | --- | --- |
-| 額度卡片 | 每個額度窗口一條進度條、重置倒數；70%／90% 變色；上面四張卡片（三家額度＋OpenRouter 餘額）、下面熱門模型排行一整列（Copilot 目前用 `PROVIDERS` 關掉） |
+| 額度卡片 | 每個額度窗口一條進度條、重置倒數；70%／90% 變色；上面四張卡片（三家額度＋OpenRouter 餘額）、下面熱門模型排行一整列 |
 | 即時更新 | SSE 推送；SSE 被企業 proxy 擋住時自動改成輪詢 |
 | OpenRouter 熱門模型 | 免費／付費各前 10 名（每天／每週／每月），付費附每百萬 token 價格 |
 | 訂閱到期日 | 手動設定，剩 30 天內提醒 |
@@ -70,7 +70,7 @@ flowchart LR
   WP -- Web Push --> PHONE[(手機)]
   UI -- GET /api/usage --> R
   H -- SSE /api/stream --> UI
-  AD -- 查用量 / 續期 --> EXT[(Claude / Codex /<br/>Antigravity / Copilot /<br/>OpenRouter)]
+  AD -- 查用量 / 續期 --> EXT[(Claude / Codex /<br/>Antigravity /<br/>OpenRouter)]
   RK -- 每小時最多一次 --> OR[(OpenRouter 公開排行)]
 ```
 
@@ -79,7 +79,7 @@ flowchart LR
 1. 瀏覽器打開頁面 → `GET /api/usage` 拿快照，同時開 SSE。
 2. 第一個觀看者出現時 `poller` 開始排程，每家每 2 分鐘抓一次；每抓到一家就透過 SSE 推給所有人。
 3. 觀看者全部離開 90 秒後停止輪詢；fly.io 偵測到沒有連線，幾分鐘後把機器 **suspend**（保留記憶體快照，下次喚醒只要幾百毫秒）。
-4. 每家 adapter 輸出統一格式 `{ plan, planExpiresAt?, windows: [{ id, label, usedPct, resetsAt, periodSec?, used?, limit? }], balance, note }`，前端只認這個格式，新增服務不必改畫面。`usedPct` 一律是「已用」0–100；`periodSec` 是窗口長度（推播靠它分辨週／月額度）；`used`／`limit` 是次數制額度（Copilot）的實際次數。
+4. 每家 adapter 輸出統一格式 `{ plan, planExpiresAt?, windows: [{ id, label, usedPct, resetsAt, periodSec? }], balance, note }`，前端只認這個格式，新增服務不必改畫面。`usedPct` 一律是「已用」0–100；`periodSec` 是窗口長度（推播靠它分辨週／月額度）。
 5. 每抓到新資料，`push.js` 記一筆樣本並判斷要不要推播；沒人看時由 Google Apps Script 定時喚醒抓一輪（GitHub Actions 排程當備援）。
 
 **後端模組**
@@ -89,7 +89,7 @@ flowchart LR
 | `server.js` | 組裝各元件、啟動與優雅關機 |
 | `src/routes.js` | 公開 API、SSE、管理 API、存取碼 |
 | `src/poller.js` | 觀看者計數、每家排程、退避、共用 in-flight Promise |
-| `src/providers/*.js` | 五家 adapter（Copilot 預設關閉） |
+| `src/providers/*.js` | 四家 adapter |
 | `src/credentials.js` | 環境變數 + 加密 volume、每家續期鎖 |
 | `src/snapshot.js` | 記憶體快照、原子寫檔 |
 | `src/rankings.js` | OpenRouter 排行（每小時最多抓一次、存檔格式版本） |
@@ -255,6 +255,6 @@ flowchart LR
 
 ## 10. 限制與後續
 
-- 除了 OpenRouter，其他四家用的是官方工具自己使用的內部端點，隨時可能改變，也可能牴觸服務條款；端點與 client id 都可以用環境變數覆寫。
+- 除了 OpenRouter，其他三家用的是官方工具自己使用的內部端點，隨時可能改變，也可能牴觸服務條款；端點與 client id 都可以用環境變數覆寫。
 - 目前是個人使用的單人版。曾評估多人登入：用 Google 登入網站可行，但各家沒有開放第三方代查用量的正式介面，替他人保管 token 的風險也高，因此選擇維持「每個人自己架一份」的模式。
 - 之後可以做的事列在 [TODO.md](TODO.md)。

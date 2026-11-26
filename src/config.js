@@ -29,7 +29,7 @@ export const config = {
   pushTickToken: process.env.PUSH_TICK_TOKEN || '',
   pushTz: process.env.PUSH_TZ || 'Asia/Taipei',
   pushQuiet: process.env.PUSH_QUIET ?? '00-08',
-  // 只開部分服務，例如 PROVIDERS=openrouter,copilot；空白代表全部
+  // 只開部分服務，例如 PROVIDERS=claude,openrouter；空白代表全部
   enabledProviders: (process.env.PROVIDERS || '')
     .split(',').map((s) => s.trim()).filter(Boolean),
 };
@@ -53,9 +53,6 @@ export const endpoints = {
     baseUrl: env('ANTIGRAVITY_BASE_URL', 'https://daily-cloudcode-pa.googleapis.com/v1internal'),
     tokenUrl: env('ANTIGRAVITY_TOKEN_URL', 'https://oauth2.googleapis.com/token'),
     userAgent: env('ANTIGRAVITY_USER_AGENT', 'antigravity/cli/1.5.15'),
-  },
-  copilot: {
-    userUrl: env('COPILOT_USER_URL', 'https://api.github.com/copilot_internal/user'),
   },
   openrouter: {
     baseUrl: env('OPENROUTER_BASE_URL', 'https://openrouter.ai/api/v1'),
