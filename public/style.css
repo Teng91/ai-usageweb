@@ -580,21 +580,8 @@ button {
   font-variant-numeric: tabular-nums;
 }
 
-.rank-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 10px;
-}
-
-.rank-title {
-  margin: 0;
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--text-2);
-  letter-spacing: 0.04em;
-}
+/* 排行卡片：時間範圍切換放在標題列右邊 */
+.rank-card .seg { margin: -3px 0 -3px auto; } /* 不把標題列撐得比其他卡片高 */
 
 /* 時間範圍切換：方角分段按鈕 */
 .seg {
@@ -731,12 +718,6 @@ button {
 @container (max-width: 380px) {
   .rt-row { grid-template-columns: 26px minmax(0, 1fr) 58px; }
   .viz { display: none; }
-}
-
-.rank-foot {
-  font-size: 0.7rem;
-  color: var(--muted);
-  margin: 10px 0 0;
 }
 
 .rank-foot:empty { display: none; }

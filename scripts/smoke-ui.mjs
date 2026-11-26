@@ -102,6 +102,13 @@ async function main() {
     const send = (method, params = {}) => new Promise((r) => { const i = ++id; pend.set(i, r); ws.send(JSON.stringify({ id: i, method, params })); });
     const ev = async (expr) => (await send('Runtime.evaluate', { expression: expr, returnByValue: true }))?.result?.value;
     const key = (k) => ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: '${k}' }))`);
+    // SMOKE_SHOTS=資料夾：順便存截圖，方便看版面（平常不存）
+    const shot = async (name) => {
+      if (!process.env.SMOKE_SHOTS) return;
+      const d = await send('Page.captureScreenshot', { format: 'png' });
+      fs.mkdirSync(process.env.SMOKE_SHOTS, { recursive: true });
+      fs.writeFileSync(path.join(process.env.SMOKE_SHOTS, `${name}.png`), Buffer.from(d.data, 'base64'));
+    };
     const viewport = (width, height, mobile = false) => send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile });
 
     await send('Runtime.enable');
@@ -122,9 +129,12 @@ async function main() {
     const rows = await ev(`(() => { const b = document.querySelector('.card[data-id="claude"] .card-body'); const wins = [...b.querySelectorAll('.win')]; const c = document.querySelector('.card[data-id="antigravity"] .card-body'); const bottom = (el) => Math.max(...[...el.children].map((x) => x.getBoundingClientRect().bottom)) - el.getBoundingClientRect().top; return { rows: new Set(wins.map((w) => w.offsetTop)).size, h: bottom(b), ch: bottom(c), sx: wins.every((w) => w.scrollWidth <= w.clientWidth + 1) }; })()`);
     check('沒用過也沒有重置時間的額度顯示「用了才開始計時」', (await ev(`document.querySelectorAll('.card[data-id="antigravity"] .win-sub')[1]?.textContent`)) === '還沒用，用了才開始計時');
     check('分區：四張卡片（OpenRouter 餘額在第四張）一區、熱門模型排行自己一區，都沒有標題', (await ev(`document.querySelectorAll('.group-title').length + '|' + [...document.querySelectorAll('.group')].map((g) => [...g.querySelectorAll('.card')].map((c) => c.dataset.id || 'rank').join('+')).join(' | ')`)) === '0|claude+antigravity+codex+openrouter | rank');
-    check('OpenRouter 卡片只放餘額，排行不在卡片裡', (await ev(`(() => { const c = document.querySelector('.card[data-id="openrouter"]'); return !!c.querySelector('.balance') && !c.querySelector('.rank'); })()`)) === true);
+    check('OpenRouter 卡片只放餘額，排行不在卡片裡', (await ev(`(() => { const c = document.querySelector('.card[data-id="openrouter"]'); return !!c.querySelector('.balance') && !c.querySelector('.rank-list'); })()`)) === true);
     check('寬螢幕四張卡片排成一列，排行卡在下面佔滿整列', (await ev(`(() => { const cs = [...document.querySelectorAll('.card[data-id]')].map((c) => c.getBoundingClientRect()); const rk = document.querySelector('.rank-card').getBoundingClientRect(); const top = cs[0].top; return cs.every((r) => Math.abs(r.top - top) < 2) && rk.top > cs[0].bottom && Math.abs(rk.left - cs[0].left) < 2 && Math.abs(rk.right - cs[3].right) < 2; })()`)) === true);
     check('四條額度（Claude 加上每週 Opus／Sonnet）排成兩列，不比兩條的卡片高、不溢出', rows?.rows === 2 && rows.h <= rows.ch + 1 && rows.sx, JSON.stringify(rows));
+    const rankHead = `(() => { const rk = document.querySelector('.rank-card'); const cl = document.querySelector('.card[data-id="claude"]'); const off = (c) => c.querySelector('.card-name').getBoundingClientRect().left - c.getBoundingClientRect().left; const body = (c) => c.querySelector('.card-body').getBoundingClientRect().left - c.getBoundingClientRect().left; return rk.querySelector('.card-head .card-name')?.textContent === 'OpenRouter 熱門模型' && !!rk.querySelector('.card-head .seg') && Math.abs(off(rk) - off(cl)) < 1 && Math.abs(body(rk) - body(cl)) < 1; })()`;
+    check('排行卡片跟上面四張同樣的標題列（標題、時間切換在標題列，左邊對齊）', (await ev(rankHead)) === true);
+    await shot('simple');
     check('Claude 到期日', /2027\/11\/4 到期/.test(await ev(`document.querySelector('.card[data-id="claude"] .plan-exp').textContent`)));
 
     // ---- 亮暗切換 ----
@@ -138,6 +148,8 @@ async function main() {
     await sleep(800);
     check('切到冒險風格', (await ev(`document.documentElement.dataset.skin`)) === 'adventure');
     check('「快用完了！」泡泡完整露出在卡片上方（不被卡片裁掉）', await ev(`(() => { const card = document.querySelector('.card[data-id="codex"]'); const b = card.querySelector('.alert-bubble'); const r = b.getBoundingClientRect(); const c = card.getBoundingClientRect(); return getComputedStyle(b).display !== 'none' && r.bottom <= c.top + 4 && getComputedStyle(card).overflow === 'visible'; })()`));
+    check('冒險風格：排行卡片的標題列也對齊', (await ev(rankHead)) === true);
+    await shot('adventure');
     check('四張地圖建立', (await ev(`document.querySelectorAll('.scene .map').length`)) === 4);
     check('新原創怪物（紫光小菇靈／露珠水精靈）存在於場景', (await ev(`!!document.querySelector('.scene .mon-sporeling') && !!document.querySelector('.scene .mon-dewdrop')`)) === true);
     check('從春天開始', (await ev(`document.documentElement.dataset.map`)) === 'spring');

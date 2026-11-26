@@ -54,11 +54,6 @@ export const endpoints = {
     tokenUrl: env('ANTIGRAVITY_TOKEN_URL', 'https://oauth2.googleapis.com/token'),
     userAgent: env('ANTIGRAVITY_USER_AGENT', 'antigravity/cli/1.5.15'),
   },
-  // grok.com 網頁用的內部端點；Cloudflare 會看 User-Agent，用一般瀏覽器的
-  grok: {
-    rateLimitsUrl: env('GROK_RATE_LIMITS_URL', 'https://grok.com/rest/rate-limits'),
-    userAgent: env('GROK_USER_AGENT', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36'),
-  },
   copilot: {
     userUrl: env('COPILOT_USER_URL', 'https://api.github.com/copilot_internal/user'),
   },

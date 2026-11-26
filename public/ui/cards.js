@@ -40,11 +40,7 @@ function syncRankCard() {
     rankCard?.remove();
     return;
   }
-  if (!rankCard) {
-    rankCard = document.createElement('section');
-    rankCard.className = 'card rank-card';
-    rankCard.append(rankingsEl());
-  }
+  rankCard ??= rankingsEl();
   const g = groupEl('rank');
   if (rankCard.parentElement !== g) g.append(rankCard);
 }
@@ -110,7 +106,7 @@ function effectiveStatus(p, now = Date.now()) {
  * 平常的例行更新不顯示任何 loading，數字到了直接換掉。
  */
 function isUpdating(p, now = Date.now()) {
-  if (p.status === 'error' || p.status === 'auth' || p.status === 'disabled') return false;
+  if (p.status === 'error' || p.status === 'auth') return false;
   if (!state.sessionStart || now - state.sessionStart > WAKE_WINDOW_MS) return false;
   if (state.offline) return false;
   if (!p.fetchedAt) return true;
@@ -242,7 +238,6 @@ function tickCard(el, p, now = Date.now()) {
   const updating = isUpdating(p, now);
   el.classList.toggle('stale', st === 'stale' && !updating);
   el.classList.toggle('updating', updating);
-  el.classList.toggle('setup', p.status === 'disabled');
   const status = el.querySelector('.card-status');
   status.className = 'card-status';
   if (updating) {

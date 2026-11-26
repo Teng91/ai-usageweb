@@ -14,7 +14,6 @@ export function credsFromEnv(env = process.env) {
   return {
     openrouter: pick({ apiKey: env.OPENROUTER_API_KEY }),
     copilot: pick({ token: env.GITHUB_COPILOT_TOKEN }),
-    grok: pick({ cookie: env.GROK_COOKIE }),
     claude: pick({
       accessToken: env.CLAUDE_ACCESS_TOKEN || env.CLAUDE_OAUTH_TOKEN,
       refreshToken: env.CLAUDE_REFRESH_TOKEN,

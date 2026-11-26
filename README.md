@@ -21,7 +21,7 @@
                           poller.js（觀看者計數、每家排程、退避）
                               │ 有人看才跑，每 2 分鐘
                               ▼
-         providers/{claude,codex,antigravity,grok,copilot,openrouter}.js
+         providers/{claude,codex,antigravity,copilot,openrouter}.js
                               │ 續期時
                               ▼
                 credentials.js（環境變數＋AES-256-GCM 加密 volume）
@@ -168,7 +168,6 @@ curl.exe -X PUT https://ai-usageweb.fly.dev/admin/credentials/claude -H "Authori
 | `codex` | **`accessToken` 或 `refreshToken`**、`expiresAt`、`accountId` |
 | `antigravity` | **`refreshToken`、`clientId`、`clientSecret`**、`projectId` |
 | `copilot` | **`token`** |
-| `grok` | **`cookie`**（grok.com 登入後的 Cookie 標頭整串；過期要重貼） |
 | `openrouter` | **`apiKey`** |
 
 - 關機（例如部署）時會等正在跑的抓取結束才退出（最多 12 秒，`fly.toml` 的 `kill_timeout` 是 15 秒），續期拿到的新 refresh token 一定會先寫進 volume。
@@ -229,7 +228,7 @@ curl.exe -X PUT https://ai-usageweb.fly.dev/admin/credentials/claude -H "Authori
 
 ## 畫面
 
-- **卡片分兩區**：上面四張卡片（Claude、Gemini、Codex、OpenRouter 餘額），下面一整列 OpenRouter 熱門模型（免費／付費），不加標題。Copilot、Grok 目前用 `fly.toml` 的 `PROVIDERS` 關掉，要看再加回去。
+- **卡片分兩區**：上面四張卡片（Claude、Gemini、Codex、OpenRouter 餘額），下面一整列 OpenRouter 熱門模型（免費／付費），不加標題。Copilot 目前用 `fly.toml` 的 `PROVIDERS` 關掉，要看再加回去。
 - **每張卡片的額度**：
   - Claude：5 小時、每週（有的話再加每週 Opus／Sonnet）
   - Gemini（Antigravity）：跟 Claude 一樣「5 小時」「每週」兩條，只算 Gemini 模型。Antigravity 附送的 Claude/GPT 額度很小（一下就用完、每週大約只有兩個 5 小時），不顯示也不推播；要看的話把 `src/providers/antigravity.js` 的 `SHOWN` 加回 `claude_gpt`。免費方案只有模型清單給的一條

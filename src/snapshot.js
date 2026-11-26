@@ -12,8 +12,6 @@ export class SnapshotStore {
     this.pollIntervalSec = pollIntervalSec;
     this.order = providers.map((p) => p.id);
     this.names = Object.fromEntries(providers.map((p) => [p.id, p.name]));
-    // 沒設定時要顯示的提示（provider 有宣告 setupNote 的才有；沒有的卡片整張不顯示）
-    this.setupNotes = Object.fromEntries(providers.filter((p) => p.setupNote).map((p) => [p.id, p.setupNote]));
     this.entries = {};
     this.writeChain = Promise.resolve();
     for (const p of providers) this.entries[p.id] = blank(p);
@@ -61,7 +59,7 @@ export class SnapshotStore {
       intervalSec: e.intervalSec || this.pollIntervalSec,
       slowed: Boolean(e.slowed),
       error: e.error,
-      note: (status === 'disabled' ? this.setupNotes[id] : e.note) || null,
+      note: e.note || null,
       windows: e.windows || [],
       balance: e.balance || null,
     };

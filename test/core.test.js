@@ -108,15 +108,6 @@ test('snapshot: 原子寫入後讀回；過 3 個間隔變 stale', async () => {
   assert.equal(s2.snapshot(t).providers[0].balance.remaining, 1);
 });
 
-test('snapshot: 沒設定時，有 setupNote 的放提示，沒有的 note 是 null', () => {
-  const s = new SnapshotStore({ dataDir: tmpDir(), pollIntervalSec: 60, providers: [{ id: 'a', name: 'A', setupNote: '去設定' }, { id: 'b', name: 'B' }] });
-  assert.equal(s.view('a').status, 'disabled');
-  assert.equal(s.view('a').note, '去設定');
-  assert.equal(s.view('b').note, null);
-  s.update('a', { status: 'ok', note: null, fetchedAt: new Date().toISOString() });
-  assert.equal(s.view('a').note, null);
-});
-
 // ---------- poller ----------
 function makePoller({ fetchImpl, now, creds = { p: { x: 1 } }, snapshotEntries = {} }) {
   const provider = {

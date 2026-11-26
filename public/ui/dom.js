@@ -39,8 +39,7 @@ export function keyAccepted() {
 }
 
 /** 沒設定憑證的服務不顯示 */
-// 沒設定的不顯示；有設定提示的（例如 Grok）照樣顯示，卡片上放提示
-export const visible = (p) => Boolean(p) && (p.status !== 'disabled' || Boolean(p.note));
+export const visible = (p) => Boolean(p) && p.status !== 'disabled';
 
 /** 讀寫 localStorage；私密模式等情況會丟錯，一律吞掉 */
 export function readStore(key) {

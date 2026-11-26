@@ -37,16 +37,16 @@ async function loadRankings() {
   renderRankings();
 }
 
-/** 排行區塊只建一次，卡片重畫時搬回去，切換的分頁不會被重設 */
+/** 排行卡片只建一次（跟額度卡片同樣的標題列／內容／底部），切換的分頁不會被重設 */
 export function rankingsEl() {
   if (!root) {
     root = document.createElement('section');
-    root.className = 'rank';
+    root.className = 'card rank-card';
     root.setAttribute('aria-label', 'OpenRouter 熱門模型');
-    const head = document.createElement('div');
-    head.className = 'rank-head';
-    const title = document.createElement('h3');
-    title.className = 'rank-title';
+    const head = document.createElement('header');
+    head.className = 'card-head';
+    const title = document.createElement('h2');
+    title.className = 'card-name';
     title.textContent = 'OpenRouter 熱門模型';
     const seg = document.createElement('div');
     seg.className = 'seg';
@@ -66,9 +66,9 @@ export function rankingsEl() {
     }
     head.append(title, seg);
     const cols = document.createElement('div');
-    cols.className = 'rank-cols';
+    cols.className = 'card-body rank-cols';
     const foot = document.createElement('p');
-    foot.className = 'rank-foot';
+    foot.className = 'card-meta rank-foot';
     root.append(head, cols, foot);
     renderRankings();
   }
