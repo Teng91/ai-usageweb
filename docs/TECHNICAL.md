@@ -209,7 +209,7 @@ flowchart LR
 | 層級 | 工具 | 內容 |
 | --- | --- | --- |
 | 單元／整合 | `node:test`（97 項） | 每家 adapter 用 fixture 驗證轉換、輪詢排程與退避、憑證加密與續期鎖、快照、排行解析、HTTP 路由、逾時分類、推播加密（RFC 8291 範例）與規則 |
-| 前端 smoke test | 自寫的 Chrome DevTools Protocol 腳本（34 項） | 用假資料起本機伺服器、開 headless Chrome 實際操作：卡片、排行與價格、亮暗與風格切換、四季地圖輪替、點怪物、跳數字、只看風景、手機版按鈕位置、通知設定對話框、沒有 JS 錯誤 |
+| 前端 smoke test | 自寫的 Chrome DevTools Protocol 腳本（37 項） | 用假資料起本機伺服器、開 headless Chrome 實際操作：卡片、排行與價格、亮暗與風格切換、四季地圖輪替、點怪物、跳數字、只看風景、手機版按鈕位置、通知設定對話框、冒險場景的多層遠景與日夜（月亮、小鎮燈火、彩虹）、沒有 JS 錯誤 |
 | CI | GitHub Actions | 推到 `main` 時兩種測試都通過才部署到 fly.io |
 
 前端 smoke test 同樣**不需要任何套件**：直接啟動本機的 Chrome／Edge，透過 Node 22 內建的 `WebSocket` 跟 DevTools Protocol 溝通。
@@ -248,7 +248,7 @@ flowchart LR
 | 後端程式 | 約 2,600 行 |
 | 前端 JavaScript | 約 1,500 行 |
 | CSS | 約 2,000 行（簡約、冒險卡片、場景三個檔） |
-| 測試 | 97 項單元／整合 + 34 項前端 smoke test |
+| 測試 | 97 項單元／整合 + 37 項前端 smoke test |
 | 原創像素圖 | 50 張（全部由產生器產生） |
 | 相依套件 | 0 |
 

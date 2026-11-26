@@ -141,6 +141,17 @@ async function main() {
     check('四張地圖建立', (await ev(`document.querySelectorAll('.scene .map').length`)) === 4);
     check('新原創怪物（紫光小菇靈／露珠水精靈）存在於場景', (await ev(`!!document.querySelector('.scene .mon-sporeling') && !!document.querySelector('.scene .mon-dewdrop')`)) === true);
     check('從春天開始', (await ev(`document.documentElement.dataset.map`)) === 'spring');
+    check('多層遠景：春天有遠丘、近丘、小鎮、彩虹與四朵柔和的雲', await ev(`(() => { const m = document.querySelector('.map.active'); const c = m.querySelectorAll('.sc-cloud'); return ['.sc-hills-far', '.sc-hills-near', '.sc-town', '.sc-town-lights', '.sc-rainbow'].every((s) => m.querySelector(s)) && c.length === 4 && getComputedStyle(c[0]).backgroundImage.includes('cloud-soft'); })()`));
+    // 白天／夜晚：月亮、小鎮燈火、彩虹、地圖本身不再整層調暗（燈火才亮得起來）
+    const themeBefore = await ev(`document.documentElement.dataset.theme || ''`);
+    const nightState = async (theme) => {
+      await ev(`document.documentElement.dataset.theme = '${theme}'`);
+      await sleep(150);
+      return ev(`['.sc-moon', '.map.active .sc-town-lights', '.map.active .sc-rainbow'].map((s) => getComputedStyle(document.querySelector(s)).display).concat(getComputedStyle(document.querySelector('.map.active')).filter).join()`);
+    };
+    check('白天：沒有月亮與燈火，有彩虹', (await nightState('light')) === 'none,none,block,none');
+    check('夜晚：月亮與小鎮燈火亮起、彩虹收起，地圖不整層調暗', (await nightState('dark')) === 'block,block,none,none');
+    await ev(themeBefore ? `document.documentElement.dataset.theme = '${themeBefore}'` : `delete document.documentElement.dataset.theme`);
     const maps = [];
     for (let i = 0; i < 4; i++) { await key('m'); await sleep(2300); maps.push(await ev(`document.documentElement.dataset.map`)); }
     check('M 依序切換四季並循環', maps.join(',') === 'summer,autumn,winter,spring', maps.join(','));
