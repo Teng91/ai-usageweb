@@ -42,6 +42,8 @@ export default {
   minIntervalSec: 60,
   // grok.com 登入後的 Cookie（至少要有 sso）；過期就重新貼一次
   credentialFields: ['cookie'],
+  // 還沒設定時卡片照樣顯示，放這段提示（其他家沒設定就整張不顯示）
+  setupNote: '還沒設定：用電腦到 grok.com 登入，F12 → Application → Cookies 複製 sso（和 sso-rw），設成 GROK_COOKIE',
   isConfigured(creds) {
     return Boolean(creds.grok?.cookie);
   },
