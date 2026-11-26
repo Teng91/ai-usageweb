@@ -354,13 +354,16 @@
   border: 3px solid var(--frame);
   border-radius: 14px;
   box-shadow: inset 0 0 0 2px var(--frame-inner), 0 5px 0 rgba(0, 0, 0, 0.22);
-  overflow: hidden;
 }
+
+/* 卡片不裁切：「快用完了！」泡泡在卡片上方，裁切會只剩下面的小尾巴；圓角改由標題列自己做 */
+[data-skin="adventure"] .sk-card { overflow: hidden; }
 
 [data-skin="adventure"] .card { transition: transform 0.15s, opacity 0.3s; }
 [data-skin="adventure"] .card:hover { border-color: var(--frame); transform: translateY(-1px); }
 
 [data-skin="adventure"] .card-head {
+  border-radius: 11px 11px 0 0; /* 卡片圓角 14px 減掉 3px 邊框 */
   background: linear-gradient(180deg, var(--head-1), var(--head-2));
   border-bottom: 3px solid var(--frame);
   padding-top: 8px;

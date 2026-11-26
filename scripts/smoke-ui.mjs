@@ -138,6 +138,7 @@ async function main() {
     await ev(`document.getElementById('skin-btn').click()`);
     await sleep(800);
     check('切到冒險風格', (await ev(`document.documentElement.dataset.skin`)) === 'adventure');
+    check('「快用完了！」泡泡完整露出在卡片上方（不被卡片裁掉）', await ev(`(() => { const card = document.querySelector('.card[data-id="codex"]'); const b = card.querySelector('.alert-bubble'); const r = b.getBoundingClientRect(); const c = card.getBoundingClientRect(); return getComputedStyle(b).display !== 'none' && r.bottom <= c.top + 4 && getComputedStyle(card).overflow === 'visible'; })()`));
     check('四張地圖建立', (await ev(`document.querySelectorAll('.scene .map').length`)) === 4);
     check('新原創怪物（紫光小菇靈／露珠水精靈）存在於場景', (await ev(`!!document.querySelector('.scene .mon-sporeling') && !!document.querySelector('.scene .mon-dewdrop')`)) === true);
     check('從春天開始', (await ev(`document.documentElement.dataset.map`)) === 'spring');
