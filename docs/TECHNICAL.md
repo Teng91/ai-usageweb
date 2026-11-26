@@ -1,7 +1,7 @@
 # AI 用量（ai-usageweb）技術文件
 
 > 一個打開就看得到「各家 AI 工具本期還剩多少額度」的 PWA。
-> 整合 Claude、Codex（ChatGPT）、Antigravity、GitHub Copilot 的用量，加上 OpenRouter 餘額與全站熱門模型排行。
+> 整合 Claude、Codex（ChatGPT）、Antigravity 的用量，加上 OpenRouter 餘額與全站熱門模型排行（GitHub Copilot 的 adapter 保留，預設不顯示）。
 
 - 網站：https://ai-usageweb.fly.dev
 - 原始碼：https://github.com/Teng91/ai-usageweb
@@ -36,7 +36,7 @@
 
 | 功能 | 說明 |
 | --- | --- |
-| 五家額度 | 每個額度窗口一條進度條、重置倒數；70%／90% 變色；上面四張卡片（三家額度＋OpenRouter 餘額）、下面熱門模型排行一整列（Copilot 目前用 `PROVIDERS` 關掉） |
+| 額度卡片 | 每個額度窗口一條進度條、重置倒數；70%／90% 變色；上面四張卡片（三家額度＋OpenRouter 餘額）、下面熱門模型排行一整列（Copilot 目前用 `PROVIDERS` 關掉） |
 | 即時更新 | SSE 推送；SSE 被企業 proxy 擋住時自動改成輪詢 |
 | OpenRouter 熱門模型 | 免費／付費各前 10 名（每天／每週／每月），付費附每百萬 token 價格 |
 | 訂閱到期日 | 手動設定，剩 30 天內提醒 |
@@ -89,7 +89,7 @@ flowchart LR
 | `server.js` | 組裝各元件、啟動與優雅關機 |
 | `src/routes.js` | 公開 API、SSE、管理 API、存取碼 |
 | `src/poller.js` | 觀看者計數、每家排程、退避、共用 in-flight Promise |
-| `src/providers/*.js` | 五家 adapter |
+| `src/providers/*.js` | 五家 adapter（Copilot 預設關閉） |
 | `src/credentials.js` | 環境變數 + 加密 volume、每家續期鎖 |
 | `src/snapshot.js` | 記憶體快照、原子寫檔 |
 | `src/rankings.js` | OpenRouter 排行（每小時最多抓一次、存檔格式版本） |

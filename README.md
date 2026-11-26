@@ -1,6 +1,6 @@
 # AI 用量（ai-usageweb）
 
-一個打開就看得到 AI 服務本期還剩多少的 PWA：**Claude Pro、Codex（ChatGPT）、Antigravity（卡片名稱是 Gemini）、GitHub Copilot** 的額度，加上 **OpenRouter** 餘額。電腦、手機瀏覽器都能看，手機可以「加到主畫面」當 App。
+一個打開就看得到 AI 服務本期還剩多少的 PWA：**Claude Pro、Codex（ChatGPT）、Antigravity（卡片名稱是 Gemini）** 的額度，加上 **OpenRouter** 餘額與全站熱門模型。GitHub Copilot 的 adapter 還在，預設不顯示。電腦、手機瀏覽器都能看，手機可以「加到主畫面」當 App。
 
 部署在 fly.io：**有人打開才喚醒機器**，開著時每 2 分鐘更新並用 SSE 推到畫面上；沒人看幾分鐘後機器自動暫停（suspend，下次喚醒只要幾百毫秒），不收 CPU／記憶體費用。
 
@@ -276,7 +276,7 @@ src/oauth.js              refresh_token 續期、先存再用、401 續期重試
 src/config.js             環境變數設定（含各家端點覆寫與手動設定值）
 src/errors.js             ProviderError（錯誤種類）、Retry-After 解析
 src/fsutil.js、log.js     原子寫檔、一行一筆 JSON log
-src/providers/*.js        五家 adapter（統一輸出 { plan, planExpiresAt?, windows, balance, note }）；顯示順序在 index.js
+src/providers/*.js        五家 adapter（Copilot 預設關閉）（統一輸出 { plan, planExpiresAt?, windows, balance, note }）；顯示順序在 index.js
 public/                   PWA（index.html、style.css、sw.js、manifest、icons）
 public/app.js             前端進入點：資料與連線（快照、SSE、SSE 被擋時改輪詢）
 public/ui/                前端模組：cards（卡片）、rankings（排行）、effects（冒險效果）、

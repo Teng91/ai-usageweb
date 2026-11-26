@@ -1,7 +1,7 @@
 {
   "name": "AI 用量",
   "short_name": "AI 用量",
-  "description": "Claude、Codex、Antigravity、Copilot 額度與 OpenRouter 餘額",
+  "description": "Claude、Codex、Antigravity 額度、OpenRouter 餘額與熱門模型",
   "lang": "zh-Hant",
   "start_url": "/",
   "scope": "/",

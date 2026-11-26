@@ -1,7 +1,7 @@
 # AGENTS.md — 給 AI 助手的專案規則
 
 ## 專案
-ai-usageweb：顯示 Claude、Codex、Antigravity、Copilot 額度與 OpenRouter 餘額的 PWA，部署在 fly.io，有人看才輪詢（每 2 分鐘），沒人看機器自動 suspend。另外有 OpenRouter 模型排行（`src/rankings.js`）。
+ai-usageweb：顯示 Claude、Codex、Antigravity 額度與 OpenRouter 餘額的 PWA（Copilot adapter 保留，預設不顯示），部署在 fly.io，有人看才輪詢（每 2 分鐘），沒人看機器自動 suspend。另外有 OpenRouter 模型排行（`src/rankings.js`）。
 
 ## 規則
 - **不加相依套件**。只用 Node 22 內建模組；前端是原生 JS（ES modules），不打包、不用框架。
