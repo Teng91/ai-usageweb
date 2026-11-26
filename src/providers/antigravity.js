@@ -43,7 +43,8 @@ export function parseModels(data) {
   }
 
   const windows = [];
-  if (groups.gemini) windows.push(toWindow('gemini', 'Gemini', groups.gemini));
+  // 卡片名稱已經是 Gemini，額度不必再寫一次「Gemini」
+  if (groups.gemini) windows.push(toWindow('gemini', '額度', groups.gemini));
   if (groups.other) windows.push(toWindow('claude_gpt', 'Claude/GPT', groups.other));
   return windows;
 }
@@ -57,8 +58,12 @@ function toWindow(id, label, g) {
 }
 
 const HOUR = 3600;
-const PERIODS = { '5h': [5 * HOUR, '5h', ''], weekly: [7 * 24 * HOUR, '每週', '_week'] };
+const PERIODS = { '5h': [5 * HOUR, '5 小時', ''], weekly: [7 * 24 * HOUR, '每週', '_week'] };
 const FAMILIES = [['gemini', 'Gemini'], ['claude_gpt', 'Claude/GPT']];
+// 卡片只顯示 Gemini 這組（跟 Claude 卡片一樣「5 小時」「每週」兩條）。
+// Claude/GPT 是 Antigravity 附送的小額度，一下就用完、每週大約只有兩個 5 小時，不顯示也不推播；
+// 要的話把 'claude_gpt' 加回來（標籤會是「Claude/GPT 5 小時」「Claude/GPT 每週」）。
+const SHOWN = ['gemini'];
 
 /**
  * retrieveUserQuotaSummary：每組模型（Gemini、Claude/GPT）的 5 小時與每週額度（付費方案才有）。
@@ -76,7 +81,7 @@ export function parseSummary(data) {
       const frac = Number(b?.remainingFraction);
       if (!p || b.remainingFraction === undefined || b.remainingFraction === null || !Number.isFinite(frac)) continue;
       (out[id] ||= {})[b.window] = {
-        id: id + p[2], label: `${name} ${p[1]}`, usedPct: usedOf(frac), resetsAt: toIso(b.resetTime), periodSec: p[0],
+        id: id + p[2], label: id === 'gemini' ? p[1] : `${name} ${p[1]}`, usedPct: usedOf(frac), resetsAt: toIso(b.resetTime), periodSec: p[0],
       };
     }
   }
@@ -84,12 +89,12 @@ export function parseSummary(data) {
 }
 
 /**
- * 合併兩個來源：每組先放 5 小時（summary 有就用 summary，否則用模型清單的），再放每週。
+ * 合併兩個來源：只取要顯示的組（SHOWN），先放 5 小時（summary 有就用 summary，否則用模型清單的），再放每週。
  * 模型清單的窗口若 5 小時內就重置，視為 5 小時額度（付費方案），標上長度。
  */
 export function mergeWindows(modelWins, summary, now = Date.now()) {
   const out = [];
-  for (const [id, name] of FAMILIES) {
+  for (const [id, name] of FAMILIES.filter(([fid]) => SHOWN.includes(fid))) {
     const s = summary[id] || {};
     let short = s['5h'];
     if (!short) {
@@ -97,7 +102,7 @@ export function mergeWindows(modelWins, summary, now = Date.now()) {
       if (m) {
         const left = Date.parse(m.resetsAt) - now;
         short = left > 0 && left <= 5 * HOUR * 1000 + 5 * 60_000
-          ? { ...m, label: `${name} 5h`, periodSec: 5 * HOUR }
+          ? { ...m, label: id === 'gemini' ? '5 小時' : `${name} 5 小時`, periodSec: 5 * HOUR }
           : m;
       }
     }

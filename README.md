@@ -230,7 +230,8 @@ curl.exe -X PUT https://ai-usageweb.fly.dev/admin/credentials/claude -H "Authori
 - **卡片分三區**：付費 AI 用量、免費 AI 用量（方案名稱有 Free 的）、OpenRouter（餘額＋熱門模型）。方案變了（例如升級 Pro）卡片會自動換區；寬螢幕上付費與免費兩區並排。
 - **每張卡片的額度**：
   - Claude：5 小時、每週（有的話再加每週 Opus／Sonnet）
-  - Gemini（Antigravity）：Gemini 與 Claude/GPT 兩組各有 5 小時與每週，共四條；三條以上排成兩欄（左 5 小時、右每週），卡片不會變高。免費方案只有模型清單給的兩條
+  - Gemini（Antigravity）：跟 Claude 一樣「5 小時」「每週」兩條，只算 Gemini 模型。Antigravity 附送的 Claude/GPT 額度很小（一下就用完、每週大約只有兩個 5 小時），不顯示也不推播；要看的話把 `src/providers/antigravity.js` 的 `SHOWN` 加回 `claude_gpt`。免費方案只有模型清單給的一條
+  - 一張卡片有三條以上額度時（例如 Claude 有每週 Opus／Sonnet）排成兩欄（左 5 小時、右每週），卡片不會變高
   - Codex：短窗與每週（依方案）
   - Copilot：Chat、程式碼補全、Premium 請求（顯示次數，每月重置）
   - 還沒用過、也沒有重置時間的額度（例如 Antigravity 剛重置、要用了第一次才開始計時）顯示「還沒用，用了才開始計時」
