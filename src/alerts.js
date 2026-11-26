@@ -2,6 +2,8 @@
 //  A. 用量警告：依最近的消耗速度，預估重置前會用完才通知；週／月額度另外在 80%、90% 各通知一次；95% 一定通知
 //  B. 快重置還有剩：只看週／月這種長週期，24h 剩 ≥40%、12h 剩 ≥20%、6h 剩 ≥10% 各提醒一次
 
+import { localParts, formatWhen, formatDuration } from './time.js';
+
 const MIN = 60_000;
 const HOUR = 60 * MIN;
 
@@ -63,18 +65,7 @@ export function inUse(h, now) {
   return cur - Math.min(...recent.map(([, p]) => p)) >= 1;
 }
 
-// ---------- 時間（依設定的時區） ----------
-
-/** 當地時間的各欄位；offsetMs = 當地時間 − UTC */
-export function localParts(ms, tz) {
-  const f = new Intl.DateTimeFormat('en-US', {
-    timeZone: tz, hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', weekday: 'short',
-  });
-  const o = Object.fromEntries(f.formatToParts(new Date(ms)).map((p) => [p.type, p.value]));
-  const y = Number(o.year), mo = Number(o.month), d = Number(o.day), hh = Number(o.hour), mm = Number(o.minute);
-  const offsetMs = Date.UTC(y, mo - 1, d, hh, mm) - Math.floor(ms / MIN) * MIN;
-  return { y, mo, d, hh, mm, weekday: o.weekday, offsetMs, dateKey: `${y}-${mo}-${d}` };
-}
+// ---------- 勿擾時段 ----------
 
 /** "00-08" → { start: 0, end: 8 }；格式不對就回 null（不設勿擾） */
 export function parseQuiet(raw) {
@@ -97,28 +88,6 @@ export function quietState(now, tz, quiet) {
   let end = midnight + quiet.end * HOUR;
   while (end <= now) end += 24 * HOUR;
   return { quiet: isQuiet, preQuiet, quietEndsAt: end };
-}
-
-const WEEK = { Sun: '日', Mon: '一', Tue: '二', Wed: '三', Thu: '四', Fri: '五', Sat: '六' };
-
-/** 重置時間的寫法：今天 16:00／明天 10:00／11/27（四）10:00 */
-export function formatWhen(ms, now, tz) {
-  const t = localParts(ms, tz);
-  const n = localParts(now, tz);
-  const hm = `${String(t.hh).padStart(2, '0')}:${String(t.mm).padStart(2, '0')}`;
-  const dayDiff = Math.round((Date.UTC(t.y, t.mo - 1, t.d) - Date.UTC(n.y, n.mo - 1, n.d)) / 86400000);
-  if (dayDiff === 0) return hm;
-  if (dayDiff === 1) return `明天 ${hm}`;
-  return `${t.mo}/${t.d}（${WEEK[t.weekday] || ''}）${hm}`;
-}
-
-export function formatDuration(ms) {
-  const m = Math.max(1, Math.round(ms / MIN));
-  if (m < 60) return `${m} 分鐘`;
-  const h = Math.floor(m / 60);
-  if (h < 10) return m % 60 ? `${h} 小時 ${m % 60} 分` : `${h} 小時`;
-  if (h < 48) return `${Math.round(m / 60)} 小時`;
-  return `${Math.round(m / 1440)} 天`;
 }
 
 const pctText = (v) => `${Math.round(v)}%`;

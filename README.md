@@ -260,11 +260,14 @@ server.js                 進入點：組裝各元件並啟動 HTTP 伺服器
 src/poller.js             觀看者計數、每家排程、退避、共用 in-flight Promise
 src/snapshot.js           記憶體快照、/data/snapshot.json 原子寫入
 src/routes.js             路由：公開 API、SSE、管理 API、ACCESS_KEY
+src/push-routes.js        推播 API：/api/push/tick 與裝置訂閱、設定、測試
 src/static.js             靜態檔（擋路徑穿越、快取標頭）
 src/respond.js            回應與驗證的共用小工具（JSON、安全標頭、固定時間比較）
 src/rankings.js           OpenRouter 模型排行（每小時最多抓一次）
 src/alerts.js             推播規則（用量警告、快重置還有剩、勿擾時段；純函式）
-src/push.js               推播服務：訂閱、樣本、去重、每日上限，存 /data/push.json
+src/time.js               時區換算與時間寫法（推播內容用）
+src/push.js               推播服務：樣本、判斷、去重、每日上限、發送
+src/push-store.js         推播存檔 /data/push.json：裝置訂閱、全站設定
 src/webpush.js            Web Push：VAPID 簽名與 RFC 8291 加密（只用內建 crypto）
 src/credentials.js        環境變數＋加密 volume、每家續期鎖
 src/sse.js                SSE 連線、ping、廣播、單一連線最長 30 分鐘、連線數上限

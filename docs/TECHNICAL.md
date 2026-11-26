@@ -62,7 +62,8 @@ flowchart LR
     P --> AD[providers/*.js]
     AD --> C[credentials.js<br/>AES-256-GCM]
     R --> RK[rankings.js]
-    P --> PS[push.js<br/>alerts.js]
+    P --> PS[push.js<br/>alerts.js / push-store.js]
+    R --> PR[push-routes.js] --> PS
     PS --> WP[webpush.js]
   end
   GAS[Google Apps Script<br/>每 15 分鐘] -- POST /api/push/tick --> R
@@ -88,13 +89,16 @@ flowchart LR
 | --- | --- |
 | `server.js` | 組裝各元件、啟動與優雅關機 |
 | `src/routes.js` | 公開 API、SSE、管理 API、存取碼 |
+| `src/push-routes.js` | 推播 API：`/api/push/tick` 與裝置訂閱、設定、測試 |
 | `src/poller.js` | 觀看者計數、每家排程、退避、共用 in-flight Promise |
 | `src/providers/*.js` | 四家 adapter |
 | `src/credentials.js` | 環境變數 + 加密 volume、每家續期鎖 |
 | `src/snapshot.js` | 記憶體快照、原子寫檔 |
 | `src/rankings.js` | OpenRouter 排行（每小時最多抓一次、存檔格式版本） |
-| `src/push.js` | 推播服務：訂閱、樣本、去重、每日上限，存 `/data/push.json` |
+| `src/push.js` | 推播服務：樣本、判斷、去重、每日上限、發送 |
+| `src/push-store.js` | 推播存檔 `/data/push.json`：裝置訂閱、全站設定、存檔格式版本 |
 | `src/alerts.js` | 推播規則（純函式）：用量警告、快重置還有剩、勿擾時段 |
+| `src/time.js` | 時區換算與時間寫法（「明天 10:00」「3 小時」） |
 | `src/webpush.js` | VAPID 簽名與 RFC 8291 內容加密 |
 | `src/sse.js` | SSE 連線、ping、廣播、單一連線最長時間與連線數上限 |
 | `src/config.js` | 環境變數設定，含各家端點覆寫與手動設定值（`CLAUDE_PLAN` 等每次直接讀） |

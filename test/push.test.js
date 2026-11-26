@@ -2,8 +2,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import { encryptPayload, vapidAuthorization, generateVapidKeys } from '../src/webpush.js';
-import { evaluateAlerts, mergeAlerts, recordSample, parseQuiet, quietState, formatWhen, formatDuration, localParts } from '../src/alerts.js';
-import { PushService, validSubscription } from '../src/push.js';
+import { evaluateAlerts, mergeAlerts, recordSample, parseQuiet, quietState } from '../src/alerts.js';
+import { formatWhen, formatDuration, localParts } from '../src/time.js';
+import { PushService } from '../src/push.js';
+import { validSubscription } from '../src/push-store.js';
 import { tmpDir } from './helpers.js';
 
 const TZ = 'Asia/Taipei';
@@ -215,7 +217,7 @@ function service({ viewers = 0, send } = {}) {
 
 test('PushService：送出、去重、prefs 關掉就不送', async () => {
   const { svc, calls, feed, advance } = service();
-  svc.subscribe(SUB, { reset: false });
+  svc.store.subscribe(SUB, { reset: false });
   feed(96);
   assert.equal(await svc.evaluate(), 1);
   assert.equal(calls[0].payload.tag, 'usage');
@@ -223,18 +225,18 @@ test('PushService：送出、去重、prefs 關掉就不送', async () => {
   advance(2 * MIN);
   feed(97);
   assert.equal(await svc.evaluate(), 0, '同一週期不重發');
-  svc.subscribe(SUB, { usage: false });
-  assert.deepEqual(svc.prefs(SUB.endpoint), { usage: false, reset: false });
+  svc.store.subscribe(SUB, { usage: false });
+  assert.deepEqual(svc.store.prefs(SUB.endpoint), { usage: false, reset: false });
 });
 
 test('PushService：網頁開著時先不推也不記下，關掉後照樣推播', async () => {
   let viewers = 1;
   const { svc, calls, feed } = service({ viewers: () => viewers });
-  svc.subscribe(SUB);
+  svc.store.subscribe(SUB);
   feed(96);
   assert.equal(await svc.evaluate(), 0);
   assert.equal(calls.length, 0);
-  assert.equal(Object.keys(svc.state.sent).length, 0);
+  assert.equal(Object.keys(svc.store.state.sent).length, 0);
   viewers = 0;
   assert.equal(await svc.evaluate(), 1);
   assert.equal(calls.length, 1);
@@ -242,15 +244,15 @@ test('PushService：網頁開著時先不推也不記下，關掉後照樣推播
 
 test('PushService：訂閱失效（410）就刪掉', async () => {
   const { svc, feed } = service({ send: async () => ({ ok: false, gone: true, status: 410 }) });
-  svc.subscribe(SUB);
+  svc.store.subscribe(SUB);
   feed(96);
   await svc.evaluate();
-  assert.equal(svc.state.subs.length, 0);
+  assert.equal(svc.store.state.subs.length, 0);
 });
 
 test('PushService：每家每天最多 4 則', async () => {
   const { svc, calls, feed, advance } = service();
-  svc.subscribe(SUB);
+  svc.store.subscribe(SUB);
   for (let i = 0; i < 6; i++) {
     feed(96, 2 * HOUR); // 每輪都是新週期（重置時間差很多）
     await svc.evaluate();
@@ -261,12 +263,12 @@ test('PushService：每家每天最多 4 則', async () => {
 
 test('PushService：被每日上限擋下的不算發過，隔天還會再判斷', async () => {
   const { svc, calls, feed, advance } = service();
-  svc.subscribe(SUB);
+  svc.store.subscribe(SUB);
   const day = localParts(NOON, TZ).dateKey;
-  svc.state.daily.claude = { day, count: 4 };
+  svc.store.state.daily.claude = { day, count: 4 };
   feed(96, 30 * HOUR);
   assert.equal(await svc.evaluate(), 0);
-  assert.equal(Object.keys(svc.state.sent).length, 0, '沒送出就不記下');
+  assert.equal(Object.keys(svc.store.state.sent).length, 0, '沒送出就不記下');
   advance(20 * HOUR); // 隔天 08:00，勿擾結束
   feed(97, 10 * HOUR);
   assert.equal(await svc.evaluate(), 1);
@@ -277,26 +279,26 @@ test('PushService：送失敗不算發過也不算次數，下次再試', async 
   let fail = true;
   const sent = [];
   const { svc, feed, advance } = service({ send: async (sub, payload) => (fail ? { ok: false, gone: false, status: 500 } : (sent.push(payload), { ok: true, status: 201 })) });
-  svc.subscribe(SUB);
+  svc.store.subscribe(SUB);
   feed(96);
   assert.equal(await svc.evaluate(), 0);
-  assert.equal(svc.state.daily.claude, undefined);
+  assert.equal(svc.store.state.daily.claude, undefined);
   fail = false;
   advance(2 * MIN);
   feed(96);
   assert.equal(await svc.evaluate(), 1);
   assert.equal(sent.length, 1);
-  assert.equal(svc.state.daily.claude.count, 1);
+  assert.equal(svc.store.state.daily.claude.count, 1);
 });
 
 test('PushService：沒有訂閱要這一類 → 記下但不算次數', async () => {
   const { svc, calls, feed } = service();
-  svc.subscribe(SUB, { usage: false });
+  svc.store.subscribe(SUB, { usage: false });
   feed(96);
   assert.equal(await svc.evaluate(), 0);
   assert.equal(calls.length, 0);
-  assert.ok(Object.keys(svc.state.sent).length > 0);
-  assert.equal(svc.state.daily.claude, undefined);
+  assert.ok(Object.keys(svc.store.state.sent).length > 0);
+  assert.equal(svc.store.state.daily.claude, undefined);
 });
 
 test('自訂門檻與勿擾時段會用在判斷上', () => {
@@ -316,10 +318,10 @@ test('自訂門檻與勿擾時段會用在判斷上', () => {
 
 test('PushService：網頁上改的設定蓋過預設，沒改過用 PUSH_QUIET', () => {
   const { svc } = service();
-  assert.deepEqual(svc.settings(), { quiet: QUIET, thresholds: [90, 80] });
-  assert.deepEqual(svc.updateSettings({ thresholds: [75] }), { quiet: QUIET, thresholds: [75] });
-  assert.equal(svc.updateSettings({ quiet: { start: 25, end: 1 } }), null);
-  assert.deepEqual(svc.settings().thresholds, [75], '不合格的不動原本的');
+  assert.deepEqual(svc.store.settings(), { quiet: QUIET, thresholds: [90, 80] });
+  assert.deepEqual(svc.store.updateSettings({ thresholds: [75] }), { quiet: QUIET, thresholds: [75] });
+  assert.equal(svc.store.updateSettings({ quiet: { start: 25, end: 1 } }), null);
+  assert.deepEqual(svc.store.settings().thresholds, [75], '不合格的不動原本的');
 });
 
 test('validSubscription 擋掉不合格的訂閱', () => {

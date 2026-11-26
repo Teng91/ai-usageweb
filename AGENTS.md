@@ -16,9 +16,9 @@ ai-usageweb：顯示 Claude、Codex、Antigravity 額度與 OpenRouter 餘額的
 - 環境變數只在 `src/config.js` 讀（各家端點覆寫在 `endpoints`），adapter 不直接讀 `process.env`。
 - 卡片順序只在 `src/providers/index.js` 定義，前端照快照順序；不要在前端再寫一份。
 - `/healthz` 與 `/api/push/tick` 不能算「有人在看」。
-- 推播：規則在 `src/alerts.js`（純函式）、服務在 `src/push.js`、加密在 `src/webpush.js`。推播內容只放百分比與重置時間。改規則要更新 `test/push.test.js` 與 README 的規則表。之後要做的事記在 `docs/TODO.md`。
+- 推播：規則在 `src/alerts.js`（純函式）、判斷與發送在 `src/push.js`、訂閱與設定的存檔在 `src/push-store.js`、API 在 `src/push-routes.js`、加密在 `src/webpush.js`、時間寫法在 `src/time.js`。推播內容只放百分比與重置時間。改規則要更新 `test/push.test.js` 與 README 的規則表。之後要做的事記在 `docs/TODO.md`。
 - 推播的排程喚醒主要靠 Google Apps Script（`google_apps_script/Code.gs`，repo 裡只是副本），GitHub Actions 的 `push-tick.yml` 是備援。前端不保存推播密碼。
-- 存檔格式（例如 `rankings.json`）改了欄位就把該檔的 `FORMAT_VERSION` +1，讓舊檔被丟掉。例外：`push.json` 只新增選填欄位（例如 `settings`）時不要升版本，升了會把訂閱一起丟掉，手機要重新開啟通知。
+- 存檔格式（例如 `rankings.json`）改了欄位就把該檔的 `FORMAT_VERSION` +1，讓舊檔被丟掉。例外：`push.json`（版本在 `push-store.js`） 只新增選填欄位（例如 `settings`）時不要升版本，升了會把訂閱一起丟掉，手機要重新開啟通知。
 
 ## 前端
 - 改了 `public/` 的檔案要把 `public/sw.js` 的 `CACHE` 版本號 +1；新增要離線可用的檔案要加進 `SHELL`。新的 `/api/*` 不經 service worker（加進 `sw.js` 的略過清單）；`/api/usage`、`/api/rankings` 走 network-first，離線時給上次存下的；前端要讀上次存下的就帶 `x-cache-only` 標頭請求，不要在前端直接開 Cache Storage（快取名稱只寫在 `sw.js`）。
@@ -31,7 +31,7 @@ ai-usageweb：顯示 Claude、Codex、Antigravity 額度與 OpenRouter 餘額的
 - 用 Node 腳本改檔案時，`String.replace` 的取代字串裡 `$` 有特殊意義（`` $` `` 會插入比對前的整段文字），含 `$` 的內容改用 `split().join()` 或直接寫檔。
 
 ## 測試
-- 後端分工：`server.js` 只組裝、`src/routes.js` 路由、`src/static.js` 靜態檔、`src/respond.js` 回應小工具。新 API 加在 `routes.js`。
+- 後端分工：`server.js` 只組裝、`src/routes.js` 路由、`src/static.js` 靜態檔、`src/respond.js` 回應小工具。新 API 加在 `routes.js`（推播的加在 `push-routes.js`）。
 - 推到 `main` 會跑 `npm test` 與 `npm run test:ui`，兩個都過才部署。
 - 改 adapter 時一併更新 `test/fixtures/` 與 `test/providers.test.js`，`npm test` 必須通過（自動部署前也會跑）。
 - 介面文字用繁體中文。
