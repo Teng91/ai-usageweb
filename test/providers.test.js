@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { fixture, mockFetch, ctxFor, tmpDir } from './helpers.js';
 import openrouter from '../src/providers/openrouter.js';
 import copilot, { parseCopilot } from '../src/providers/copilot.js';
+import grok, { parseGrok } from '../src/providers/grok.js';
 import claude, { parseClaude, parsePlanExpiry } from '../src/providers/claude.js';
 import codex, { parseCodex } from '../src/providers/codex.js';
 import { createAntigravity, parseModels, parseSummary, mergeWindows, tierName } from '../src/providers/antigravity.js';
@@ -436,4 +437,21 @@ test('antigravity: 拿到新 refresh token 但存不進去 → upstream，不使
 
 test('antigravity: 沒有 client id/secret 視為未設定', () => {
   assert.equal(antigravity.isConfigured({ antigravity: { refreshToken: 'rt' } }), false);
+});
+
+// ---------- Grok ----------
+test('grok: /rest/rate-limits → 已用百分比、窗口長度；Cookie 照原樣帶上', async () => {
+  mock = mockFetch([['/rest/rate-limits', () => ({ json: fixture('grok-rate-limits.json') })]]);
+  const r = await grok.fetch(ctxFor({ grok: { cookie: 'sso=abc; sso-rw=def' } }));
+  assert.equal(r.plan, 'Free');
+  assert.deepEqual(r.windows, [{ id: 'chat', label: '2 小時', usedPct: 25, resetsAt: null, used: 5, limit: 20, periodSec: 7200 }]);
+  assert.equal(mock.calls[0].headers.cookie, 'sso=abc; sso-rw=def');
+  assert.equal(mock.calls[0].method, 'POST');
+});
+
+test('grok: 沒有次數（付費用量池）→ note；沒給窗口長度 → 標「額度」', () => {
+  assert.equal(parseGrok({ windowSizeSeconds: 0 }).windows.length, 0);
+  assert.match(parseGrok({}).note, /免費方案/);
+  assert.deepEqual(parseGrok({ remainingQueries: 10, totalQueries: 10 }).windows[0], { id: 'chat', label: '額度', usedPct: 0, resetsAt: null, used: 0, limit: 10 });
+  assert.equal(grok.isConfigured({ grok: { cookie: '' } }), false);
 });

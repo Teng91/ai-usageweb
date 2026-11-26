@@ -21,7 +21,7 @@
                           poller.js（觀看者計數、每家排程、退避）
                               │ 有人看才跑，每 2 分鐘
                               ▼
-         providers/{claude,codex,antigravity,copilot,openrouter}.js
+         providers/{claude,codex,antigravity,grok,copilot,openrouter}.js
                               │ 續期時
                               ▼
                 credentials.js（環境變數＋AES-256-GCM 加密 volume）
@@ -168,6 +168,7 @@ curl.exe -X PUT https://ai-usageweb.fly.dev/admin/credentials/claude -H "Authori
 | `codex` | **`accessToken` 或 `refreshToken`**、`expiresAt`、`accountId` |
 | `antigravity` | **`refreshToken`、`clientId`、`clientSecret`**、`projectId` |
 | `copilot` | **`token`** |
+| `grok` | **`cookie`**（grok.com 登入後的 Cookie 標頭整串；過期要重貼） |
 | `openrouter` | **`apiKey`** |
 
 - 關機（例如部署）時會等正在跑的抓取結束才退出（最多 12 秒，`fly.toml` 的 `kill_timeout` 是 15 秒），續期拿到的新 refresh token 一定會先寫進 volume。
