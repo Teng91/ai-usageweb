@@ -120,7 +120,8 @@ export function createHandler({ cfg, poller, hub, snapshot, creds, providers, ra
     const m = p.match(/^\/admin\/credentials\/([a-z]+)$/);
     if (m && req.method === 'PUT') {
       const id = m[1];
-      if (!providers.some((x) => x.id === id)) return sendJson(res, 404, { error: 'unknown provider' });
+      const prov = providers.find((x) => x.id === id);
+      if (!prov) return sendJson(res, 404, { error: 'unknown provider' });
       let body;
       try {
         body = JSON.parse(await readBody(req, 64 * 1024));
@@ -130,6 +131,8 @@ export function createHandler({ cfg, poller, hub, snapshot, creds, providers, ra
       if (!body || typeof body !== 'object' || Array.isArray(body)) {
         return sendJson(res, 400, { error: 'body 必須是 JSON 物件' });
       }
+      const problem = checkCredentialBody(prov, body);
+      if (problem) return sendJson(res, 400, problem);
       await creds.replace(id, body);
       poller.credentialsChanged(id);
       logInfo('credentials replaced', { provider: id });
@@ -153,4 +156,18 @@ export function createHandler({ cfg, poller, hub, snapshot, creds, providers, ra
   }
 
   return handle;
+}
+
+/**
+ * 管理 API 換憑證：只接受這家認得的欄位（值要是字串或數字），而且換完要能用。
+ * 打錯欄位名稱（例如 refresh_token）會直接回 400，不會默默把那一家變成未設定。不回傳任何值。
+ */
+export function checkCredentialBody(prov, body) {
+  const allowed = prov.credentialFields || [];
+  const unknown = Object.keys(body).filter((k) => !allowed.includes(k));
+  if (unknown.length) return { error: `不認得的欄位：${unknown.join(', ')}`, allowed };
+  const badType = Object.keys(body).filter((k) => !['string', 'number'].includes(typeof body[k]));
+  if (badType.length) return { error: `欄位的值要是字串或數字：${badType.join(', ')}`, allowed };
+  if (!prov.isConfigured({ [prov.id]: body })) return { error: '缺少必要欄位，換上去也不能用', allowed };
+  return null;
 }

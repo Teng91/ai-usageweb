@@ -43,12 +43,14 @@ Google Apps Script 每 15 分鐘 ──POST /api/push/tick──▶ 機器沒人
 | `POST /api/push/status`、`/prefs`、`/unsubscribe`、`/test` | 查狀態、改通知種類（body 加 `prefs`）、退訂、送測試通知（body：`endpoint`；測試 30 秒一次） | 知道自己的 endpoint |
 | `POST /api/push/tick` | 排程喚醒：各家抓一輪並判斷推播，不算「有人在看」 | `PUSH_TICK_TOKEN` |
 | `POST /admin/refresh` | 立刻重抓（仍受每家最短間隔限制） | `ADMIN_TOKEN` |
-| `PUT /admin/credentials/:provider` | 替換某一家的憑證（JSON body） | `ADMIN_TOKEN` |
+| `PUT /admin/credentials/:provider` | 替換某一家的憑證（JSON body，只收該家認得的欄位） | `ADMIN_TOKEN` |
 | `GET /admin/status` | 各家錯誤種類、下次抓取、token 到期時間（不含 token） | `ADMIN_TOKEN` |
 
 SSE 被擋時（例如公司 proxy 會卡住串流），前端 6 秒內沒連上就改成每 30 秒輪詢 `/api/usage`，右上角顯示「自動更新」。
 
 同時最多 20 條 SSE 連線（`SSE_MAX_CLIENTS`），滿了回 503，前端一樣改用輪詢。
+
+Cloudflare 判斷只看 HTML 挑戰頁或 `cf-mitigated` 標頭；一般 JSON 的 403 照「403 沒有權限」處理。
 
 錯誤處理：429 依 `Retry-After` 或 240→480→最多 900 秒退避（卡片保留舊數字並標「更新放慢」）；401 先續期再重試一次；續期失敗標「需要重新登入」並停止那一家；403／Cloudflare 這次觀看期間不再試；網路／5xx 退避最多 300 秒；格式變了每 300 秒試一次。
 
@@ -157,6 +159,19 @@ fly deploy
 ```powershell
 curl.exe -X PUT https://ai-usageweb.fly.dev/admin/credentials/claude -H "Authorization: Bearer $env:ADMIN_TOKEN" -H "Content-Type: application/json" -d '{\"accessToken\":\"...\",\"refreshToken\":\"...\",\"expiresAt\":0}'
 ```
+
+管理 API 只收各家認得的欄位，打錯名稱（例如 `refresh_token`）或少了必要欄位會回 400 並列出可用欄位，原本的憑證不會被動到：
+
+| 服務 | 欄位（粗體是必要的） |
+| --- | --- |
+| `claude` | **`accessToken` 或 `refreshToken`**、`expiresAt` |
+| `codex` | **`accessToken` 或 `refreshToken`**、`expiresAt`、`accountId` |
+| `antigravity` | **`refreshToken`、`clientId`、`clientSecret`**、`projectId` |
+| `copilot` | **`token`** |
+| `openrouter` | **`apiKey`** |
+
+- 關機（例如部署）時會等正在跑的抓取結束才退出（最多 12 秒，`fly.toml` 的 `kill_timeout` 是 15 秒），續期拿到的新 refresh token 一定會先寫進 volume。
+- 沒設 `CREDENTIALS_KEY` 時續期後的 token 只存在記憶體，log 會寫「只存在記憶體」提醒。
 
 ### 不想完全公開
 

@@ -74,6 +74,21 @@ test('credentials: CLAUDE_PLAN 不放進憑證', async () => {
   assert.equal(s.get('claude').plan, undefined);
 });
 
+test('credentials: 沒設金鑰時，續期的 log 說「只存在記憶體」', async () => {
+  const lines = [];
+  const orig = process.stdout.write;
+  process.stdout.write = (s) => { lines.push(String(s)); return true; };
+  try {
+    const s = await new CredentialStore({ dataDir: tmpDir(), keyB64: '', env: { CLAUDE_REFRESH_TOKEN: 'r' } }).load();
+    await s.save('claude', { refreshToken: 'r2' });
+  } finally {
+    process.stdout.write = orig;
+  }
+  const log = lines.join('');
+  assert.ok(log.includes('只存在記憶體'));
+  assert.ok(!log.includes('憑證已續期並寫入'));
+});
+
 test('credentials: 錯的金鑰長度直接報錯', () => {
   assert.throws(() => new CredentialStore({ dataDir: tmpDir(), keyB64: 'c2hvcnQ=', env: {} }));
 });
@@ -274,6 +289,27 @@ test('poller: 抓取中再觸發共用同一個 Promise', async () => {
   await a;
   assert.equal(n, 1);
   void p;
+});
+
+test('poller: drain 會等正在跑的抓取結束（關機時不丟掉續期結果）', async () => {
+  let done = false;
+  const { poller } = makePoller({ now: () => 1_000_000, fetchImpl: () => new Promise((r) => setTimeout(() => { done = true; r({ windows: [] }); }, 30)) });
+  poller.run(poller.providers[0]);
+  await poller.drain();
+  assert.equal(done, true);
+  await poller.drain(); // 沒有在跑的也不會卡住
+});
+
+test('http: Cloudflare 只認 HTML 挑戰頁或 cf-mitigated，JSON 的 403 照一般 403 處理', async () => {
+  const original = globalThis.fetch;
+  try {
+    globalThis.fetch = async () => new Response('{"error":"cf-like text"}', { status: 403, headers: { 'content-type': 'application/json' } });
+    await assert.rejects(requestJson('https://example.test/'), (e) => e.kind === 'forbidden' && e.message === '403 沒有權限');
+    globalThis.fetch = async () => new Response('{}', { status: 403, headers: { 'content-type': 'application/json', 'cf-mitigated': 'challenge' } });
+    await assert.rejects(requestJson('https://example.test/'), (e) => e.message === '被 Cloudflare 擋下');
+  } finally {
+    globalThis.fetch = original;
+  }
 });
 
 test('sse: 連線數到上限就回 503，不算觀看者', async () => {

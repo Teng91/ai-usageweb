@@ -207,6 +207,7 @@ export function createAntigravity() {
     id: 'antigravity',
     name: 'Gemini',
     minIntervalSec: 60,
+    credentialFields: ['refreshToken', 'clientId', 'clientSecret', 'projectId'],
     isConfigured(creds) {
       const c = creds.antigravity;
       return Boolean(c?.refreshToken && c?.clientId && c?.clientSecret);

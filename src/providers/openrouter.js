@@ -33,6 +33,7 @@ export default {
   id: 'openrouter',
   name: 'OpenRouter',
   minIntervalSec: 60,
+  credentialFields: ['apiKey'],
   isConfigured(creds) {
     return Boolean(creds.openrouter?.apiKey);
   },

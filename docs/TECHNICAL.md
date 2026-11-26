@@ -152,6 +152,8 @@ flowchart LR
 - **先寫後用**：拿到新的 refresh token 時，先成功寫入 volume 才開始使用；續期包在每家各自的鎖（`withLock`）裡，避免同時續期造成 token 失效。
 - **加密保存**：volume 上的憑證用 AES-256-GCM 加密，金鑰只存在 fly secrets。
 - **讀取優先順序**：volume ＞ 環境變數，重新部署不會把已輪換的 token 蓋回舊值；手動設定的值（方案名稱、到期日）則直接讀環境變數。
+- **關機不丟 token**：收到 SIGTERM 時先等正在跑的抓取結束（`poller.drain()`），續期拿到的新 refresh token 寫進 volume 才退出；`fly.toml` 的 `kill_timeout` 調成 15 秒，比請求逾時長。
+- **管理 API 檢查欄位**：每家 adapter 宣告 `credentialFields`，換憑證時不認得的欄位、型別不對或換完不能用都回 400，不會默默把那一家變成未設定。
 - **不外流**：log、錯誤訊息、API 回應只留服務名、狀態碼與簡短中文說明；log 的路徑會去掉 query（裡面可能有存取碼）。
 
 ### 5.3 即時更新與企業網路
@@ -201,7 +203,7 @@ flowchart LR
 
 | 層級 | 工具 | 內容 |
 | --- | --- | --- |
-| 單元／整合 | `node:test`（90 項） | 每家 adapter 用 fixture 驗證轉換、輪詢排程與退避、憑證加密與續期鎖、快照、排行解析、HTTP 路由、逾時分類、推播加密（RFC 8291 範例）與規則 |
+| 單元／整合 | `node:test`（93 項） | 每家 adapter 用 fixture 驗證轉換、輪詢排程與退避、憑證加密與續期鎖、快照、排行解析、HTTP 路由、逾時分類、推播加密（RFC 8291 範例）與規則 |
 | 前端 smoke test | 自寫的 Chrome DevTools Protocol 腳本（32 項） | 用假資料起本機伺服器、開 headless Chrome 實際操作：卡片、排行與價格、亮暗與風格切換、四季地圖輪替、點怪物、跳數字、只看風景、手機版按鈕位置、通知設定對話框、沒有 JS 錯誤 |
 | CI | GitHub Actions | 推到 `main` 時兩種測試都通過才部署到 fly.io |
 
@@ -226,6 +228,7 @@ flowchart LR
 | iPhone 上「只看風景」回不去 | 返回按鈕被狀態列蓋住 | 用 `env(safe-area-inset-*)` 避開，手機版移到下方，並支援點兩下背景返回 |
 | 沒開網頁時幾乎收不到推播 | GitHub Actions 的 `schedule` 15 小時只跑了 1 次 | 改由 Google Apps Script 觸發器每 15 分鐘打 `/api/push/tick`，GitHub 排程留著當備援 |
 | 第一次打開網頁會自己重整一次 | Service worker 第一次接手（`clients.claim`）也會觸發 `controllerchange` | 只有按了「重新載入」才重整 |
+| 部署時剛好在續期可能要重新登入 | 關機沒等抓取結束，新 refresh token 還沒寫進 volume 就被結束，舊的已失效 | 關機先 `drain()`，`kill_timeout` 改 15 秒 |
 | 平台上的怪物被卡片擋住 | 位置用畫面寬度百分比計算 | 改用卡片區兩側剩餘寬度計算，放不下就隱藏 |
 
 ## 9. 專案數據
@@ -235,7 +238,7 @@ flowchart LR
 | 後端程式 | 約 2,600 行 |
 | 前端 JavaScript | 約 1,500 行 |
 | CSS | 約 2,000 行（簡約、冒險卡片、場景三個檔） |
-| 測試 | 90 項單元／整合 + 32 項前端 smoke test |
+| 測試 | 93 項單元／整合 + 32 項前端 smoke test |
 | 原創像素圖 | 32 張（全部由產生器產生） |
 | 相依套件 | 0 |
 

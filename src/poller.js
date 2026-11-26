@@ -83,6 +83,11 @@ export class Poller {
     this.tick();
   }
 
+  /** 等正在跑的抓取結束（關機用：續期拿到的新 token 要寫進 volume 才能結束，不然會遺失） */
+  async drain() {
+    await Promise.allSettled(Object.values(this.state).map((s) => s.inflight).filter(Boolean));
+  }
+
   stop() {
     if (!this.running) return;
     clearInterval(this.timer);

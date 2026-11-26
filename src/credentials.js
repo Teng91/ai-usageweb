@@ -142,7 +142,8 @@ export class CredentialStore {
       throw err;
     }
     // 只記服務名稱，方便從 log 確認伺服器有自己續期（不記 token）
-    logInfo('憑證已續期並寫入', { provider: id });
+    if (this.key) logInfo('憑證已續期並寫入', { provider: id });
+    else logWarn('憑證已續期，但沒設 CREDENTIALS_KEY，只存在記憶體（重開機會遺失）', { provider: id });
   }
 
   /** 管理 API：整份替換某一家的憑證（視為新登入）；正在續期就等它結束，免得續期結果蓋掉新憑證 */

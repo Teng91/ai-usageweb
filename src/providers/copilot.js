@@ -87,6 +87,7 @@ export default {
   id: 'copilot',
   name: 'GitHub Copilot',
   minIntervalSec: 60,
+  credentialFields: ['token'],
   isConfigured(creds) {
     return Boolean(creds.copilot?.token);
   },

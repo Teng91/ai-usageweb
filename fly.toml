@@ -1,5 +1,7 @@
 app = "ai-usageweb"
 primary_region = "sin"
+# 關機時要等正在跑的抓取（含續期寫檔）結束；預設 5 秒比請求逾時（10 秒）短
+kill_timeout = "15s"
 
 [build]
   dockerfile = "Dockerfile"

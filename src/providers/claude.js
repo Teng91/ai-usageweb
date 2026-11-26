@@ -70,6 +70,8 @@ export default {
   id: 'claude',
   name: 'Claude',
   minIntervalSec: 60,
+  // 管理 API 換憑證時接受的欄位
+  credentialFields: ['accessToken', 'refreshToken', 'expiresAt'],
   isConfigured(creds) {
     // refresh token（獨立登入）或 setup-token 產生的長效 token 都可以
     return Boolean(creds.claude?.refreshToken || creds.claude?.accessToken);

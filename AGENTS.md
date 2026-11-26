@@ -9,6 +9,7 @@ ai-usageweb：顯示 Claude、Codex、Antigravity、Copilot 額度與 OpenRouter
 - 公開 API 只回傳百分比、剩餘量、重置時間；不回傳 email、帳號 ID、組織名。排行也一樣只存公開資料。
 - repo 是公開的：不要提交 `.env*`、`server-*`、`*.enc`、`data/`。
 - 每家 adapter 輸出統一格式 `{ plan, planExpiresAt?, windows: [{ id, label, usedPct, resetsAt, periodSec?, used?, limit? }], balance, note }`；`usedPct` 一律是「已用」0–100。前端只認這個格式。`periodSec` 是窗口長度（秒），推播靠它分辨週／月額度，知道就要填。
+- 每家 adapter 要宣告 `credentialFields`（管理 API 換憑證時接受的欄位）；憑證多了新欄位就加進去。
 - 續期拿到新 refresh token 時：**先 `await saveCreds()` 成功才使用**；續期包在 `withLock` 裡。
 - 對各家的請求不論幾個人在看都不超過每家每 `minIntervalSec` 一次；不要新增公開的「立刻重抓」。OpenRouter 排行最多每小時抓一次。
 - 手動設定的值（`CLAUDE_PLAN`、`CLAUDE_PLAN_EXPIRES_AT`）透過 `config.js` 的 `manual` 每次直接讀環境變數，不要放進憑證：volume 裡的憑證會蓋過環境變數。

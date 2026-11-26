@@ -110,6 +110,18 @@ test('PUT /admin/credentials/:provider 替換憑證', async () => {
   });
   assert.equal(res.status, 200);
   assert.equal(app.creds.get('copilot').token, 'gho_new');
+  const put = (body) => realFetch(`${base}/admin/credentials/copilot`, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${ADMIN}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  // 打錯欄位名稱：回 400 並列出可用欄位，原本的憑證不動
+  const typo = await put({ tokn: 'gho_typo' });
+  assert.equal(typo.status, 400);
+  assert.deepEqual((await typo.json()).allowed, ['token']);
+  assert.equal(app.creds.get('copilot').token, 'gho_new');
+  assert.equal((await put({})).status, 400, '缺少必要欄位');
+  assert.equal((await put({ token: { x: 1 } })).status, 400, '值不是字串或數字');
   const bad = await realFetch(`${base}/admin/credentials/nope`, {
     method: 'PUT',
     headers: { Authorization: `Bearer ${ADMIN}` },

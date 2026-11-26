@@ -32,8 +32,8 @@ export async function requestJson(url, { method = 'GET', headers = {}, body, sig
   }
   const contentType = res.headers.get('content-type') || '';
   const looksHtml = contentType.includes('text/html') || /^\s*</.test(text);
-  const cloudflare = looksHtml && /cloudflare|cf-chl|cf-ray|challenge-platform/i.test(text)
-    || (res.status === 403 && /cf-/i.test(text))
+  // 只認 HTML 挑戰頁或 cf-mitigated 標頭；JSON 回應裡剛好有「cf-」字樣不算
+  const cloudflare = (looksHtml && /cloudflare|cf-chl|cf-ray|challenge-platform/i.test(text))
     || res.headers.get('cf-mitigated') === 'challenge';
 
   if (cloudflare) {

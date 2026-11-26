@@ -79,6 +79,8 @@ export async function createApp(opts = {}) {
   async function shutdown() {
     poller.stop();
     hub.closeAll();
+    // 正在抓的等它結束：Claude／Codex 續期拿到的新 refresh token 一定要寫進 volume，舊的已經失效
+    await poller.drain();
     await snapshot.save();
     await snapshot.flush();
     await push.flush();
@@ -104,7 +106,8 @@ if (isMain) {
     if (closing) return;
     closing = true;
     logInfo('shutting down', { signal: sig });
-    const force = setTimeout(() => process.exit(0), 8000);
+    // 抓取最多約 10 秒逾時；fly.toml 的 kill_timeout 是 15 秒，這裡 12 秒後強制結束
+    const force = setTimeout(() => process.exit(0), 12_000);
     force.unref();
     try { await app.shutdown(); } finally { process.exit(0); }
   };

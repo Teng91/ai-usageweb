@@ -85,6 +85,7 @@ export default {
   id: 'codex',
   name: 'Codex',
   minIntervalSec: 60,
+  credentialFields: ['accessToken', 'refreshToken', 'expiresAt', 'accountId'],
   isConfigured(creds) {
     return Boolean(creds.codex?.refreshToken || creds.codex?.accessToken);
   },
