@@ -335,19 +335,6 @@
 [data-skin="adventure"] .cards { gap: 16px; margin-top: 18px; }
 [data-skin="adventure"] .group { row-gap: 10px; }
 
-/* 分區標題：跟頁面標題同一種白字粗描邊，小一號 */
-[data-skin="adventure"] .group-title {
-  margin: 2px 0 0 4px;
-  font-size: 1rem;
-  font-weight: 900;
-  color: #fff;
-  letter-spacing: 0.06em;
-  text-shadow:
-    1.5px 0 0 var(--frame), -1.5px 0 0 var(--frame), 0 1.5px 0 var(--frame), 0 -1.5px 0 var(--frame),
-    1.5px 1.5px 0 var(--frame), -1.5px 1.5px 0 var(--frame), 1.5px -1.5px 0 var(--frame), -1.5px -1.5px 0 var(--frame),
-    0 3px 0 rgba(0, 0, 0, 0.25);
-}
-
 [data-skin="adventure"] .card,
 [data-skin="adventure"] .sk-card {
   background: var(--panel);

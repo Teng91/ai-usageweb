@@ -18,36 +18,25 @@ export function renderAll() {
   renderEmpty();
 }
 
-// 分區：付費（有付費方案）、免費（方案名有 Free）、OpenRouter（餘額＋排行，自己一區、不加標題）
-const GROUPS = [['paid', '付費 AI 用量'], ['free', '免費 AI 用量'], ['or', '']];
-const groupOf = (p) => (p.id === 'openrouter' ? 'or' : /free/i.test(p.plan || '') ? 'free' : 'paid');
+// 分區：各家額度一區、OpenRouter（餘額＋排行）自己一區，都不加標題
+const GROUPS = ['ai', 'or'];
+const groupOf = (p) => (p.id === 'openrouter' ? 'or' : 'ai');
 
 function groupEl(key) {
   let g = cardsEl.querySelector(`.group[data-group="${key}"]`);
   if (g) return g;
-  const [, title] = GROUPS.find(([k]) => k === key);
   g = document.createElement('section');
   g.className = 'group';
   g.dataset.group = key;
-  if (title) {
-    const h = document.createElement('h2');
-    h.className = 'group-title';
-    h.textContent = title;
-    g.append(h);
-    g.setAttribute('aria-label', title);
-  }
-  const order = GROUPS.map(([k]) => k);
-  const next = [...cardsEl.querySelectorAll('.group')].find((x) => order.indexOf(x.dataset.group) > order.indexOf(key));
+  const next = [...cardsEl.querySelectorAll('.group')].find((x) => GROUPS.indexOf(x.dataset.group) > GROUPS.indexOf(key));
   cardsEl.insertBefore(g, next || null);
   return g;
 }
 
-/** 空的分區拿掉；寬螢幕上每區佔「卡片數」欄，付費和免費可以並排 */
+/** 空的分區拿掉 */
 function syncGroups() {
   for (const g of cardsEl.querySelectorAll('.group')) {
-    const n = g.querySelectorAll(':scope > .card').length;
-    if (!n) g.remove();
-    else g.style.setProperty('--span', String(Math.min(n, 4)));
+    if (!g.querySelector(':scope > .card')) g.remove();
   }
 }
 

@@ -10,6 +10,7 @@ kill_timeout = "15s"
   DATA_DIR = "/data"
   POLL_INTERVAL_SEC = "120"  # Claude 的用量 API 約每 2 分鐘只給查一次，全部統一 2 分鐘
   IDLE_GRACE_SEC = "90"
+  PROVIDERS = "claude,antigravity,codex,openrouter"  # Copilot 不顯示（用不到）；要加回來就把 copilot 放進來
 
 [mounts]
   source = "usage_data"

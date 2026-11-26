@@ -122,9 +122,7 @@ async function main() {
     check('卡片順序：Claude、Gemini、Codex', (await ev(`[...document.querySelectorAll('.card')].slice(0, 3).map((c) => c.querySelector('.card-name').textContent).join(',')`)) === 'Claude,Gemini,Codex');
     const rows = await ev(`(() => { const b = document.querySelector('.card[data-id="claude"] .card-body'); const wins = [...b.querySelectorAll('.win')]; const c = document.querySelector('.card[data-id="antigravity"] .card-body'); const bottom = (el) => Math.max(...[...el.children].map((x) => x.getBoundingClientRect().bottom)) - el.getBoundingClientRect().top; return { rows: new Set(wins.map((w) => w.offsetTop)).size, h: bottom(b), ch: bottom(c), sx: wins.every((w) => w.scrollWidth <= w.clientWidth + 1) }; })()`);
     check('沒用過也沒有重置時間的額度顯示「用了才開始計時」', (await ev(`document.querySelectorAll('.card[data-id="antigravity"] .win-sub')[1]?.textContent`)) === '還沒用，用了才開始計時');
-    check('分區：付費 Claude、Gemini；免費 Codex、Copilot；OpenRouter 自己一區', (await ev(`[...document.querySelectorAll('.group')].map((g) => (g.querySelector('.group-title')?.textContent || '-') + ':' + [...g.querySelectorAll('.card')].map((c) => c.dataset.id).join('+')).join(' | ')`)) === '付費 AI 用量:claude+antigravity | 免費 AI 用量:codex+copilot | -:openrouter');
-    const gt = await ev(`[...document.querySelectorAll('.group[data-group="paid"], .group[data-group="free"]')].map((g) => g.getBoundingClientRect().top)`);
-    check('寬螢幕：付費與免費並排', gt?.length === 2 && Math.abs(gt[0] - gt[1]) < 1, JSON.stringify(gt));
+    check('分區：各家額度一區、OpenRouter 自己一區，都沒有標題', (await ev(`document.querySelectorAll('.group-title').length + '|' + [...document.querySelectorAll('.group')].map((g) => [...g.querySelectorAll('.card')].map((c) => c.dataset.id).join('+')).join(' | ')`)) === '0|claude+antigravity+codex+copilot | openrouter');
     check('四條額度（Claude 加上每週 Opus／Sonnet）排成兩列，不比兩條的卡片高、不溢出', rows?.rows === 2 && rows.h <= rows.ch + 1 && rows.sx, JSON.stringify(rows));
     check('Claude 到期日', /2027\/11\/4 到期/.test(await ev(`document.querySelector('.card[data-id="claude"] .plan-exp').textContent`)));
 
