@@ -20,7 +20,6 @@ export function renderAll() {
 
 // 分區：各家額度（含 OpenRouter 餘額）一區、底下 OpenRouter 熱門模型排行一區，都不加標題
 const GROUPS = ['ai', 'rank'];
-const groupOf = () => 'ai';
 
 function groupEl(key) {
   let g = cardsEl.querySelector(`.group[data-group="${key}"]`);
@@ -85,8 +84,8 @@ function cardFor(p) {
     el = tpl.content.firstElementChild.cloneNode(true);
     el.dataset.id = p.id;
   }
-  // 放進該在的分區（方案變了會換區），區內依固定順序
-  const g = groupEl(groupOf(p));
+  // 放進額度分區，依固定順序
+  const g = groupEl('ai');
   const order = [...state.providers.keys()];
   const idx = order.indexOf(p.id);
   const after = [...g.querySelectorAll(':scope > .card')].find((c) => c !== el && order.indexOf(c.dataset.id) > idx) || null;

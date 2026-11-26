@@ -528,8 +528,6 @@
 [data-skin="adventure"] .rt-row .tk,
 [data-skin="adventure"] .rt-row .pr { color: var(--text-2); font-weight: 700; }
 
-[data-skin="adventure"] .rank-foot { color: var(--muted); font-weight: 600; }
-
 /* ---- 其他 ---- */
 [data-skin="adventure"] .banner {
   background: var(--panel);
