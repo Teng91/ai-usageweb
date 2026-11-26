@@ -235,7 +235,7 @@ curl.exe -X PUT https://ai-usageweb.fly.dev/admin/credentials/claude -H "Authori
   - 一張卡片有三條以上額度時（例如 Claude 有每週 Opus／Sonnet）排成兩欄（左 5 小時、右每週），卡片不會變高
   - Codex：短窗與每週（依方案）
   - Copilot：Chat、程式碼補全、Premium 請求（顯示次數，每月重置）
-  - 還沒用過、也沒有重置時間的額度（例如 Antigravity 剛重置、要用了第一次才開始計時）顯示「還沒用，用了才開始計時」
+  - 還沒開始計時的額度一律顯示「還沒用，用了才開始計時」：已用 0% 而且服務沒給重置時間（例如 Claude 的 5 小時），或給的重置時間剛好是「現在＋整個週期」、每次更新都往後推（例如 Codex 免費版每月、Gemini 的 5 小時）。每月 1 號固定重置的 Copilot 照常顯示倒數
   - OpenRouter：剩餘餘額與已用金額
 - 70% 變橘、90% 變紅；超過 3 個更新週期沒有新資料標「資料已過期」
 - **兩種風格**（右上角旗子按鈕切換，會記住）：

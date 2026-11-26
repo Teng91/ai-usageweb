@@ -312,6 +312,20 @@ test('http: Cloudflare 只認 HTML 挑戰頁或 cf-mitigated，JSON 的 403 照�
   }
 });
 
+test('poller: 還沒開始的額度（0%、重置時間＝現在＋整個週期）把重置時間拿掉', async () => {
+  const { clearUnstartedResets } = await import('../src/poller.js');
+  const now = Date.parse('2026-11-26T05:00:00Z');
+  const at = (ms) => new Date(now + ms).toISOString();
+  const out = clearUnstartedResets([
+    { id: 'codex', usedPct: 0, periodSec: 30 * 86400, resetsAt: at(30 * 86400e3 - 60e3) }, // 還沒用：每次都是 30 天後
+    { id: 'used', usedPct: 1, periodSec: 30 * 86400, resetsAt: at(30 * 86400e3 - 60e3) }, // 有用了：保留
+    { id: 'copilot', usedPct: 0, periodSec: 30 * 86400, resetsAt: at(4 * 86400e3) }, // 每月 1 號固定重置：保留
+    { id: 'gemini5h', usedPct: 0, periodSec: 18000, resetsAt: at(5 * 3600e3) },
+    { id: 'noPeriod', usedPct: 0, resetsAt: at(5 * 3600e3) }, // 不知道週期：保留
+  ], now);
+  assert.deepEqual(out.map((w) => [w.id, w.resetsAt === null]), [['codex', true], ['used', false], ['copilot', false], ['gemini5h', true], ['noPeriod', false]]);
+});
+
 test('sse: 連線數到上限就回 503，不算觀看者', async () => {
   const { SseHub } = await import('../src/sse.js');
   let joins = 0;
