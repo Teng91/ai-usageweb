@@ -205,6 +205,7 @@ async function main() {
     for (let i = 0; i < 10 && keyRow !== false; i++) { keyRow = await ev(`document.getElementById('push-key-row').hidden`); if (keyRow !== false) await sleep(200); }
     check('還沒訂閱時要輸入推播密碼', keyRow === false);
     check('還沒開啟通知時不顯示勿擾與門檻設定（選單已建好）', (await ev(`[document.getElementById('push-settings').hidden, document.getElementById('push-quiet-start').options.length, document.getElementById('push-t1').options.length].join()`)) === 'true,24,8');
+    check('三種通知都能選（用量警告、快重置還有剩、額度重置了），預設都開', (await ev(`['push-usage', 'push-reset', 'push-restored'].map((id) => document.getElementById(id)?.checked).join()`)) === 'true,true,true');
     check('推播密碼不存在瀏覽器裡', (await ev(`localStorage.getItem('pushKey')`)) === null);
     const skinBefore = await ev(`document.documentElement.dataset.skin`);
     await key('s');

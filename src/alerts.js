@@ -1,6 +1,7 @@
 // 推播的判斷規則（純函式，不碰網路與檔案，方便測試）
 //  A. 用量警告：依最近的消耗速度，預估重置前會用完才通知；週／月額度另外在 80%、90% 各通知一次；95% 一定通知
 //  B. 快重置還有剩：只看週／月這種長週期，24h 剩 ≥40%、12h 剩 ≥20%、6h 剩 ≥10% 各提醒一次
+//  C. 額度重置了：上一輪用到 90% 以上，重置後通知一次（5 小時這種短週期 2 小時內、週／月 12 小時內，太晚就不發）
 
 import { localParts, formatWhen, formatDuration } from './time.js';
 
@@ -17,6 +18,9 @@ export const RULES = {
   inUseLookbackMs: 60 * MIN, // 這段時間內用量有漲就當作正在用，不發「快重置」
   keepSamplesMs: 3 * HOUR,
   longPeriodSec: 3 * 86400, // 週期至少這麼長才發「快重置」
+  restoredPeakPct: 90, // 上一輪至少用到這麼多，重置才值得通知
+  restoredMaxPct: 50, // 現在的用量要低於這個，才確定是真的重置了
+  restoredFreshMs: { short: 2 * HOUR, long: 12 * HOUR }, // 重置後多久內還發（勿擾結束後補發長週期的）
   stages: [ // 由緊到鬆
     { id: '6h', hours: 6, minRemaining: 10 },
     { id: '12h', hours: 12, minRemaining: 20 },
@@ -26,7 +30,10 @@ export const RULES = {
 
 // ---------- 樣本 ----------
 
-/** 記一筆樣本；換了重置週期（或用量突然下降＝提早重置）就清掉舊樣本 */
+/**
+ * 記一筆樣本；換了重置週期（或用量突然下降＝提早重置）就清掉舊樣本。
+ * peak 是這一輪用到的最高值；換週期時記成 prevPeak，startedAt 是發現新週期的時間（「額度重置了」用）。
+ */
 export function recordSample(history, key, win, now) {
   const r = win.resetsAt ? Date.parse(win.resetsAt) : null;
   const pct = Number(win.usedPct);
@@ -37,8 +44,12 @@ export function recordSample(history, key, win, now) {
     || (r && h.resetsAt && Math.abs(r - h.resetsAt) > 30 * MIN) // 重置時間每次可能差幾秒，差很多才算新週期
     || (h.resetsAt && now > h.resetsAt + MIN)
     || (last && last[1] - pct > 5);
-  if (newCycle) h = history[key] = { cycle: String(r ?? `t${now}`), resetsAt: r, samples: [] };
-  else if (r) h.resetsAt = r;
+  if (newCycle) {
+    // 舊存檔沒有 peak，用還留著的樣本補
+    const prevPeak = h ? Math.max(h.peak ?? 0, ...h.samples.map(([, p]) => p)) : null;
+    h = history[key] = { cycle: String(r ?? `t${now}`), resetsAt: r, samples: [], startedAt: now, prevPeak };
+  } else if (r) h.resetsAt = r;
+  h.peak = Math.max(h.peak ?? 0, pct);
   const tail = h.samples[h.samples.length - 1];
   if (tail && now - tail[0] < 30_000) tail[1] = pct;
   else h.samples.push([now, pct]);
@@ -98,7 +109,7 @@ const pctText = (v) => `${Math.round(v)}%`;
  * 依目前資料算出要發的通知（不改 sent，由呼叫端決定要不要記下）。
  * providers：快照的 provider view；history：recordSample 累積的樣本；sent：已發過的 key。
  * quiet：勿擾時段 { start, end } 或 null；thresholds：週／月額度的固定門檻（由高到低）。
- * 回傳 [{ kind: 'usage'|'reset', provider, keys: [...], title, body }]
+ * 回傳 [{ kind: 'usage'|'reset'|'restored', provider, keys: [...], title, body }]
  */
 export function evaluateAlerts({ providers, history, sent, now, tz, quiet, thresholds = RULES.longThresholds }) {
   const tList = [...thresholds].sort((a, b) => b - a);
@@ -115,6 +126,20 @@ export function evaluateAlerts({ providers, history, sent, now, tz, quiet, thres
       const name = `${p.name} ${w.label}`;
       const base = `${p.id}:${w.id}:${h.cycle}`;
       const resetText = r ? formatWhen(r, now, tz) : null;
+
+      // ---- C. 額度重置了（勿擾時段不發；長週期在勿擾結束後補發） ----
+      if (!q.quiet && h.prevPeak >= RULES.restoredPeakPct && pct <= RULES.restoredMaxPct) {
+        const fresh = Number(w.periodSec) >= RULES.longPeriodSec ? RULES.restoredFreshMs.long : RULES.restoredFreshMs.short;
+        const kRestored = `restored:${base}`;
+        if (!sent[kRestored] && now - h.startedAt <= fresh) {
+          out.push({
+            kind: 'restored', provider: p.id, keys: [kRestored],
+            title: `✅ ${name} 已重置`,
+            body: `上一輪用到 ${pctText(h.prevPeak)}，現在可以繼續用了`,
+          });
+          continue;
+        }
+      }
 
       // ---- A. 用量警告（勿擾時段不發，之後再重新判斷） ----
       if (!q.quiet) {
@@ -179,6 +204,8 @@ export function evaluateAlerts({ providers, history, sent, now, tz, quiet, thres
   return out;
 }
 
+const MERGED_TITLE = { usage: '⚠️ 額度警告', reset: '💡 快重置還有剩', restored: '✅ 額度已重置' };
+
 /** 同一類合成一則 */
 export function mergeAlerts(alerts) {
   const byKind = new Map();
@@ -188,7 +215,7 @@ export function mergeAlerts(alerts) {
   }
   return [...byKind].map(([kind, list]) => {
     if (list.length === 1) return { kind, title: list[0].title, body: list[0].body };
-    const head = kind === 'usage' ? `⚠️ 額度警告（${list.length} 項）` : `💡 快重置還有剩（${list.length} 項）`;
+    const head = `${MERGED_TITLE[kind]}（${list.length} 項）`;
     return { kind, title: head, body: list.map((a) => `${a.title.replace(/^\S+\s/, '')}：${a.body}`).join('\n') };
   });
 }

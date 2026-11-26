@@ -147,6 +147,60 @@ test('B：正在用（最近一小時有漲）或短週期 → 不發', () => {
   assert.equal(run([[-HOUR, 10], [0, 10]], { resetAt: NOON + 4 * HOUR, w: { id: 'x', periodSec: undefined } }).length, 0, '週期不明');
 });
 
+test('C：上一輪用到 90% 以上，重置後通知一次', () => {
+  const history = {};
+  const k = 'claude:5h';
+  const feedAt = (t, pct, resetAt) => recordSample(history, k, { id: '5h', label: '5 小時', usedPct: pct, resetsAt: resetAt ? new Date(resetAt).toISOString() : null, periodSec: 18000 }, t);
+  const ev = (t, pct, resetAt, sent = {}) => evaluateAlerts({
+    providers: [prov([{ id: '5h', label: '5 小時', usedPct: pct, resetsAt: resetAt ? new Date(resetAt).toISOString() : null, periodSec: 18000 }])],
+    history, sent, now: t, tz: TZ, quiet: QUIET,
+  });
+  const firstReset = NOON + HOUR;
+  feedAt(NOON - 2 * HOUR, 70, firstReset);
+  feedAt(NOON, 97, firstReset);
+  // 13:00 重置；13:15 抓到 0%（Claude 沒在用時不給重置時間）
+  const t = firstReset + 15 * MIN;
+  const h = feedAt(t, 0, null);
+  assert.equal(h.prevPeak, 97);
+  const a = ev(t, 0, null);
+  assert.equal(a.length, 1);
+  assert.equal(a[0].kind, 'restored');
+  assert.equal(a[0].title, '✅ Claude 5 小時 已重置');
+  assert.equal(a[0].body, '上一輪用到 97%，現在可以繼續用了');
+  const sent = Object.fromEntries(a[0].keys.map((x) => [x, 1]));
+  assert.equal(ev(t + 2 * MIN, 0, null, sent).length, 0, '只發一次');
+  // 開始用了、重置時間出現：還是同一輪，不會再發
+  feedAt(t + 10 * MIN, 5, t + 10 * MIN + 5 * HOUR);
+  assert.equal(history[k].cycle, h.cycle);
+  assert.equal(ev(t + 10 * MIN, 5, t + 10 * MIN + 5 * HOUR, sent).length, 0);
+  assert.equal(ev(t + 3 * HOUR, 5, t + 10 * MIN + 5 * HOUR).length, 0, '短週期超過 2 小時就不發');
+});
+
+test('C：上一輪沒用到 90%、或第一次看到 → 不發', () => {
+  const history = {};
+  const w = (pct, resetAt) => ({ id: '5h', label: '5 小時', usedPct: pct, resetsAt: new Date(resetAt).toISOString(), periodSec: 18000 });
+  const ev = (t, win) => evaluateAlerts({ providers: [prov([win])], history, sent: {}, now: t, tz: TZ, quiet: QUIET });
+  recordSample(history, 'claude:5h', w(0, NOON + 5 * HOUR), NOON);
+  assert.equal(ev(NOON, w(0, NOON + 5 * HOUR)).length, 0, '第一次看到');
+  recordSample(history, 'claude:5h', w(80, NOON + 5 * HOUR), NOON + HOUR);
+  const after = NOON + 5 * HOUR + 10 * MIN;
+  recordSample(history, 'claude:5h', w(0, after + 5 * HOUR), after);
+  assert.equal(ev(after, w(0, after + 5 * HOUR)).length, 0, '上一輪只到 80%');
+});
+
+test('C：週額度在勿擾時段重置，勿擾結束後補發', () => {
+  const history = {};
+  const w = (pct, resetAt) => ({ id: '7d', label: '每週', usedPct: pct, resetsAt: new Date(resetAt).toISOString(), periodSec: 604800 });
+  const night = Date.UTC(2026, 10, 25, 19, 0); // 台北 03:00 重置
+  recordSample(history, 'claude:7d', w(92, night), night - 3 * HOUR);
+  recordSample(history, 'claude:7d', w(0, night + 7 * 86400_000), night + 5 * MIN);
+  const ev = (t) => evaluateAlerts({ providers: [prov([w(0, night + 7 * 86400_000)])], history, sent: {}, now: t, tz: TZ, quiet: QUIET });
+  assert.equal(ev(night + 5 * MIN).length, 0, '勿擾時段不發');
+  const a = ev(night + 5 * HOUR + 5 * MIN); // 08:05
+  assert.equal(a.length, 1);
+  assert.equal(a[0].title, '✅ Claude 每週 已重置');
+});
+
 test('勿擾：00–08 不發；22–24 時把勿擾期間會遇到的提醒提前發', () => {
   const night = Date.UTC(2026, 10, 25, 18, 0); // 台北 02:00
   assert.equal(quietState(night, TZ, QUIET).quiet, true);
@@ -226,7 +280,7 @@ test('PushService：送出、去重、prefs 關掉就不送', async () => {
   feed(97);
   assert.equal(await svc.evaluate(), 0, '同一週期不重發');
   svc.store.subscribe(SUB, { usage: false });
-  assert.deepEqual(svc.store.prefs(SUB.endpoint), { usage: false, reset: false });
+  assert.deepEqual(svc.store.prefs(SUB.endpoint), { usage: false, reset: false, restored: true });
 });
 
 test('PushService：網頁開著時先不推也不記下，關掉後照樣推播', async () => {
@@ -362,9 +416,9 @@ test('推播 API：訂閱要密碼、tick 要 token 且不算有人在看', asyn
     assert.equal((await post('/api/push/subscribe', { subscription: { endpoint: 'x' } }, 'pk')).status, 400);
     const ok = await post('/api/push/subscribe', { subscription: SUB, prefs: { reset: false } }, 'pk');
     assert.equal(ok.status, 200);
-    assert.deepEqual((await ok.json()).prefs, { usage: true, reset: false });
+    assert.deepEqual((await ok.json()).prefs, { usage: true, reset: false, restored: true });
     assert.deepEqual(await (await post('/api/push/status', { endpoint: SUB.endpoint })).json(), {
-      subscribed: true, prefs: { usage: true, reset: false }, settings: { quiet: { start: 0, end: 8 }, thresholds: [90, 80] },
+      subscribed: true, prefs: { usage: true, reset: false, restored: true }, settings: { quiet: { start: 0, end: 8 }, thresholds: [90, 80] },
     });
     // 設定：只有已訂閱的裝置能改；格式不對回 400 不動原設定
     const st = await post('/api/push/settings', { endpoint: SUB.endpoint, settings: { quiet: { start: 23, end: 7 }, thresholds: [70, 85] } });
@@ -378,7 +432,7 @@ test('推播 API：訂閱要密碼、tick 要 token 且不算有人在看', asyn
     // 改通知種類不需要密碼，但只能改已訂閱的
     const pr = await post('/api/push/prefs', { endpoint: SUB.endpoint, prefs: { usage: false } });
     assert.equal(pr.status, 200);
-    assert.deepEqual((await pr.json()).prefs, { usage: false, reset: false });
+    assert.deepEqual((await pr.json()).prefs, { usage: false, reset: false, restored: true });
     assert.equal((await post('/api/push/prefs', { endpoint: 'https://push.example.test/nope', prefs: { usage: false } })).status, 404);
     // 沒訂閱的 endpoint 送測試：404，也不佔用冷卻
     assert.equal((await post('/api/push/test', { endpoint: 'https://push.example.test/nope' })).status, 404);

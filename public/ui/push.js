@@ -1,4 +1,4 @@
-// 推播通知設定：頂列的鈴鐺 → 對話框（開關、兩種通知、測試）；訂閱交給 service worker 的 pushManager
+// 推播通知設定：頂列的鈴鐺 → 對話框（開關、三種通知、測試）；訂閱交給 service worker 的 pushManager
 // 推播密碼只在開啟通知時用一次，不存起來；之後改設定、退訂、測試都靠這台裝置的訂閱 endpoint
 import { $, withKey, removeStore, isIos, isStandalone } from './dom.js';
 
@@ -78,7 +78,7 @@ async function saveSettings() {
 }
 
 function prefsFromForm() {
-  return { usage: $('push-usage').checked, reset: $('push-reset').checked };
+  return { usage: $('push-usage').checked, reset: $('push-reset').checked, restored: $('push-restored').checked };
 }
 
 /** 依目前訂閱狀態更新對話框 */
@@ -105,6 +105,7 @@ async function refresh() {
     if (subscribed) {
       $('push-usage').checked = r.data.prefs.usage !== false;
       $('push-reset').checked = r.data.prefs.reset !== false;
+      $('push-restored').checked = r.data.prefs.restored !== false;
     }
   }
   on.checked = subscribed;
@@ -115,7 +116,7 @@ async function refresh() {
   $('push-test').disabled = !subscribed;
   $('push-btn').classList.toggle('on', subscribed);
   if (Notification.permission === 'denied') setMsg('通知權限被封鎖了，要到瀏覽器的網站設定裡打開', true);
-  else setMsg(subscribed ? '已開啟：快用完或快重置時會通知這台裝置' : '尚未開啟');
+  else setMsg(subscribed ? '已開啟：快用完、快重置或重置後會通知這台裝置' : '尚未開啟');
 }
 
 async function enable() {
@@ -202,6 +203,7 @@ export async function initPush() {
   $('push-on').addEventListener('change', (e) => busy(() => (e.target.checked ? enable() : disable())));
   $('push-usage').addEventListener('change', () => savePrefs());
   $('push-reset').addEventListener('change', () => savePrefs());
+  $('push-restored').addEventListener('change', () => savePrefs());
   buildSettingsForm();
   for (const id of ['push-quiet-on', 'push-quiet-start', 'push-quiet-end', 'push-t1', 'push-t2']) {
     $(id).addEventListener('change', () => saveSettings());

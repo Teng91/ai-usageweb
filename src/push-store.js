@@ -7,7 +7,9 @@ import { RULES } from './alerts.js';
 // 存檔欄位改了就 +1，舊檔會被丟掉（只新增選填欄位時不要升，升了訂閱會一起丟掉）
 const FORMAT_VERSION = 1;
 const MAX_SUBS = 10;
-const DEFAULT_PREFS = { usage: true, reset: true };
+// 通知種類（跟 alerts.js 的 kind 一樣）；舊訂閱沒有的種類當作開啟
+const KINDS = ['usage', 'reset', 'restored'];
+const DEFAULT_PREFS = Object.fromEntries(KINDS.map((k) => [k, true]));
 
 export class PushStore {
   constructor({ dataDir, quiet, now = Date.now }) {
@@ -131,8 +133,7 @@ function cleanThresholds(t) {
 
 function cleanPrefs(p) {
   const out = {};
-  if (p && typeof p.usage === 'boolean') out.usage = p.usage;
-  if (p && typeof p.reset === 'boolean') out.reset = p.reset;
+  for (const k of KINDS) if (p && typeof p[k] === 'boolean') out[k] = p[k];
   return out;
 }
 
