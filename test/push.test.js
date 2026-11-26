@@ -299,6 +299,29 @@ test('PushService：沒有訂閱要這一類 → 記下但不算次數', async (
   assert.equal(svc.state.daily.claude, undefined);
 });
 
+test('自訂門檻與勿擾時段會用在判斷上', () => {
+  const resetAt = NOON + 4 * 24 * HOUR;
+  const history = {};
+  const w = { id: '7d', label: '每週', usedPct: 72, resetsAt: new Date(resetAt).toISOString(), periodSec: 604800 };
+  recordSample(history, 'claude:7d', w, NOON - HOUR);
+  recordSample(history, 'claude:7d', w, NOON);
+  const ev = (opts) => evaluateAlerts({ providers: [prov([w])], history, sent: {}, now: NOON, tz: TZ, quiet: QUIET, ...opts });
+  assert.equal(ev({}).length, 0, '預設 80% 門檻：72% 不發');
+  const a = ev({ thresholds: [85, 70] });
+  assert.equal(a.length, 1);
+  assert.ok(a[0].keys[0].endsWith(':t70'));
+  assert.equal(ev({ thresholds: [] }).length, 0, '門檻全關');
+  assert.equal(ev({ thresholds: [70], quiet: { start: 10, end: 14 } }).length, 0, '自訂勿擾 10–14，中午不發');
+});
+
+test('PushService：網頁上改的設定蓋過預設，沒改過用 PUSH_QUIET', () => {
+  const { svc } = service();
+  assert.deepEqual(svc.settings(), { quiet: QUIET, thresholds: [90, 80] });
+  assert.deepEqual(svc.updateSettings({ thresholds: [75] }), { quiet: QUIET, thresholds: [75] });
+  assert.equal(svc.updateSettings({ quiet: { start: 25, end: 1 } }), null);
+  assert.deepEqual(svc.settings().thresholds, [75], '不合格的不動原本的');
+});
+
 test('validSubscription 擋掉不合格的訂閱', () => {
   assert.ok(validSubscription(SUB));
   assert.equal(validSubscription({ ...SUB, endpoint: 'http://push.example.test/x' }), null);
@@ -338,7 +361,18 @@ test('推播 API：訂閱要密碼、tick 要 token 且不算有人在看', asyn
     const ok = await post('/api/push/subscribe', { subscription: SUB, prefs: { reset: false } }, 'pk');
     assert.equal(ok.status, 200);
     assert.deepEqual((await ok.json()).prefs, { usage: true, reset: false });
-    assert.deepEqual(await (await post('/api/push/status', { endpoint: SUB.endpoint })).json(), { subscribed: true, prefs: { usage: true, reset: false } });
+    assert.deepEqual(await (await post('/api/push/status', { endpoint: SUB.endpoint })).json(), {
+      subscribed: true, prefs: { usage: true, reset: false }, settings: { quiet: { start: 0, end: 8 }, thresholds: [90, 80] },
+    });
+    // 設定：只有已訂閱的裝置能改；格式不對回 400 不動原設定
+    const st = await post('/api/push/settings', { endpoint: SUB.endpoint, settings: { quiet: { start: 23, end: 7 }, thresholds: [70, 85] } });
+    assert.equal(st.status, 200);
+    assert.deepEqual((await st.json()).settings, { quiet: { start: 23, end: 7 }, thresholds: [85, 70] });
+    assert.equal((await post('/api/push/settings', { endpoint: SUB.endpoint, settings: { thresholds: [99] } })).status, 400);
+    assert.equal((await post('/api/push/settings', { endpoint: SUB.endpoint, settings: { quiet: { start: 3, end: 3 } } })).status, 400);
+    assert.equal((await post('/api/push/settings', { endpoint: 'https://push.example.test/nope', settings: { quiet: null } })).status, 404);
+    const off = await post('/api/push/settings', { endpoint: SUB.endpoint, settings: { quiet: null, thresholds: [] } });
+    assert.deepEqual((await off.json()).settings, { quiet: null, thresholds: [] });
     // 改通知種類不需要密碼，但只能改已訂閱的
     const pr = await post('/api/push/prefs', { endpoint: SUB.endpoint, prefs: { usage: false } });
     assert.equal(pr.status, 200);

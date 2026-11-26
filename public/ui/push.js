@@ -30,6 +30,53 @@ function setMsg(text, warn = false) {
   el.classList.toggle('warn', warn);
 }
 
+const hh = (h) => `${String(h).padStart(2, '0')}:00`;
+const THRESHOLD_CHOICES = [50, 60, 70, 75, 80, 85, 90];
+
+/** 勿擾與門檻的選單只建一次 */
+function buildSettingsForm() {
+  for (const id of ['push-quiet-start', 'push-quiet-end']) {
+    const sel = $(id);
+    if (sel.options.length) continue;
+    for (let h = 0; h < 24; h++) sel.add(new Option(hh(h), String(h)));
+  }
+  for (const id of ['push-t1', 'push-t2']) {
+    const sel = $(id);
+    if (sel.options.length) continue;
+    sel.add(new Option('關閉', ''));
+    for (const t of THRESHOLD_CHOICES) sel.add(new Option(`${t}%`, String(t)));
+  }
+}
+
+/** 把伺服器的設定填進表單，也更新說明文字 */
+function showSettings(s) {
+  const q = s?.quiet || null;
+  $('push-quiet-on').checked = Boolean(q);
+  $('push-quiet-start').value = String(q ? q.start : 0);
+  $('push-quiet-end').value = String(q ? q.end : 8);
+  $('push-quiet-start').disabled = !q;
+  $('push-quiet-end').disabled = !q;
+  const t = s?.thresholds || [];
+  $('push-t1').value = t[0] !== undefined ? String(t[0]) : '';
+  $('push-t2').value = t[1] !== undefined ? String(t[1]) : '';
+  const tText = t.length ? `週／月額度到 ${[...t].sort((a, b) => a - b).map((x) => `${x}%`).join('、')}；` : '';
+  $('push-usage-desc').textContent = `照目前速度會在重置前用完；${tText}或已用 95%`;
+  $('push-note').textContent = `${q ? `${hh(q.start)}–${hh(q.end)} 不通知；` : '沒有勿擾時段；'}網頁開著時先不通知，關掉後條件還成立才通知。`;
+}
+
+async function saveSettings() {
+  const sub = await currentSub().catch(() => null);
+  if (!sub) return;
+  const on = $('push-quiet-on').checked;
+  const settings = {
+    quiet: on ? { start: Number($('push-quiet-start').value), end: Number($('push-quiet-end').value) } : null,
+    thresholds: [$('push-t1').value, $('push-t2').value].filter(Boolean).map(Number),
+  };
+  const r = await api('/api/push/settings', { endpoint: sub.endpoint, settings });
+  if (r.ok) showSettings(r.data.settings);
+  setMsg(r.ok ? '已儲存' : (r.status === 400 && on && settings.quiet.start === settings.quiet.end ? '勿擾的開始和結束不能一樣' : (r.data.error || '儲存失敗')), !r.ok);
+}
+
 function prefsFromForm() {
   return { usage: $('push-usage').checked, reset: $('push-reset').checked };
 }
@@ -39,6 +86,7 @@ async function refresh() {
   const on = $('push-on');
   if (!supported()) {
     $('push-key-row').hidden = true;
+    $('push-settings').hidden = true;
     on.disabled = true;
     $('push-test').disabled = true;
     setMsg(isIos() && !isStandalone()
@@ -49,8 +97,10 @@ async function refresh() {
   on.disabled = false;
   const sub = await currentSub().catch(() => null);
   let subscribed = false;
+  let subRes = null;
   if (sub) {
     const r = await api('/api/push/status', { endpoint: sub.endpoint }).catch(() => null);
+    subRes = r;
     subscribed = Boolean(r?.data?.subscribed);
     if (subscribed) {
       $('push-usage').checked = r.data.prefs.usage !== false;
@@ -58,8 +108,10 @@ async function refresh() {
     }
   }
   on.checked = subscribed;
-  // 已經開啟就不必再輸入密碼
+  // 已經開啟就不必再輸入密碼；勿擾與門檻只有開啟後才能改
   $('push-key-row').hidden = subscribed;
+  $('push-settings').hidden = !subscribed;
+  if (subscribed) showSettings(subRes.data.settings);
   $('push-test').disabled = !subscribed;
   $('push-btn').classList.toggle('on', subscribed);
   if (Notification.permission === 'denied') setMsg('通知權限被封鎖了，要到瀏覽器的網站設定裡打開', true);
@@ -145,6 +197,10 @@ export async function initPush() {
   $('push-on').addEventListener('change', (e) => busy(() => (e.target.checked ? enable() : disable())));
   $('push-usage').addEventListener('change', () => savePrefs());
   $('push-reset').addEventListener('change', () => savePrefs());
+  buildSettingsForm();
+  for (const id of ['push-quiet-on', 'push-quiet-start', 'push-quiet-end', 'push-t1', 'push-t2']) {
+    $(id).addEventListener('change', () => saveSettings());
+  }
   $('push-test').addEventListener('click', () => busy(async () => {
     const sub = await currentSub();
     const r = await api('/api/push/test', { endpoint: sub?.endpoint || '' });

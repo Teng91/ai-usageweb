@@ -223,6 +223,22 @@ button {
 }
 
 .push-kinds { margin: 10px 0 0; padding: 4px 0 0; border: 0; border-top: 1px solid var(--line); }
+.push-settings { margin: 10px 0 0; padding: 4px 0 0; border: 0; border-top: 1px solid var(--line); }
+.push-settings[hidden] { display: none; }
+.push-inline { align-items: center; flex-wrap: wrap; gap: 6px 8px; }
+.push-inline label { display: flex; align-items: center; gap: 6px; }
+.push-inline input[type="checkbox"] { margin: 0; accent-color: var(--accent); }
+.push-to, .push-label { color: var(--text-2); }
+.push-settings select {
+  padding: 3px 6px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: var(--panel-2);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.82rem;
+}
+.push-settings select:disabled { opacity: 0.5; }
 .push-note { margin: 8px 0 0; color: var(--muted); font-size: 0.76rem; }
 .push-msg { min-height: 1.2em; margin: 8px 0 0; color: var(--text-2); font-size: 0.8rem; }
 .push-msg.warn { color: var(--warn); }

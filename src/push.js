@@ -3,7 +3,7 @@ import path from 'node:path';
 import { writeFileAtomic, readFileOrNull } from './fsutil.js';
 import { logInfo, logWarn } from './log.js';
 import { sendPush } from './webpush.js';
-import { evaluateAlerts, mergeAlerts, recordSample, localParts } from './alerts.js';
+import { evaluateAlerts, mergeAlerts, recordSample, localParts, RULES } from './alerts.js';
 
 // 存檔欄位改了就 +1，舊檔會被丟掉
 const FORMAT_VERSION = 1;
@@ -81,6 +81,36 @@ export class PushService {
     return sub.prefs;
   }
 
+  /**
+   * 全站共用的推播設定（只有一個人在用，不必每台裝置各一份）：勿擾時段與週／月門檻。
+   * 沒在網頁上改過就用預設：勿擾時段來自 PUSH_QUIET，門檻是 RULES.longThresholds。
+   */
+  settings() {
+    const s = this.state.settings || {};
+    return {
+      quiet: s.quiet !== undefined ? s.quiet : this.quiet,
+      thresholds: s.thresholds || RULES.longThresholds,
+    };
+  }
+
+  /** 從網頁改設定；格式不對回 null（不動原本的設定） */
+  updateSettings(input) {
+    const next = { ...(this.state.settings || {}) };
+    if (input && 'quiet' in input) {
+      const q = cleanQuiet(input.quiet);
+      if (q === undefined) return null;
+      next.quiet = q;
+    }
+    if (input && 'thresholds' in input) {
+      const t = cleanThresholds(input.thresholds);
+      if (!t) return null;
+      next.thresholds = t;
+    }
+    this.state.settings = next;
+    this.save();
+    return this.settings();
+  }
+
   prefs(endpoint) {
     return this.state.subs.find((s) => s.endpoint === endpoint)?.prefs || null;
   }
@@ -118,7 +148,8 @@ export class PushService {
     const now = this.now();
     this.#prune(now);
     const providers = this.snapshot.snapshot(now).providers;
-    const alerts = evaluateAlerts({ providers, history: this.state.history, sent: this.state.sent, now, tz: this.tz, quiet: this.quiet });
+    const { quiet, thresholds } = this.settings();
+    const alerts = evaluateAlerts({ providers, history: this.state.history, sent: this.state.sent, now, tz: this.tz, quiet, thresholds });
     if (!alerts.length) return 0;
 
     const markSent = (list) => { for (const a of list) for (const k of a.keys) this.state.sent[k] = now; };
@@ -184,6 +215,20 @@ export class PushService {
 
 function blankState() {
   return { version: FORMAT_VERSION, subs: [], sent: {}, daily: {}, history: {} };
+}
+
+/** 勿擾時段：null（關閉）或 { start, end } 整點 0–23、不能相同；不合格回 undefined */
+function cleanQuiet(q) {
+  if (q === null) return null;
+  const ok = (n) => Number.isInteger(n) && n >= 0 && n <= 23;
+  if (!q || typeof q !== 'object' || !ok(q.start) || !ok(q.end) || q.start === q.end) return undefined;
+  return { start: q.start, end: q.end };
+}
+
+/** 週／月門檻：0–3 個 50–94 的整數（95% 一定會發，不必設），去重後由高到低；不合格回 null */
+function cleanThresholds(t) {
+  if (!Array.isArray(t) || t.length > 3 || !t.every((n) => Number.isInteger(n) && n >= 50 && n <= 94)) return null;
+  return [...new Set(t)].sort((a, b) => b - a);
 }
 
 function cleanPrefs(p) {

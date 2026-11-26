@@ -18,7 +18,7 @@ ai-usageweb：顯示 Claude、Codex、Antigravity、Copilot 額度與 OpenRouter
 - `/healthz` 與 `/api/push/tick` 不能算「有人在看」。
 - 推播：規則在 `src/alerts.js`（純函式）、服務在 `src/push.js`、加密在 `src/webpush.js`。推播內容只放百分比與重置時間。改規則要更新 `test/push.test.js` 與 README 的規則表。之後要做的事記在 `docs/TODO.md`。
 - 推播的排程喚醒主要靠 Google Apps Script（`google_apps_script/Code.gs`，repo 裡只是副本），GitHub Actions 的 `push-tick.yml` 是備援。前端不保存推播密碼。
-- 存檔格式（例如 `rankings.json`）改了欄位就把該檔的 `FORMAT_VERSION` +1，讓舊檔被丟掉。
+- 存檔格式（例如 `rankings.json`）改了欄位就把該檔的 `FORMAT_VERSION` +1，讓舊檔被丟掉。例外：`push.json` 只新增選填欄位（例如 `settings`）時不要升版本，升了會把訂閱一起丟掉，手機要重新開啟通知。
 
 ## 前端
 - 改了 `public/` 的檔案要把 `public/sw.js` 的 `CACHE` 版本號 +1；新增要離線可用的檔案要加進 `SHELL`。新的 `/api/*` 不經 service worker（加進 `sw.js` 的略過清單）。

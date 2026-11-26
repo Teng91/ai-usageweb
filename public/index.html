@@ -86,10 +86,24 @@
     <label class="push-row push-main"><input type="checkbox" id="push-on"> 在這台裝置開啟通知</label>
     <label class="push-row" id="push-key-row">推播密碼 <input type="password" id="push-key" autocomplete="off" placeholder="PUSH_KEY"></label>
     <fieldset class="push-kinds">
-      <label class="push-row"><input type="checkbox" id="push-usage" checked> <span><b>用量警告</b><small>照目前速度會在重置前用完；週／月額度到 80%、90%；或已用 95%</small></span></label>
+      <label class="push-row"><input type="checkbox" id="push-usage" checked> <span><b>用量警告</b><small id="push-usage-desc">照目前速度會在重置前用完；週／月額度到 80%、90%；或已用 95%</small></span></label>
       <label class="push-row"><input type="checkbox" id="push-reset" checked> <span><b>快重置還有剩</b><small>週／月額度：24 小時內剩 40%、12 小時剩 20%、6 小時剩 10%</small></span></label>
     </fieldset>
-    <p class="push-note">00:00–08:00 不通知；網頁開著時先不通知，關掉後條件還成立才通知。</p>
+    <!-- 勿擾時段與週／月門檻：全站共用，開啟通知後才能改 -->
+    <fieldset class="push-settings" id="push-settings" hidden>
+      <div class="push-row push-inline">
+        <label><input type="checkbox" id="push-quiet-on"> 勿擾時段</label>
+        <select id="push-quiet-start" aria-label="勿擾開始"></select>
+        <span class="push-to">到</span>
+        <select id="push-quiet-end" aria-label="勿擾結束"></select>
+      </div>
+      <div class="push-row push-inline">
+        <span class="push-label">週／月額度提醒</span>
+        <select id="push-t1" aria-label="第一個門檻"></select>
+        <select id="push-t2" aria-label="第二個門檻"></select>
+      </div>
+    </fieldset>
+    <p class="push-note" id="push-note">00:00–08:00 不通知；網頁開著時先不通知，關掉後條件還成立才通知。</p>
     <p class="push-msg" id="push-msg" role="status"></p>
     <div class="push-actions">
       <button type="button" id="push-test" disabled>送測試通知</button>

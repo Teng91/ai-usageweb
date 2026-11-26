@@ -8,7 +8,7 @@ const HOUR = 60 * MIN;
 export const RULES = {
   warnFloorPct: 50, // 低於這個不做速度預警，避免一開工就被叫
   hardPct: 95, // 到這裡一定通知
-  longThresholds: [90, 80], // 週／月額度的固定門檻（由高到低），同一週期各一次
+  longThresholds: [90, 80], // 週／月額度的固定門檻預設值（由高到低），同一週期各一次；可在網頁上改
   rateLookbackMs: 90 * MIN, // 用這段時間內的樣本估速度
   rateMinSpanMs: 10 * MIN, // 樣本至少跨這麼久才估
   rateMinDelta: 2, // 這段時間至少漲幾個百分點才算「在用」
@@ -128,9 +128,11 @@ const pctText = (v) => `${Math.round(v)}%`;
 /**
  * 依目前資料算出要發的通知（不改 sent，由呼叫端決定要不要記下）。
  * providers：快照的 provider view；history：recordSample 累積的樣本；sent：已發過的 key。
+ * quiet：勿擾時段 { start, end } 或 null；thresholds：週／月額度的固定門檻（由高到低）。
  * 回傳 [{ kind: 'usage'|'reset', provider, keys: [...], title, body }]
  */
-export function evaluateAlerts({ providers, history, sent, now, tz, quiet }) {
+export function evaluateAlerts({ providers, history, sent, now, tz, quiet, thresholds = RULES.longThresholds }) {
+  const tList = [...thresholds].sort((a, b) => b - a);
   const q = quietState(now, tz, quiet);
   const out = [];
   for (const p of providers) {
@@ -152,19 +154,19 @@ export function evaluateAlerts({ providers, history, sent, now, tz, quiet }) {
         if (pct >= RULES.hardPct && !sent[kHard]) {
           out.push({
             // 低的門檻一起記下，到 95% 之後不會再補發 90%／80%
-            kind: 'usage', provider: p.id, keys: [kHard, kWarn, ...RULES.longThresholds.map((t) => `usage:${base}:t${t}`)],
+            kind: 'usage', provider: p.id, keys: [kHard, kWarn, ...tList.map((t) => `usage:${base}:t${t}`)],
             title: `⚠️ ${name} 已用 ${pctText(pct)}`,
             body: r ? `${resetText} 才重置（還要 ${formatDuration(r - now)}）` : '快用完了',
           });
           continue;
         }
-        // 週／月這種長週期漲得慢，速度預警很難成立：另外在固定門檻（90%、80%）各提醒一次
+        // 週／月這種長週期漲得慢，速度預警很難成立：另外在固定門檻（預設 90%、80%）各提醒一次
         if (Number(w.periodSec) >= RULES.longPeriodSec) {
-          const idx = RULES.longThresholds.findIndex((t) => pct >= t && !sent[`usage:${base}:t${t}`]);
-          if (idx >= 0 && !RULES.longThresholds.slice(0, idx).some((t) => pct >= t)) {
+          const idx = tList.findIndex((t) => pct >= t && !sent[`usage:${base}:t${t}`]);
+          if (idx >= 0 && !tList.slice(0, idx).some((t) => pct >= t)) {
             out.push({
               kind: 'usage', provider: p.id,
-              keys: RULES.longThresholds.slice(idx).map((t) => `usage:${base}:t${t}`), // 低的門檻一起記下
+              keys: tList.slice(idx).map((t) => `usage:${base}:t${t}`), // 低的門檻一起記下
               title: `⚠️ ${name} 已用 ${pctText(pct)}`,
               body: r ? `${resetText} 重置（還有 ${formatDuration(r - now)}）` : '快用完了',
             });

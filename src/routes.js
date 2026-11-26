@@ -80,7 +80,14 @@ export function createHandler({ cfg, poller, hub, snapshot, creds, providers, ra
     const endpoint = typeof body.endpoint === 'string' ? body.endpoint : '';
     if (p === '/api/push/status') {
       const prefs = push.prefs(endpoint);
-      return sendJson(res, 200, { subscribed: Boolean(prefs), prefs });
+      // 設定只給已訂閱的裝置看
+      return sendJson(res, 200, prefs ? { subscribed: true, prefs, settings: push.settings() } : { subscribed: false, prefs: null });
+    }
+    if (p === '/api/push/settings') {
+      // 勿擾時段與週／月門檻（全站共用）；只有已訂閱的裝置能改
+      if (!push.prefs(endpoint)) return sendJson(res, 404, { error: '這台裝置沒有訂閱' });
+      const settings = push.updateSettings(body.settings);
+      return settings ? sendJson(res, 200, { ok: true, settings }) : sendJson(res, 400, { error: '設定格式不對' });
     }
     if (p === '/api/push/prefs') {
       const prefs = push.updatePrefs(endpoint, body.prefs);

@@ -40,7 +40,7 @@ Google Apps Script 每 15 分鐘 ──POST /api/push/tick──▶ 機器沒人
 | `GET /healthz` | 健康檢查，不觸發輪詢 | 公開 |
 | `GET /api/push/config` | 推播是否啟用與 VAPID 公鑰 | 公開（或 `ACCESS_KEY`） |
 | `POST /api/push/subscribe` | 新增訂閱（body：`subscription`、`prefs`） | `PUSH_KEY` |
-| `POST /api/push/status`、`/prefs`、`/unsubscribe`、`/test` | 查狀態、改通知種類（body 加 `prefs`）、退訂、送測試通知（body：`endpoint`；測試 30 秒一次） | 知道自己的 endpoint |
+| `POST /api/push/status`、`/prefs`、`/settings`、`/unsubscribe`、`/test` | 查狀態（已訂閱時附上設定）、改通知種類（body 加 `prefs`）、改勿擾時段與週／月門檻（body 加 `settings`）、退訂、送測試通知（body：`endpoint`；測試 30 秒一次） | 已訂閱、知道自己的 endpoint |
 | `POST /api/push/tick` | 排程喚醒：各家抓一輪並判斷推播，不算「有人在看」 | `PUSH_TICK_TOKEN` |
 | `POST /admin/refresh` | 立刻重抓（仍受每家最短間隔限制） | `ADMIN_TOKEN` |
 | `PUT /admin/credentials/:provider` | 替換某一家的憑證（JSON body，只收該家認得的欄位） | `ADMIN_TOKEN` |
@@ -221,7 +221,8 @@ curl.exe -X PUT https://ai-usageweb.fly.dev/admin/credentials/claude -H "Authori
 | 用量警告 | 已用 ≥ 50%，且照最近 90 分鐘的速度會在重置前用完；週／月額度另外在 80%、90% 各一次（不看速度）；已用 95% 一定發。同一個重置週期各一次 |
 | 快重置還有剩 | 只看週／月額度，而且最近一小時沒在用：24 小時內剩 ≥ 40%、12 小時內剩 ≥ 20%、6 小時內剩 ≥ 10% 各一次 |
 
-- 00:00–08:00 不發（`PUSH_QUIET`，時區 `PUSH_TZ`）；「快重置」會落在勿擾時段的提醒，提前到 22:00 後發。
+- 00:00–08:00 不發（時區 `PUSH_TZ`）；「快重置」會落在勿擾時段的提醒，提前到勿擾開始前 2 小時內發。
+- **勿擾時段和週／月門檻可以在網頁上改**：開啟通知後，通知設定對話框會多出「勿擾時段」（開始、結束各選一個整點，或關掉）和「週／月額度提醒」（兩個門檻，可選 50%–90% 或關閉；95% 一定會發，不用設）。設定全站共用、存在 `/data/push.json`；沒改過時勿擾用 `PUSH_QUIET`、門檻是 80%／90%。
 - 網頁開著時先不推播、也不記成已發，關掉網頁後條件還成立就照樣推播（電腦開著分頁、人不在時手機也收得到）；同一類合成一則，新的蓋掉舊的；每家每天最多 4 則（超過上限或送失敗的不算發過，之後還會再判斷）。
 - 機器每 15 分鐘被叫醒一次（Apps Script 不保證固定在哪一分鐘）、抓完約幾分鐘後又 suspend，執行時間大約多三分之一，費用每月不到 1 美元。
 
