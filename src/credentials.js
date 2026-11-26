@@ -137,8 +137,11 @@ export class CredentialStore {
     await job;
   }
 
-  /** 合併新值，先寫 volume 成功才生效 */
-  async save(id, patch) {
+  /** 合併新值，先寫 volume 成功才生效；給了 expectVersion 而憑證已被換掉就不存（丟錯） */
+  async save(id, patch, expectVersion) {
+    if (expectVersion !== undefined && this.version(id) !== expectVersion) {
+      throw new Error('憑證已被換掉，不存舊流程的續期結果');
+    }
     const next = { ...(this.creds[id] || {}), ...patch };
     const prev = this.creds[id];
     this.creds[id] = next;

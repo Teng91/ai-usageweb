@@ -209,7 +209,8 @@ export class Poller {
     try {
       const result = await p.fetch({
         creds: all,
-        saveCreds: (patch) => this.creds.save(p.id, patch),
+        // 抓取途中憑證被換掉（管理 API）：舊流程續期拿到的 token 不能蓋掉新憑證
+        saveCreds: (patch) => this.creds.save(p.id, patch, versionAtStart),
         withLock: (fn) => this.creds.withLock(p.id, fn),
       });
       const interval = this.baseInterval(p);

@@ -1,5 +1,5 @@
 // 快取名稱帶版本號；改了前端檔案就把版本 +1
-const CACHE = 'app-v49';
+const CACHE = 'app-v50';
 const SHELL = [
   '/',
   '/index.html',
@@ -74,6 +74,7 @@ const SHELL = [
   '/icons/icon-512.png',
   '/icons/apple-touch-icon.png',
 ];
+// 上次的 /api/usage、/api/rankings；名稱只在這裡，前端要讀就帶 x-cache-only 標頭來問
 const API_CACHE = 'api-last';
 
 self.addEventListener('install', (event) => {
@@ -127,29 +128,36 @@ self.addEventListener('fetch', (event) => {
   // SSE、推播與管理 API 完全不經過 service worker（/api/usage、/api/rankings 走下面的 network-first）
   if (url.pathname === '/api/stream' || url.pathname.startsWith('/api/push/') || url.pathname.startsWith('/admin/') || url.pathname === '/healthz') return;
 
-  // 用量與排行：先問伺服器，失敗（離線）才用上次存下的
+  // 用量與排行：先問伺服器，失敗（離線）才用上次存下的；帶 x-cache-only 的只看上次存下的（開頁先畫舊數字用）
   if (url.pathname === '/api/usage' || url.pathname === '/api/rankings') {
-    event.respondWith(networkFirst(req, url.pathname));
+    event.respondWith(req.headers.get('x-cache-only') ? fromApiCache(url.pathname) : networkFirst(event, req, url.pathname));
     return;
   }
 
   event.respondWith(cacheFirst(req));
 });
 
-async function networkFirst(req, key) {
-  const cache = await caches.open(API_CACHE);
+async function networkFirst(event, req, key) {
   try {
     const res = await fetch(req);
-    if (res.ok) cache.put(key, res.clone());
+    // 寫快取放進 waitUntil：回應先給頁面，service worker 也不會在寫完前被停掉
+    if (res.ok) {
+      const copy = res.clone();
+      event.waitUntil(caches.open(API_CACHE).then((c) => c.put(key, copy)));
+    }
     return res;
   } catch {
-    const cached = await cache.match(key);
-    if (!cached) return new Response(JSON.stringify({ error: 'offline' }), { status: 503, headers: { 'Content-Type': 'application/json' } });
-    // 標記為快取，前端顯示「離線」
-    const headers = new Headers(cached.headers);
-    headers.set('x-from-cache', '1');
-    return new Response(await cached.blob(), { status: 200, headers });
+    return fromApiCache(key);
   }
+}
+
+/** 上次存下的回應，標上 x-from-cache（前端顯示「離線」）；沒有就 503 */
+async function fromApiCache(key) {
+  const cached = await (await caches.open(API_CACHE)).match(key);
+  if (!cached) return new Response(JSON.stringify({ error: 'offline' }), { status: 503, headers: { 'Content-Type': 'application/json' } });
+  const headers = new Headers(cached.headers);
+  headers.set('x-from-cache', '1');
+  return new Response(await cached.blob(), { status: 200, headers });
 }
 
 async function cacheFirst(req) {

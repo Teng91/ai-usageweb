@@ -57,6 +57,16 @@ test('credentials: 寫入失敗時不採用新值', async () => {
   assert.equal(s.get('claude').refreshToken, 'old');
 });
 
+test('credentials: 抓取途中憑證被換掉，舊流程的續期結果不存', async () => {
+  const s = await new CredentialStore({ dataDir: tmpDir(), keyB64: KEY, env: { CLAUDE_REFRESH_TOKEN: 'old' } }).load();
+  const v = s.version('claude');
+  await s.replace('claude', { refreshToken: 'replaced' });
+  await assert.rejects(s.save('claude', { refreshToken: 'from-old-flow' }, v));
+  assert.equal(s.get('claude').refreshToken, 'replaced');
+  await s.save('claude', { accessToken: 'a' }, s.version('claude'));
+  assert.equal(s.get('claude').accessToken, 'a', '版本對得上照常存');
+});
+
 test('credentials: 同一家續期共用同一個 Promise', async () => {
   const s = await new CredentialStore({ dataDir: tmpDir(), keyB64: KEY, env: {} }).load();
   let calls = 0;

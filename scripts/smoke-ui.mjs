@@ -215,7 +215,7 @@ async function main() {
     check('按「關閉」收起通知設定', (await ev(`document.getElementById('push-dialog').open`)) === false);
 
     // 離線：排行跟用量一樣經 service worker 存一份（離線時給這份；模擬離線管不到 service worker，所以只檢查有存）
-    const cached = await send('Runtime.evaluate', { expression: `(async () => { await navigator.serviceWorker.ready; for (let i = 0; i < 50 && !navigator.serviceWorker.controller; i++) await new Promise((r) => setTimeout(r, 200)); if (!navigator.serviceWorker.controller) return 'service worker 沒接管頁面'; await fetch('/api/rankings'); let r; for (let i = 0; i < 20 && !r; i++) { r = await (await caches.open('api-last')).match('/api/rankings'); if (!r) await new Promise((ok) => setTimeout(ok, 100)); } if (!r) return '沒存到'; return !!(await r.json()).views; })()`, awaitPromise: true, returnByValue: true });
+    const cached = await send('Runtime.evaluate', { expression: `(async () => { await navigator.serviceWorker.ready; for (let i = 0; i < 50 && !navigator.serviceWorker.controller; i++) await new Promise((r) => setTimeout(r, 200)); if (!navigator.serviceWorker.controller) return 'service worker 沒接管頁面'; await fetch('/api/rankings'); let r; for (let i = 0; i < 20 && !r?.ok; i++) { r = await fetch('/api/rankings', { headers: { 'x-cache-only': '1' } }); if (!r.ok) await new Promise((ok) => setTimeout(ok, 100)); } if (!r.ok) return '沒存到'; return r.headers.get('x-from-cache') === '1' && !!(await r.json()).views; })()`, awaitPromise: true, returnByValue: true });
     check('排行經 service worker 存一份，離線時用得到', cached?.result?.value === true, JSON.stringify(cached?.result));
 
     check('沒有 JS 錯誤', errors.length === 0, errors.join(' | '));

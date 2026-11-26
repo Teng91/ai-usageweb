@@ -32,13 +32,14 @@ async function loadSnapshot() {
   renderChrome();
 }
 
-/** 先畫出上次存下的數字，伺服器還在喚醒時畫面就不會是空的 */
+/** 先畫出上次存下的數字，伺服器還在喚醒時畫面就不會是空的（由 service worker 給，快取細節只在 sw.js） */
 async function paintCached() {
+  if (!navigator.serviceWorker?.controller) return; // 第一次開、還沒有 service worker：維持骨架畫面
   try {
-    const res = await (await caches.open('api-last')).match('/api/usage');
-    if (res) applySnapshot(await res.json());
+    const res = await fetch('/api/usage', { headers: { 'x-cache-only': '1' } });
+    if (res.ok) applySnapshot(await res.json());
   } catch {
-    // 沒有快取或瀏覽器不支援：維持骨架畫面
+    // 沒有快取：維持骨架畫面
   }
 }
 
