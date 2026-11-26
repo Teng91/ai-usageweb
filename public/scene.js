@@ -44,6 +44,8 @@ function buildMaps() {
   mapEls.forEach((m, j) => m.classList.toggle('active', j === mapIndex));
 }
 
+// 月亮（只有夜晚顯示），放在地圖外面，不跟地圖一起被調暗
+const moon = el('sc-moon');
 const flies = el('sc-flies');
 for (let i = 1; i <= 6; i++) flies.append(el(`sc-fly f${i}`));
 const portal = el('sc-portal');
@@ -51,7 +53,7 @@ portal.title = '傳送點：點一下換地圖';
 const hero = el('sc-hero');
 hero.title = '點我跳一下';
 const fade = el('sc-fade');
-sceneEl.append(flies, portal, hero, fade);
+sceneEl.append(moon, flies, portal, hero, fade);
 
 // 地圖名稱的牌子（放在場景外，才會蓋在卡片上面）
 const plaque = document.createElement('div');

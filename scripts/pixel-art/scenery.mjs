@@ -47,18 +47,6 @@ svg("house", [[
   "....kkkkkkkkkkkkkkkkk...",
 ]]);
 
-// 像素雲
-svg('cloud', [[
-  '.........kkkkk..........',
-  '.......kkwwwwwkk........',
-  '...kkkkwwwwwwwwwk.......',
-  '..kwwwwwwwwwwwwwwkkkk...',
-  '.kwwwwwwwwwwwwwwwwwwwk..',
-  'kwwwwwwwwwwwwwwwwwwwwwk.',
-  'kWWWWwwwwwWWWWwwwwWWWWk.',
-  '.kkkkkkkkkkkkkkkkkkkkk..',
-]]);
-
 // 草地邊緣＋花（橫向重複的 32x10 圖塊）
 const GRASS = [
   '.....p.............n........y...',
@@ -360,5 +348,128 @@ svg('platform-autumn', [recolor(PF_GRASS, { g: 'h', G: 'N' })]);
   for (const [name, pal] of Object.entries(SEASONS)) {
     svgFrames(`hills-far-${name}`, [farHills(pal)]);
     if (name !== 'summer') svgFrames(`hills-near-${name}`, [nearHills(pal)]); // 夏天是海邊，前面是海不是丘陵
+  }
+}
+
+// ---------- 天空與遠方小鎮（原創，程式算出來） ----------
+{
+  const disc = (c, cx, cy, r, col) => {
+    for (let y = Math.floor(cy - r); y <= cy + r; y++) {
+      for (let x = Math.floor(cx - r); x <= cx + r; x++) if (Math.hypot(x - cx, y - cy) <= r) c.px(x, y, col);
+    }
+  };
+
+  // 柔和的雲：幾個圓疊成一團，沒有黑色描邊，底部一層淡藍陰影
+  {
+    const c = makeCanvas(64, 26);
+    const puffs = [[14, 16, 9], [27, 11, 11], [41, 12, 10], [52, 17, 8], [33, 17, 9]];
+    for (const [x, y, r] of puffs) disc(c, x, y + 1, r, '#dcebf8'); // 陰影：整團往下一格
+    for (const [x, y, r] of puffs) disc(c, x, y, r, '#ffffff');
+    for (let x = 7; x < 59; x++) for (let y = 20; y < 25; y++) if (c.get(x, y - 1)) c.px(x, y, y >= 22 ? '#dcebf8' : '#f3f8fd');
+    svgFrames('cloud-soft', [c]);
+  }
+
+  // 漂浮小島：草頂、往下收尖的土石、上面一棵小樹；春夏、秋、冬三種
+  const ISLANDS = {
+    island: { top: '#7cc95f', topHi: '#a7e07e', tree: '#5cbf5a', treeDark: '#3d9147' },
+    'island-autumn': { top: '#c9a24a', topHi: '#e3c46a', tree: '#e0843f', treeDark: '#b45a2b' },
+    'island-snow': { top: '#f4f8fc', topHi: '#ffffff', tree: '#5f9a7e', treeDark: '#447a62' },
+  };
+  for (const [name, pal] of Object.entries(ISLANDS)) {
+    const W = 48, H = 40, c = makeCanvas(W, H);
+    for (let y = 12; y < H; y++) {
+      const half = Math.max(0, 21 - (y - 12) * 0.85 + Math.sin(y * 1.7) * 1.2);
+      for (let x = Math.round(24 - half); x <= Math.round(24 + half); x++) {
+        const dark = x > 24 + half * 0.3 || y > 30;
+        c.px(x, y, (x + y) % 7 === 0 ? '#8a6a4a' : dark ? '#7a5a3c' : '#9c7650');
+      }
+    }
+    for (let x = 2; x <= 46; x++) { c.px(x, 11, pal.topHi); c.px(x, 12, pal.top); c.px(x, 13, pal.top); }
+    for (let y = 4; y <= 11; y++) { c.px(16, y, '#6b4a2e'); c.px(17, y, '#5a3d25'); }
+    disc(c, 16.5, 4, 5, pal.tree);
+    disc(c, 18, 5, 3, pal.treeDark);
+    disc(c, 15, 2.5, 1.5, pal.topHi);
+    svgFrames(name, [c]);
+  }
+
+  // 彩虹：六道色帶的半圓（CSS 會調成半透明）
+  {
+    const W = 96, H = 48, c = makeCanvas(W, H);
+    const bands = ['#ff6b6b', '#ffa94d', '#ffe066', '#69db7c', '#4dabf7', '#9775fa'];
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        const d = Math.hypot(x - 47.5, y - 47.5);
+        const i = Math.floor((47.5 - d) / 3);
+        if (i >= 0 && i < bands.length) c.px(x, y, bands[i]);
+      }
+    }
+    svgFrames('rainbow', [c]);
+  }
+
+  // 月亮：圓月加幾個坑
+  {
+    const c = makeCanvas(24, 24);
+    disc(c, 11.5, 11.5, 11, '#fff3c4');
+    disc(c, 13, 13, 9, '#ffeaa0');
+    for (const [x, y, r] of [[8, 8, 2], [15, 15, 2.5], [14, 6, 1.2], [6, 15, 1.5]]) disc(c, x, y, r, '#f2d985');
+    svgFrames('moon', [c]);
+  }
+
+  // 遠方小鎮：一排高矮不一的房子（屋頂、煙囪、窗戶、門口小招牌），可橫向無縫重複；
+  // 另外產生一張只有窗戶與招牌的「燈火」圖，夜晚疊上去
+  const TOWNS = {
+    spring: { wall: '#ecdfcf', wallDark: '#d8c8b4', roof: '#d98a8a', roofDark: '#bf6f74', win: '#8fa6b8', sign: '#c9a26b' },
+    autumn: { wall: '#ecd9c1', wallDark: '#d6c0a2', roof: '#c9714a', roofDark: '#a95a3a', win: '#8b8f9a', sign: '#b98a4a' },
+    winter: { wall: '#e8edf3', wallDark: '#cfd8e3', roof: '#9aaec4', roofDark: '#7d93ab', win: '#8fa0b4', sign: '#b39373', snow: '#ffffff' },
+  };
+  const W = 160, H = 44;
+  let seed = 11;
+  const rand = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+  const HOUSES = [];
+  for (let x = 2; x < W - 12;) {
+    const w = 10 + Math.floor(rand() * 8);
+    HOUSES.push({ x, w, h: 10 + Math.floor(rand() * 12), roof: rand() < 0.7 ? 'peak' : 'flat', chimney: rand() < 0.5, sign: rand() < 0.4 });
+    x += w + 2 + Math.floor(rand() * 4);
+  }
+  function town(pal, lightsOnly) {
+    const c = makeCanvas(W, H);
+    const lit = '#ffd36b';
+    for (const hs of HOUSES) {
+      const top = H - hs.h;
+      if (!lightsOnly) {
+        for (let y = top; y < H; y++) for (let x = hs.x; x < hs.x + hs.w; x++) c.px(x, y, x >= hs.x + hs.w - 2 ? pal.wallDark : pal.wall);
+        if (hs.roof === 'peak') {
+          const rh = Math.ceil(hs.w / 2);
+          for (let i = 0; i < rh; i++) {
+            for (let x = hs.x - 1 + i; x <= hs.x + hs.w - i; x++) {
+              const y = top - 1 - i;
+              c.px(x, y, i === rh - 1 && pal.snow ? pal.snow : x > hs.x + hs.w / 2 ? pal.roofDark : pal.roof);
+            }
+          }
+          if (pal.snow) for (let i = 0; i < rh; i++) { c.px(hs.x - 1 + i, top - 1 - i, pal.snow); }
+        } else {
+          for (let x = hs.x - 1; x <= hs.x + hs.w; x++) { c.px(x, top - 1, pal.snow || pal.roof); c.px(x, top - 2, pal.snow || pal.roofDark); }
+        }
+        if (hs.chimney) for (let y = top - Math.ceil(hs.w / 2) + 1; y < top - 1; y++) { c.px(hs.x + hs.w - 4, y, pal.roofDark); c.px(hs.x + hs.w - 3, y, pal.roofDark); }
+      }
+      // 窗戶：每 4 格一扇 2x2
+      for (let y = top + 2; y < H - 4; y += 5) {
+        for (let x = hs.x + 2; x < hs.x + hs.w - 3; x += 4) {
+          const col = lightsOnly ? lit : pal.win;
+          c.px(x, y, col); c.px(x + 1, y, col); c.px(x, y + 1, col); c.px(x + 1, y + 1, col);
+        }
+      }
+      // 門口小招牌（掛在柱子上）
+      if (hs.sign) {
+        const sx = hs.x + hs.w - 1, sy = H - 7;
+        if (!lightsOnly) for (let y = sy; y < H; y++) c.px(sx + 1, y, '#6b4a2e');
+        for (let x = sx - 3; x <= sx + 1; x++) for (let y = sy - 3; y < sy; y++) c.px(x, y, lightsOnly ? '#ffb347' : pal.sign);
+      }
+    }
+    return c;
+  }
+  for (const [name, pal] of Object.entries(TOWNS)) {
+    svgFrames(`town-${name}`, [town(pal, false)]);
+    svgFrames(`town-lights-${name}`, [town(pal, true)]);
   }
 }

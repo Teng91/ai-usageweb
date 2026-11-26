@@ -34,21 +34,26 @@
 .scene .map { inset: 0; opacity: 0; visibility: hidden; transition: opacity 0.6s, visibility 0.6s; }
 .scene .map.active { opacity: 1; visibility: visible; }
 
+/* 夜晚的調暗由 --night 決定，地圖裡每個元素各自套用；小鎮燈火不套，才亮得起來（整層調暗的話燈火最多只有 55% 亮） */
+:where(.scene .map) > *,
+:where(.scene .map)::before,
+:where(.scene .map)::after { filter: var(--night, none); }
+
 /* 每張地圖兩朵飄動的像素雲 */
 .scene .map::before,
 .scene .map::after {
   content: "";
   position: absolute;
   left: -200px;
-  width: 144px;
-  height: 48px;
-  background: url(/pixel/cloud.svg) 0 0 / 100% 100% no-repeat;
+  width: 160px;
+  height: 65px;
+  background: url(/pixel/cloud-soft.svg) 0 0 / 100% 100% no-repeat;
   image-rendering: pixelated;
   animation: sc-drift 160s linear infinite;
 }
 
 .scene .map::before { top: 6%; animation-delay: -40s; }
-.scene .map::after { top: 24%; width: 96px; height: 32px; animation-duration: 220s; animation-delay: -130s; }
+.scene .map::after { top: 24%; width: 112px; height: 46px; animation-duration: 220s; animation-delay: -130s; }
 
 @keyframes sc-drift {
   from { transform: translateX(0); }
@@ -65,12 +70,12 @@
 }
 
 /* 有遠丘的地圖：山脈放大、往後退，從丘陵後面露出雪頂 */
-.sc-mountains.behind { bottom: 150px; height: 168px; background-size: 576px 168px !important; opacity: 0.6; }
+.sc-mountains.behind { bottom: 196px; height: 210px; background-size: 720px 210px !important; opacity: 0.6; }
 
 /* ---- 多層遠景：遠丘、近丘（由產生器畫，四季各一套），慢慢橫移做出層次 ---- */
 .sc-hills-far, .sc-hills-near { left: 0; right: 0; background-repeat: repeat-x !important; }
-.sc-hills-far { bottom: 84px; height: 200px; background-size: 640px 200px !important; animation: sc-pan 360s linear infinite; }
-.sc-hills-near { bottom: 58px; height: 160px; background-size: 512px 160px !important; animation: sc-pan-near 240s linear infinite; }
+.sc-hills-far { bottom: 84px; height: 240px; background-size: 768px 240px !important; animation: sc-pan 360s linear infinite; }
+.sc-hills-near { bottom: 58px; height: 200px; background-size: 640px 200px !important; animation: sc-pan-near 240s linear infinite; }
 .sc-hills-far.sea-far { bottom: 128px; height: 140px; background-size: 448px 140px !important; }
 .hills-spring.sc-hills-far { background-image: url(/pixel/hills-far-spring.svg); }
 .hills-spring.sc-hills-near { background-image: url(/pixel/hills-near-spring.svg); }
@@ -80,17 +85,41 @@
 .hills-winter.sc-hills-far { background-image: url(/pixel/hills-far-winter.svg); }
 .hills-winter.sc-hills-near { background-image: url(/pixel/hills-near-winter.svg); }
 
-@keyframes sc-pan { from { background-position: 0 0; } to { background-position: -640px 0; } }
-@keyframes sc-pan-near { from { background-position: 0 0; } to { background-position: -512px 0; } }
+@keyframes sc-pan { from { background-position: 0 0; } to { background-position: -768px 0; } }
+@keyframes sc-pan-near { from { background-position: 0 0; } to { background-position: -640px 0; } }
+@keyframes sc-pan-town { from { background-position: 0 0; } to { background-position: -480px 0; } }
+
+/* 遠方小鎮：躲在近丘的樹後面露出屋頂；夜晚疊一層亮著的窗戶與招牌 */
+.sc-town, .sc-town-lights { left: 0; right: 0; bottom: 132px; height: 132px; background-repeat: repeat-x !important; background-size: 480px 132px !important; animation: sc-pan-town 300s linear infinite; }
+.sc-town-lights { display: none; }
+.town-spring.sc-town { background-image: url(/pixel/town-spring.svg); }
+.town-spring.sc-town-lights { background-image: url(/pixel/town-lights-spring.svg); }
+.town-autumn.sc-town { background-image: url(/pixel/town-autumn.svg); }
+.town-autumn.sc-town-lights { background-image: url(/pixel/town-lights-autumn.svg); }
+.town-winter.sc-town { background-image: url(/pixel/town-winter.svg); }
+.town-winter.sc-town-lights { background-image: url(/pixel/town-lights-winter.svg); }
+
+/* 天空：漂浮小島（上下飄）、彩虹、月亮（只有夜晚） */
+.sc-island { width: 144px; height: 120px; background-image: url(/pixel/island.svg); animation: sc-float 7s ease-in-out infinite; }
+.sc-island.autumn { background-image: url(/pixel/island-autumn.svg); }
+.sc-island.snow { background-image: url(/pixel/island-snow.svg); }
+.sc-island.small { width: 96px; height: 80px; animation-duration: 9s; animation-delay: -3s; }
+.sc-rainbow { width: 384px; height: 192px; background-image: url(/pixel/rainbow.svg); opacity: 0.45; }
+.sc-moon { display: none; right: 9%; top: 7%; width: 72px; height: 72px; background-image: url(/pixel/moon.svg); filter: drop-shadow(0 0 18px rgba(255, 236, 170, 0.65)); }
+
+@keyframes sc-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
 
 /* 每張地圖多幾朵雲：大小、高度、速度都不同 */
-.sc-cloud { left: -220px; background-image: url(/pixel/cloud.svg); animation: sc-drift 220s linear infinite; }
-.sc-cloud.c1 { top: 11%; width: 192px; height: 64px; animation-duration: 200s; animation-delay: -20s; }
-.sc-cloud.c2 { top: 33%; width: 120px; height: 40px; animation-duration: 260s; animation-delay: -150s; opacity: 0.9; }
-.sc-cloud.c3 { top: 19%; width: 168px; height: 56px; animation-duration: 230s; animation-delay: -95s; }
-.sc-cloud.c4 { top: 44%; width: 96px; height: 32px; animation-duration: 300s; animation-delay: -210s; opacity: 0.8; }
+.sc-cloud { left: -220px; background-image: url(/pixel/cloud-soft.svg); animation: sc-drift 220s linear infinite; }
+.sc-cloud.c1 { top: 11%; width: 192px; height: 78px; animation-duration: 200s; animation-delay: -20s; }
+.sc-cloud.c2 { top: 33%; width: 128px; height: 52px; animation-duration: 260s; animation-delay: -150s; opacity: 0.9; }
+.sc-cloud.c3 { top: 19%; width: 160px; height: 65px; animation-duration: 230s; animation-delay: -95s; }
+.sc-cloud.c4 { top: 44%; width: 112px; height: 46px; animation-duration: 300s; animation-delay: -210s; opacity: 0.8; }
 
-.sc-mountains.snowy { filter: saturate(0.35) brightness(1.18); }
+.sc-mountains.snowy { filter: var(--night,) saturate(0.35) brightness(1.18); }
 
 .sc-ground { left: 0; right: 0; bottom: 0; height: 76px; }
 .ground-grass { background: url(/pixel/grass.svg) repeat-x 0 0 / 128px 40px, linear-gradient(transparent 39px, #4fa83a 39px) !important; }
@@ -98,7 +127,7 @@
 .ground-snow { background: url(/pixel/snow.svg) repeat-x 0 0 / 128px 40px, linear-gradient(transparent 39px, #ffffff 39px) !important; }
 
 .sc-house { width: 144px; height: 102px; background-image: url(/pixel/house.svg); }
-.sc-house.snowy-house { filter: saturate(0.8); }
+.sc-house.snowy-house { filter: var(--night,) saturate(0.8); }
 
 /* 雪屋頂：一條白色的雪 */
 .sc-house.snowy-house::after {
@@ -116,7 +145,7 @@
 .sc-tree.blossom { background-image: url(/pixel/tree-blossom.svg); }
 .sc-tree.maple { background-image: url(/pixel/tree-maple.svg); }
 .sc-tree.maple-gold { background-image: url(/pixel/tree-gold.svg); }
-.sc-mountains.autumn-hills { filter: hue-rotate(165deg) saturate(0.75) brightness(1.05); }
+.sc-mountains.autumn-hills { filter: var(--night,) hue-rotate(165deg) saturate(0.75) brightness(1.05); }
 .ground-grass.autumn-grass { background: url(/pixel/grass-autumn.svg) repeat-x 0 0 / 128px 40px, linear-gradient(transparent 39px, #b39a3a 39px) !important; }
 .sc-pf.autumn-grass { background-image: url(/pixel/platform-autumn.svg); }
 
@@ -194,7 +223,7 @@
 }
 
 /* 浮空平台、梯子、繩子 */
-.sc-pf { height: 32px; background-repeat: repeat-x !important; background-size: 64px 32px !important; filter: drop-shadow(0 4px 0 rgba(0, 0, 0, 0.18)); }
+.sc-pf { height: 32px; background-repeat: repeat-x !important; background-size: 64px 32px !important; filter: var(--night,) drop-shadow(0 4px 0 rgba(0, 0, 0, 0.18)); }
 .pf-grass { background-image: url(/pixel/platform-grass.svg); }
 .pf-snow { background-image: url(/pixel/platform-snow.svg); }
 .pf-wood { background-image: url(/pixel/platform-wood.svg); }
@@ -527,10 +556,13 @@
 }
 
 /* ---- 夜晚：場景變暗、星星與螢火蟲 ---- */
-[data-skin="adventure"][data-theme="dark"] .scene .map,
+[data-skin="adventure"][data-theme="dark"] .scene .map { --night: brightness(0.55) saturate(0.8); }
 [data-skin="adventure"][data-theme="dark"] .scene .sc-hero { filter: brightness(0.55) saturate(0.8); }
 [data-skin="adventure"][data-theme="dark"] .scene .sc-flies { display: block; }
 [data-skin="adventure"][data-theme="dark"] .sc-sun { display: none; }
+[data-skin="adventure"][data-theme="dark"] .sc-moon { display: block; }
+[data-skin="adventure"][data-theme="dark"] .sc-town-lights { display: block; filter: drop-shadow(0 0 3px #ffc85a) drop-shadow(0 0 8px rgba(255, 180, 70, 0.8)); }
+[data-skin="adventure"][data-theme="dark"] .sc-rainbow { display: none; }
 
 [data-skin="adventure"][data-theme="dark"] body {
   background: linear-gradient(180deg, var(--sky-1) 0%, var(--sky-2) 55%, var(--sky-3) 100%) fixed;
@@ -555,16 +587,18 @@
     radial-gradient(2px 2px at 84% 10%, #fff7c2 98%, transparent),
     radial-gradient(1px 1px at 93% 28%, #fff 98%, transparent),
     radial-gradient(1px 1px at 5% 44%, #fff 98%, transparent),
-    radial-gradient(1.5px 1.5px at 55% 46%, #fff 98%, transparent),
-    radial-gradient(34px 34px at 96% 4%, #fff4c8 45%, rgba(255, 244, 200, 0.15) 60%, transparent 70%);
+    radial-gradient(1.5px 1.5px at 55% 46%, #fff 98%, transparent);
   animation: adv-twinkle 4s ease-in-out infinite alternate;
 }
 
 @media (prefers-color-scheme: dark) {
-  [data-skin="adventure"]:not([data-theme="light"]) .scene .map,
+  [data-skin="adventure"]:not([data-theme="light"]) .scene .map { --night: brightness(0.55) saturate(0.8); }
   [data-skin="adventure"]:not([data-theme="light"]) .scene .sc-hero { filter: brightness(0.55) saturate(0.8); }
   [data-skin="adventure"]:not([data-theme="light"]) .scene .sc-flies { display: block; }
   [data-skin="adventure"]:not([data-theme="light"]) .sc-sun { display: none; }
+  [data-skin="adventure"]:not([data-theme="light"]) .sc-moon { display: block; }
+  [data-skin="adventure"]:not([data-theme="light"]) .sc-town-lights { display: block; filter: drop-shadow(0 0 3px #ffc85a) drop-shadow(0 0 8px rgba(255, 180, 70, 0.8)); }
+  [data-skin="adventure"]:not([data-theme="light"]) .sc-rainbow { display: none; }
 
   [data-skin="adventure"]:not([data-theme="light"]) body {
     background: linear-gradient(180deg, var(--sky-1) 0%, var(--sky-2) 55%, var(--sky-3) 100%) fixed;
@@ -589,8 +623,7 @@
       radial-gradient(2px 2px at 84% 10%, #fff7c2 98%, transparent),
       radial-gradient(1px 1px at 93% 28%, #fff 98%, transparent),
       radial-gradient(1px 1px at 5% 44%, #fff 98%, transparent),
-      radial-gradient(1.5px 1.5px at 55% 46%, #fff 98%, transparent),
-      radial-gradient(34px 34px at 96% 4%, #fff4c8 45%, rgba(255, 244, 200, 0.15) 60%, transparent 70%);
+      radial-gradient(1.5px 1.5px at 55% 46%, #fff 98%, transparent);
     animation: adv-twinkle 4s ease-in-out infinite alternate;
   }
 }

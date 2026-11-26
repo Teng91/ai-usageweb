@@ -1,5 +1,5 @@
 // 快取名稱帶版本號；改了前端檔案就把版本 +1
-const CACHE = 'app-v39';
+const CACHE = 'app-v40';
 const SHELL = [
   '/',
   '/index.html',
@@ -20,7 +20,7 @@ const SHELL = [
   '/scene.css',
   '/manifest.webmanifest',
   '/icons/icon.svg',
-  '/pixel/cloud.svg',
+  '/pixel/cloud-soft.svg',
   '/pixel/grass.svg',
   '/pixel/hero.svg',
   '/pixel/house.svg',
@@ -58,6 +58,17 @@ const SHELL = [
   '/pixel/hills-far-autumn.svg',
   '/pixel/hills-near-autumn.svg',
   '/pixel/hills-far-winter.svg',
+  '/pixel/island.svg',
+  '/pixel/island-autumn.svg',
+  '/pixel/island-snow.svg',
+  '/pixel/rainbow.svg',
+  '/pixel/moon.svg',
+  '/pixel/town-spring.svg',
+  '/pixel/town-lights-spring.svg',
+  '/pixel/town-autumn.svg',
+  '/pixel/town-lights-autumn.svg',
+  '/pixel/town-winter.svg',
+  '/pixel/town-lights-winter.svg',
   '/pixel/hills-near-winter.svg',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
