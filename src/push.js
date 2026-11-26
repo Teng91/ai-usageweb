@@ -122,12 +122,8 @@ export class PushService {
     if (!alerts.length) return 0;
 
     const markSent = (list) => { for (const a of list) for (const k of a.keys) this.state.sent[k] = now; };
-    if (this.viewers() > 0) {
-      // 看著網頁時只記下不推播：畫面上已經看到了
-      markSent(alerts);
-      this.save();
-      return 0;
-    }
+    // 網頁開著時先不推播、也不記下：可能只是分頁開著人沒在看，關掉之後條件還成立就照樣推播
+    if (this.viewers() > 0) return 0;
 
     // 超過每日上限的先不送也不記下，明天（或額度還沒重置前）還會再判斷，不會整個週期都漏掉
     const day = localParts(now, this.tz).dateKey;

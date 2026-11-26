@@ -1,5 +1,5 @@
 // 推播的判斷規則（純函式，不碰網路與檔案，方便測試）
-//  A. 用量警告：依最近的消耗速度，預估重置前會用完才通知；95% 一定通知
+//  A. 用量警告：依最近的消耗速度，預估重置前會用完才通知；週／月額度另外在 80%、90% 各通知一次；95% 一定通知
 //  B. 快重置還有剩：只看週／月這種長週期，24h 剩 ≥40%、12h 剩 ≥20%、6h 剩 ≥10% 各提醒一次
 
 const MIN = 60_000;
@@ -8,6 +8,7 @@ const HOUR = 60 * MIN;
 export const RULES = {
   warnFloorPct: 50, // 低於這個不做速度預警，避免一開工就被叫
   hardPct: 95, // 到這裡一定通知
+  longThresholds: [90, 80], // 週／月額度的固定門檻（由高到低），同一週期各一次
   rateLookbackMs: 90 * MIN, // 用這段時間內的樣本估速度
   rateMinSpanMs: 10 * MIN, // 樣本至少跨這麼久才估
   rateMinDelta: 2, // 這段時間至少漲幾個百分點才算「在用」
@@ -150,11 +151,25 @@ export function evaluateAlerts({ providers, history, sent, now, tz, quiet }) {
         const kWarn = `usage:${base}:warn`;
         if (pct >= RULES.hardPct && !sent[kHard]) {
           out.push({
-            kind: 'usage', provider: p.id, keys: [kHard, kWarn],
+            // 低的門檻一起記下，到 95% 之後不會再補發 90%／80%
+            kind: 'usage', provider: p.id, keys: [kHard, kWarn, ...RULES.longThresholds.map((t) => `usage:${base}:t${t}`)],
             title: `⚠️ ${name} 已用 ${pctText(pct)}`,
             body: r ? `${resetText} 才重置（還要 ${formatDuration(r - now)}）` : '快用完了',
           });
           continue;
+        }
+        // 週／月這種長週期漲得慢，速度預警很難成立：另外在固定門檻（90%、80%）各提醒一次
+        if (Number(w.periodSec) >= RULES.longPeriodSec) {
+          const idx = RULES.longThresholds.findIndex((t) => pct >= t && !sent[`usage:${base}:t${t}`]);
+          if (idx >= 0 && !RULES.longThresholds.slice(0, idx).some((t) => pct >= t)) {
+            out.push({
+              kind: 'usage', provider: p.id,
+              keys: RULES.longThresholds.slice(idx).map((t) => `usage:${base}:t${t}`), // 低的門檻一起記下
+              title: `⚠️ ${name} 已用 ${pctText(pct)}`,
+              body: r ? `${resetText} 重置（還有 ${formatDuration(r - now)}）` : '快用完了',
+            });
+            continue;
+          }
         }
         const rate = burnRate(h, now);
         if (pct >= RULES.warnFloorPct && rate > 0 && r && !sent[kWarn]) {

@@ -91,9 +91,37 @@ test('A：重置時間每次差幾秒仍算同一週期', () => {
 });
 
 const weekly = { id: '7d', label: '每週', periodSec: 604800 };
+// 單獨測「快重置」時，先把 80%／90% 門檻標成已發
+const thresholdsSent = (resetAt) => ({ [`usage:claude:7d:${resetAt}:t80`]: 1, [`usage:claude:7d:${resetAt}:t90`]: 1 });
+
+test('A：週／月額度到 80%、90% 各發一次（不看速度）', () => {
+  const at = (pct, sent) => run([[-HOUR, pct], [0, pct]], { resetAt: NOON + 4 * 24 * HOUR, w: weekly, sent });
+  const a = at(81);
+  assert.equal(a.length, 1);
+  assert.equal(a[0].kind, 'usage');
+  assert.equal(a[0].title, '⚠️ Claude 每週 已用 81%');
+  assert.match(a[0].body, /重置（還有 4 天）/);
+  assert.ok(a[0].keys[0].endsWith(':t80'));
+  const s80 = Object.fromEntries(a[0].keys.map((k) => [k, 1]));
+  assert.equal(at(85, s80).length, 0, '80% 發過就不再發');
+  const b = at(91, s80);
+  assert.equal(b.length, 1, '90% 再發一次');
+  assert.ok(b[0].keys[0].endsWith(':t90'));
+  // 直接跳到 91%：只發 90% 那則，80% 一起記下
+  const c = at(91);
+  assert.deepEqual(c[0].keys.map((k) => k.split(':').pop()), ['t90', 't80']);
+  // 95% 保底發過之後，不會再補 90%／80%
+  const hard = Object.fromEntries(at(96)[0].keys.map((k) => [k, 1]));
+  assert.equal(at(97, hard).length, 0);
+  assert.equal(at(79).length, 0, '還不到 80%');
+  assert.equal(run([[-HOUR, 81], [0, 81]], { resetAt: NOON + 3 * HOUR }).length, 0, '5 小時額度不用固定門檻');
+});
 
 test('B：24h 剩 ≥40%、12h 剩 ≥20%、6h 剩 ≥10%', () => {
-  const at = (hoursLeft, pct, sent) => run([[-HOUR, pct], [0, pct]], { resetAt: NOON + hoursLeft * HOUR, w: weekly, sent });
+  const at = (hoursLeft, pct, sent = {}) => {
+    const resetAt = NOON + hoursLeft * HOUR;
+    return run([[-HOUR, pct], [0, pct]], { resetAt, w: weekly, sent: { ...thresholdsSent(resetAt), ...sent } });
+  };
   const a = at(20, 50);
   assert.equal(a.length, 1);
   assert.equal(a[0].kind, 'reset');
@@ -127,7 +155,7 @@ test('勿擾：00–08 不發；22–24 時把勿擾期間會遇到的提醒提�
   assert.equal(q.preQuiet, true);
   assert.equal(q.quietEndsAt, Date.UTC(2026, 10, 26, 0, 0)); // 隔天 08:00
   // 隔天 09:00 重置（距 22:00 有 11 小時）：6h 那階會落在勿擾期間（03:00）→ 現在先發
-  const a = run([[-HOUR, 85], [0, 85]], { now: ten, resetAt: ten + 11 * HOUR, w: weekly });
+  const a = run([[-HOUR, 85], [0, 85]], { now: ten, resetAt: ten + 11 * HOUR, w: weekly, sent: thresholdsSent(ten + 11 * HOUR) });
   assert.equal(a.length, 1);
   assert.ok(a[0].keys[0].endsWith(':6h'));
   assert.match(a[0].body, /明天 09:00 重置/);
@@ -161,6 +189,7 @@ test('同一類的通知合成一則', () => {
 const SUB = { endpoint: 'https://push.example.test/abc', keys: { p256dh: 'B'.padEnd(87, 'A'), auth: 'A'.repeat(22) } };
 
 function service({ viewers = 0, send } = {}) {
+  const viewersFn = typeof viewers === 'function' ? viewers : () => viewers;
   let now = NOON;
   const views = [];
   const snapshot = { snapshot: () => ({ providers: views }) };
@@ -171,7 +200,7 @@ function service({ viewers = 0, send } = {}) {
     tz: TZ,
     quiet: QUIET,
     snapshot,
-    viewers: () => viewers,
+    viewers: viewersFn,
     now: () => now,
     send: send || (async (sub, payload) => { calls.push({ sub: sub.endpoint, payload }); return { ok: true, status: 201 }; }),
   });
@@ -198,13 +227,17 @@ test('PushService：送出、去重、prefs 關掉就不送', async () => {
   assert.deepEqual(svc.prefs(SUB.endpoint), { usage: false, reset: false });
 });
 
-test('PushService：網頁開著時記下但不推播', async () => {
-  const { svc, calls, feed } = service({ viewers: 1 });
+test('PushService：網頁開著時先不推也不記下，關掉後照樣推播', async () => {
+  let viewers = 1;
+  const { svc, calls, feed } = service({ viewers: () => viewers });
   svc.subscribe(SUB);
   feed(96);
   assert.equal(await svc.evaluate(), 0);
   assert.equal(calls.length, 0);
-  assert.ok(Object.keys(svc.state.sent).length > 0);
+  assert.equal(Object.keys(svc.state.sent).length, 0);
+  viewers = 0;
+  assert.equal(await svc.evaluate(), 1);
+  assert.equal(calls.length, 1);
 });
 
 test('PushService：訂閱失效（410）就刪掉', async () => {

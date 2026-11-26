@@ -218,6 +218,8 @@ function renderWindow(w) {
   const sub = document.createElement('p');
   sub.className = 'win-sub';
   sub.dataset.resetsAt = w.resetsAt || '';
+  // 沒用過、也沒有重置時間（例如 Antigravity 的額度要用了第一次才開始計時）：講清楚，不要留白
+  if (!w.resetsAt && !(w.usedPct > 0)) sub.dataset.idle = '1';
 
   wrap.append(row, bar, sub);
   return wrap;
@@ -226,7 +228,7 @@ function renderWindow(w) {
 /** 每秒更新：倒數、X 分鐘前、狀態 */
 function tickCard(el, p, now = Date.now()) {
   for (const sub of el.querySelectorAll('.win-sub')) {
-    const full = resetText(sub.dataset.resetsAt, now);
+    const full = resetText(sub.dataset.resetsAt, now) || (sub.dataset.idle ? '還沒用，用了才開始計時' : '');
     // 兩欄時寬度不夠，只顯示倒數，完整時間放在提示
     const short = sub.closest('.win-grid') ? full.replace(/（.*）$/, '') : full;
     sub.textContent = short;
