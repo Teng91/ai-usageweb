@@ -9,8 +9,47 @@ import { SnapshotStore } from '../src/snapshot.js';
 import { Poller } from '../src/poller.js';
 import { ProviderError } from '../src/errors.js';
 import { requestJson } from '../src/http.js';
+import { SerialWriter } from '../src/fsutil.js';
+import { credsFromEnv } from '../src/config.js';
+import { readJsonBody } from '../src/respond.js';
+import { Readable } from 'node:stream';
 
 const KEY = crypto.randomBytes(32).toString('base64');
+
+// ---------- 共用小工具 ----------
+test('SerialWriter: 依序寫入；某一次失敗會丟給呼叫端，但不會卡住下一次', async () => {
+  const dir = tmpDir();
+  const w = new SerialWriter(path.join(dir, 'a.json'));
+  await Promise.all([w.write('1'), w.write('2')]);
+  assert.equal(fs.readFileSync(path.join(dir, 'a.json'), 'utf8'), '2');
+  const bad = new SerialWriter(path.join(dir, 'a.json', 'x.json')); // 父路徑是檔案：一定寫不進去
+  await assert.rejects(bad.write('x'));
+  await bad.flush();
+  bad.file = path.join(dir, 'b.json');
+  await bad.write('ok');
+  assert.equal(fs.readFileSync(path.join(dir, 'b.json'), 'utf8'), 'ok');
+});
+
+test('credsFromEnv: 只取有值的欄位，整家都沒有就是 null', () => {
+  const c = credsFromEnv({ CLAUDE_OAUTH_TOKEN: 'long', CLAUDE_EXPIRES_AT: '123', CODEX_REFRESH_TOKEN: '' });
+  assert.deepEqual(c.claude, { accessToken: 'long', expiresAt: 123 });
+  assert.equal(c.codex, null);
+  assert.equal(c.openrouter, null);
+});
+
+test('readJsonBody: 只收 JSON 物件，陣列、壞掉的、太大的都回 null', async () => {
+  const req = (text) => Readable.from([Buffer.from(text)]);
+  assert.deepEqual(await readJsonBody(req('{"a":1}'), 100), { a: 1 });
+  assert.equal(await readJsonBody(req('[1]'), 100), null);
+  assert.equal(await readJsonBody(req('{oops'), 100), null);
+  assert.equal(await readJsonBody(req('null'), 100), null);
+  assert.equal(await readJsonBody(req(`{"a":"${'x'.repeat(200)}"}`), 100), null);
+});
+
+test('CredentialStore: 可以直接給 config.js 讀好的初始憑證', async () => {
+  const s = await new CredentialStore({ dataDir: tmpDir(), keyB64: KEY, initial: { openrouter: { apiKey: 'k' } } }).load();
+  assert.equal(s.get('openrouter').apiKey, 'k');
+});
 
 // ---------- credentials ----------
 test('credentials: 續期後重開機，用的是 volume 裡的新 token', async () => {

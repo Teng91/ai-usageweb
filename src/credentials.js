@@ -1,36 +1,8 @@
 import crypto from 'node:crypto';
 import path from 'node:path';
-import { writeFileAtomic, readFileOrNull } from './fsutil.js';
+import { SerialWriter, readFileOrNull } from './fsutil.js';
+import { credsFromEnv } from './config.js';
 import { logWarn, logInfo } from './log.js';
-
-/** 每家從環境變數（fly secrets）讀出的初始憑證 */
-export function credsFromEnv(env = process.env) {
-  const pick = (obj) => {
-    const out = {};
-    for (const [k, v] of Object.entries(obj)) if (v !== undefined && v !== '') out[k] = v;
-    return Object.keys(out).length ? out : null;
-  };
-  const num = (v) => (v === undefined || v === '' ? undefined : Number(v));
-  return {
-    openrouter: pick({ apiKey: env.OPENROUTER_API_KEY }),
-    claude: pick({
-      accessToken: env.CLAUDE_ACCESS_TOKEN || env.CLAUDE_OAUTH_TOKEN,
-      refreshToken: env.CLAUDE_REFRESH_TOKEN,
-      expiresAt: num(env.CLAUDE_EXPIRES_AT),
-    }),
-    codex: pick({
-      accessToken: env.CODEX_ACCESS_TOKEN,
-      refreshToken: env.CODEX_REFRESH_TOKEN,
-      accountId: env.CODEX_ACCOUNT_ID,
-    }),
-    antigravity: pick({
-      refreshToken: env.ANTIGRAVITY_REFRESH_TOKEN,
-      clientId: env.ANTIGRAVITY_CLIENT_ID,
-      clientSecret: env.ANTIGRAVITY_CLIENT_SECRET,
-      projectId: env.ANTIGRAVITY_PROJECT_ID,
-    }),
-  };
-}
 
 function encrypt(key, plaintext) {
   const iv = crypto.randomBytes(12);
@@ -57,21 +29,22 @@ export function parseKey(b64) {
 /**
  * 憑證儲存：
  *  - 讀取優先順序：volume（加密）> 環境變數；CREDENTIALS_RESET 指定的服務以環境變數為準
+ *  - 環境變數由 config.js 讀好傳進來（initial）；測試可以改傳原始的 env 物件
  *  - 續期後的新值先原子寫入 volume，成功才更新記憶體（寫入失敗就不使用新 token）
  *  - 每家一個 in-flight 鎖，避免同時用舊 refresh token 續期兩次
  */
 export class CredentialStore {
-  constructor({ dataDir, keyB64, env = process.env, reset = [], knownIds = null }) {
+  constructor({ dataDir, keyB64, initial = null, env = {}, reset = [], knownIds = null }) {
     this.file = path.join(dataDir, 'credentials.enc');
     this.key = parseKey(keyB64);
-    this.env = credsFromEnv(env);
+    this.env = initial || credsFromEnv(env);
     this.reset = new Set(reset);
     // 有程式的服務；volume 裡其他服務（例如已刪掉的 Grok、Copilot）的憑證在載入時清掉，不再留著
     this.knownIds = knownIds ? new Set(knownIds) : null;
     this.creds = {};
     this.versions = {};
     this.locks = new Map();
-    this.writeChain = Promise.resolve();
+    this.writer = new SerialWriter(this.file);
   }
 
   async load() {
@@ -131,10 +104,7 @@ export class CredentialStore {
 
   async persist() {
     if (!this.key) return;
-    const text = encrypt(this.key, JSON.stringify(this.creds));
-    const job = this.writeChain.then(() => writeFileAtomic(this.file, text));
-    this.writeChain = job.catch(() => {});
-    await job;
+    await this.writer.write(encrypt(this.key, JSON.stringify(this.creds)));
   }
 
   /** 合併新值，先寫 volume 成功才生效；給了 expectVersion 而憑證已被換掉就不存（丟錯） */

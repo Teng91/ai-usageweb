@@ -12,6 +12,8 @@ export const state = {
   pollIntervalSec: 120,
   es: null,
   live: false,
+  // 頂列的連線狀態（live／offline／paused／waking／polling／connecting），由 app.js 算好
+  conn: 'connecting',
   // SSE 太久沒收到事件就當作半斷線：伺服器 ping 的間隔（連上時伺服器會告訴我們）與計時器
   pingSec: 25,
   sseWatchdog: null,

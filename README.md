@@ -303,20 +303,20 @@ src/snapshot.js           記憶體快照、/data/snapshot.json 原子寫入
 src/routes.js             路由：公開 API、SSE、管理 API、ACCESS_KEY
 src/push-routes.js        推播 API：/api/push/tick 與裝置訂閱、設定、測試
 src/static.js             靜態檔（擋路徑穿越、br／gzip 預先壓好放記憶體、ETag）
-src/respond.js            回應與驗證的共用小工具（JSON、安全標頭、固定時間比較）
+src/respond.js            回應與驗證的共用小工具（JSON、讀 JSON body、安全標頭、固定時間比較）
 src/rankings.js           OpenRouter 模型排行（每小時最多抓一次）
 src/alerts.js             推播規則（用量警告、快重置還有剩、額度重置了、勿擾時段；純函式）
 src/time.js               時區換算與時間寫法（推播內容用）
 src/push.js               推播服務：判斷、去重、每日上限、發送
 src/push-store.js         推播存檔 /data/push.json：裝置訂閱、全站設定、樣本、已發紀錄與每日次數
 src/webpush.js            Web Push：VAPID 簽名與 RFC 8291 加密（只用內建 crypto）
-src/credentials.js        環境變數＋加密 volume、每家續期鎖
+src/credentials.js        加密 volume（初始值來自 config.js 讀的環境變數）、每家續期鎖
 src/sse.js                SSE 連線、ping 事件、廣播、單一連線最長 30 分鐘、連線數上限
 src/http.js               對外請求、錯誤分類、Cloudflare 偵測
 src/oauth.js              refresh_token 續期、先存再用、401 續期重試（Claude／Codex 共用）
-src/config.js             環境變數設定（含各家端點覆寫與手動設定值）
+src/config.js             環境變數設定（全專案只在這裡讀；含初始憑證、各家端點覆寫與手動設定值）
 src/errors.js             ProviderError（錯誤種類）、Retry-After 解析
-src/fsutil.js、log.js     原子寫檔、一行一筆 JSON log
+src/fsutil.js、log.js     原子寫檔、同一個檔案依序寫入（SerialWriter）、一行一筆 JSON log
 src/providers/*.js        四家 adapter（統一輸出 { plan, planExpiresAt?, windows, balance, note }）；顯示順序在 index.js
 public/                   PWA（index.html、style.css、sw.js、manifest、icons）
 public/app.js             前端進入點：資料與連線（快照、SSE、SSE 被擋時改輪詢）

@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { writeFileAtomic, readFileOrNull } from './fsutil.js';
+import { SerialWriter, readFileOrNull } from './fsutil.js';
 import { logWarn } from './log.js';
 
 // 超過幾個更新週期沒新資料就算過期（快照的每家都附上算好的 staleAt，前端不必再寫一份規則）
@@ -24,7 +24,7 @@ export class SnapshotStore {
     this.order = providers.map((p) => p.id);
     this.names = Object.fromEntries(providers.map((p) => [p.id, p.name]));
     this.entries = {};
-    this.writeChain = Promise.resolve();
+    this.writer = new SerialWriter(this.file);
     for (const p of providers) this.entries[p.id] = blank(p);
   }
 
@@ -89,13 +89,11 @@ export class SnapshotStore {
 
   async save() {
     const data = JSON.stringify(this.snapshot(), null, 2);
-    const job = this.writeChain.then(() => writeFileAtomic(this.file, data));
-    this.writeChain = job.catch((err) => logWarn('寫入 snapshot.json 失敗', { code: err.code }));
-    return this.writeChain;
+    return this.writer.write(data).catch((err) => logWarn('寫入 snapshot.json 失敗', { code: err.code }));
   }
 
   flush() {
-    return this.writeChain;
+    return this.writer.flush();
   }
 }
 

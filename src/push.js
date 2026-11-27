@@ -42,6 +42,14 @@ export class PushService {
     return this.#deliver(sub, { title: '🔔 測試通知', body: '收得到這則，額度快用完或快重置時就會通知你', tag: 'test', url: '/' });
   }
 
+  // ---- 裝置訂閱與設定（push-routes.js 只透過這些，不直接碰 PushStore） ----
+  subscribe(sub, prefs) { return this.store.subscribe(sub, prefs); }
+  unsubscribe(endpoint) { this.store.unsubscribe(endpoint); }
+  prefs(endpoint) { return this.store.prefs(endpoint); }
+  updatePrefs(endpoint, prefs) { return this.store.updatePrefs(endpoint, prefs); }
+  settings() { return this.store.settings(); }
+  updateSettings(input) { return this.store.updateSettings(input); }
+
   // ---- 資料 ----
   /** 每次某家抓到新資料時呼叫 */
   observe(view) {

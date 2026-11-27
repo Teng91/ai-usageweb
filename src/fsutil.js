@@ -17,3 +17,25 @@ export async function readFileOrNull(file) {
     throw err;
   }
 }
+
+/**
+ * 同一個檔案的寫入排隊依序做（同時寫會共用同一個 .tmp）。
+ * write() 回傳這一次的結果（失敗會丟錯，由呼叫端決定要不要吞掉）；失敗不會卡住下一次。
+ * flush() 等排在前面的都寫完（關機用）。
+ */
+export class SerialWriter {
+  constructor(file) {
+    this.file = file;
+    this.chain = Promise.resolve();
+  }
+
+  write(data) {
+    const job = this.chain.then(() => writeFileAtomic(this.file, data));
+    this.chain = job.catch(() => {});
+    return job;
+  }
+
+  flush() {
+    return this.chain;
+  }
+}

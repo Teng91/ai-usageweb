@@ -3,10 +3,10 @@ import { config } from './config.js';
 
 /**
  * 對外部服務發一個請求並解析 JSON。所有錯誤都轉成 ProviderError，
- * 錯誤訊息只含狀態碼與簡短說明，不含 token 或原始回應。
+ * 錯誤訊息只含狀態碼與簡短說明，不含 token 或原始回應。逾時 timeoutMs 預設是 REQUEST_TIMEOUT_MS。
  */
-export async function requestJson(url, { method = 'GET', headers = {}, body, label = '' } = {}) {
-  const timeout = AbortSignal.timeout(config.requestTimeoutMs);
+export async function requestJson(url, { method = 'GET', headers = {}, body, label = '', timeoutMs = config.requestTimeoutMs } = {}) {
+  const timeout = AbortSignal.timeout(timeoutMs);
   let res;
   try {
     res = await fetch(url, {

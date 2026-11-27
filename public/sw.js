@@ -1,5 +1,5 @@
 // 快取名稱帶版本號；改了前端檔案就把版本 +1
-const CACHE = 'app-v58';
+const CACHE = 'app-v59';
 const SHELL = [
   '/',
   '/index.html',

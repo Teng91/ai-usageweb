@@ -1,5 +1,37 @@
 import path from 'node:path';
 
+/**
+ * 每家從環境變數（fly secrets）讀出的初始憑證；新增或刪掉一家時改這裡。
+ * 傳入 env 物件（測試可以給假的），這個函式本身不讀 process.env。
+ */
+export function credsFromEnv(env) {
+  const pick = (obj) => {
+    const out = {};
+    for (const [k, v] of Object.entries(obj)) if (v !== undefined && v !== '') out[k] = v;
+    return Object.keys(out).length ? out : null;
+  };
+  const num = (v) => (v === undefined || v === '' ? undefined : Number(v));
+  return {
+    openrouter: pick({ apiKey: env.OPENROUTER_API_KEY }),
+    claude: pick({
+      accessToken: env.CLAUDE_ACCESS_TOKEN || env.CLAUDE_OAUTH_TOKEN,
+      refreshToken: env.CLAUDE_REFRESH_TOKEN,
+      expiresAt: num(env.CLAUDE_EXPIRES_AT),
+    }),
+    codex: pick({
+      accessToken: env.CODEX_ACCESS_TOKEN,
+      refreshToken: env.CODEX_REFRESH_TOKEN,
+      accountId: env.CODEX_ACCOUNT_ID,
+    }),
+    antigravity: pick({
+      refreshToken: env.ANTIGRAVITY_REFRESH_TOKEN,
+      clientId: env.ANTIGRAVITY_CLIENT_ID,
+      clientSecret: env.ANTIGRAVITY_CLIENT_SECRET,
+      projectId: env.ANTIGRAVITY_PROJECT_ID,
+    }),
+  };
+}
+
 function int(name, def) {
   const v = Number.parseInt(process.env[name] ?? '', 10);
   return Number.isFinite(v) && v > 0 ? v : def;
@@ -32,6 +64,8 @@ export const config = {
   // 只開部分服務，例如 PROVIDERS=claude,openrouter；空白代表全部
   enabledProviders: (process.env.PROVIDERS || '')
     .split(',').map((s) => s.trim()).filter(Boolean),
+  // 各家的初始憑證（fly secrets）；volume 裡續期過的會蓋過它，見 credentials.js
+  initialCredentials: credsFromEnv(process.env),
 };
 
 // 各家端點與 client id：內部端點常變，可用環境變數覆寫；啟動時讀一次

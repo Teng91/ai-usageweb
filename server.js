@@ -26,6 +26,7 @@ export async function createApp(opts = {}) {
   const creds = await new CredentialStore({
     dataDir: cfg.dataDir,
     keyB64: cfg.credentialsKey,
+    initial: cfg.initialCredentials,
     reset: cfg.credentialsReset,
     knownIds: ALL_PROVIDERS.map((p) => p.id),
   }).load();

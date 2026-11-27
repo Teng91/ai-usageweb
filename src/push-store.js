@@ -1,7 +1,7 @@
 // 推播的存檔（/data/push.json）：裝置訂閱、全站設定，以及判斷用的樣本、已發紀錄與每日次數
 // 存檔格式只有這個檔案知道；push.js 透過下面的方法讀寫，不直接碰 state
 import path from 'node:path';
-import { writeFileAtomic, readFileOrNull } from './fsutil.js';
+import { SerialWriter, readFileOrNull } from './fsutil.js';
 import { logWarn } from './log.js';
 import { RULES, recordSample } from './alerts.js';
 
@@ -18,7 +18,7 @@ export class PushStore {
     this.quiet = quiet; // PUSH_QUIET：網頁上沒改過勿擾時段時用這個
     this.now = now;
     this.state = blankState();
-    this.writeChain = Promise.resolve();
+    this.writer = new SerialWriter(this.file);
   }
 
   async load() {
@@ -35,13 +35,11 @@ export class PushStore {
 
   save() {
     const data = JSON.stringify(this.state);
-    const job = this.writeChain.then(() => writeFileAtomic(this.file, data));
-    this.writeChain = job.catch((err) => logWarn('寫入 push.json 失敗', { code: err.code }));
-    return this.writeChain;
+    return this.writer.write(data).catch((err) => logWarn('寫入 push.json 失敗', { code: err.code }));
   }
 
   flush() {
-    return this.writeChain;
+    return this.writer.flush();
   }
 
   // ---- 判斷用的紀錄 ----

@@ -8,3 +8,5 @@ server-*.json
 *.enc.tmp
 *.log
 .DS_Store
+# 本機的接手筆記（含個人資料，repo 是公開的，不要提交）
+繼續清單.md

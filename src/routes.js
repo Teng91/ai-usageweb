@@ -2,7 +2,7 @@
 import { logInfo } from './log.js';
 import { serveStatic } from './static.js';
 import { createPushRoutes } from './push-routes.js';
-import { sendJson, setSecurityHeaders, readBody, safeEqual, checkBearer, parseCookies } from './respond.js';
+import { sendJson, setSecurityHeaders, readJsonBody, safeEqual, checkBearer, parseCookies } from './respond.js';
 
 /** 依 app 的各元件建立 request handler（async，錯誤由呼叫端處理） */
 export function createHandler({ cfg, poller, hub, snapshot, creds, providers, rankings, push, publicDir }) {
@@ -73,15 +73,8 @@ export function createHandler({ cfg, poller, hub, snapshot, creds, providers, ra
       const id = m[1];
       const prov = providers.find((x) => x.id === id);
       if (!prov) return sendJson(res, 404, { error: 'unknown provider' });
-      let body;
-      try {
-        body = JSON.parse(await readBody(req, 64 * 1024));
-      } catch {
-        return sendJson(res, 400, { error: 'body 必須是 JSON 物件' });
-      }
-      if (!body || typeof body !== 'object' || Array.isArray(body)) {
-        return sendJson(res, 400, { error: 'body 必須是 JSON 物件' });
-      }
+      const body = await readJsonBody(req, 64 * 1024);
+      if (!body) return sendJson(res, 400, { error: 'body 必須是 JSON 物件' });
       const problem = checkCredentialBody(prov, body);
       if (problem) return sendJson(res, 400, problem);
       await creds.replace(id, body);

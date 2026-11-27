@@ -20,6 +20,23 @@ const SLOW_WAKE_MS = 800;
 // SSE 連著會自己推過來；輪詢模式（或 SSE 還沒連上）就照這些間隔再問，直到各家都是新的，不必等下一輪或按 F5
 const CATCH_UP_DELAYS_MS = [2000, 3000, 4000, 6000, 10000];
 
+// ---------- 連線狀態 ----------
+/** 連線狀態只在這裡判斷（輸入都是這個檔案的連線細節），cards.js 照 state.conn 畫 */
+function connState() {
+  if (state.live) return 'live';
+  if (state.offline) return 'offline';
+  if (document.visibilityState === 'hidden') return 'paused';
+  if (state.slowWake) return 'waking';
+  if (state.fallbackTimer) return 'polling';
+  return 'connecting';
+}
+
+/** 連線狀態有可能變了：重算並更新頂列 */
+function chrome() {
+  state.conn = connState();
+  renderChrome();
+}
+
 // ---------- 資料 ----------
 async function loadSnapshot() {
   try {
@@ -33,7 +50,7 @@ async function loadSnapshot() {
   } catch {
     state.offline = true;
   }
-  renderChrome();
+  chrome();
 }
 
 /** 先畫出上次存下的數字，伺服器還在喚醒時畫面就不會是空的（由 service worker 給，快取細節只在 sw.js） */
@@ -78,7 +95,7 @@ function openStream() {
     state.offline = false;
     stopFallback();
     armWatchdog();
-    renderChrome();
+    chrome();
   });
   es.addEventListener('snapshot', (e) => {
     armWatchdog();
@@ -87,7 +104,7 @@ function openStream() {
   es.addEventListener('provider', (e) => {
     armWatchdog();
     applyProvider(JSON.parse(e.data));
-    renderChrome();
+    chrome();
   });
   es.addEventListener('ping', (e) => {
     // 伺服器連上時先送一次，告訴我們間隔
@@ -102,7 +119,7 @@ function openStream() {
   es.addEventListener('error', () => {
     state.live = false;
     state.sseFailures += 1;
-    renderChrome();
+    chrome();
     // 瀏覽器會自動重連（retry: 5000），但重連被拒（例如回 502／503）就整個關掉、不再重試，要馬上改輪詢；
     // 一直重連不上也一樣，連續失敗 3 次改輪詢
     if (es.readyState === EventSource.CLOSED || state.sseFailures >= 3) fallBackToPolling();
@@ -186,8 +203,8 @@ async function start() {
   state.catchUpStep = 0;
   stopCatchUp();
   state.waking = true;
-  const slowTimer = setTimeout(() => { state.slowWake = true; renderChrome(); }, SLOW_WAKE_MS);
-  renderChrome();
+  const slowTimer = setTimeout(() => { state.slowWake = true; chrome(); }, SLOW_WAKE_MS);
+  chrome();
   if (!state.providers.size) await paintCached();
   renderEmpty();
   try {
@@ -197,7 +214,7 @@ async function start() {
     state.waking = false;
     state.slowWake = false;
     renderEmpty();
-    renderChrome();
+    chrome();
   }
   if (document.visibilityState !== 'visible') return;
   // 已經在輪詢（SSE 被擋）就繼續輪詢，不必每次回到前景都再等一次 SSE 逾時
@@ -212,14 +229,19 @@ document.addEventListener('visibilitychange', () => {
     closeStream();
     stopFallback();
     stopCatchUp();
-    renderChrome();
+    chrome();
   } else {
     start();
   }
 });
 
-window.addEventListener('online', () => { state.offline = false; start(); });
-window.addEventListener('offline', () => { state.offline = true; renderChrome(); });
+window.addEventListener('online', () => {
+  state.offline = false;
+  // 背景分頁不必馬上叫醒伺服器：切回來時 visibilitychange 會再 start()
+  if (document.visibilityState === 'visible') start();
+  else chrome();
+});
+window.addEventListener('offline', () => { state.offline = true; chrome(); });
 
 // ---------- 啟動 ----------
 initThemeToggle();

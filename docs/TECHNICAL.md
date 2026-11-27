@@ -94,16 +94,16 @@ flowchart LR
 | `src/forecast.js` | 預估用完時間：5 小時這種短週期看最近 90 分鐘的速度（跟推播共用 `alerts.js` 的算法）；每週、每月看這一輪的平均速度 |
 | `src/static.js` | 靜態檔：擋路徑穿越、文字檔預先壓成 br／gzip 放記憶體、ETag／304 |
 | `src/providers/*.js` | 四家 adapter |
-| `src/credentials.js` | 環境變數 + 加密 volume、每家續期鎖 |
+| `src/credentials.js` | 加密 volume（初始值是 `config.js` 讀好的環境變數）、每家續期鎖 |
 | `src/snapshot.js` | 記憶體快照、原子寫檔 |
-| `src/rankings.js` | OpenRouter 排行（每小時最多抓一次、存檔格式版本） |
+| `src/rankings.js` | OpenRouter 排行（每小時最多抓一次，模型列表與三個排行同時抓；存檔格式版本） |
 | `src/push.js` | 推播服務：判斷、去重、每日上限、發送 |
 | `src/push-store.js` | 推播存檔 `/data/push.json`：裝置訂閱、全站設定、樣本、已發紀錄、每日次數、存檔格式版本（只有這個檔案知道存檔格式，`push.js` 透過它的方法讀寫） |
 | `src/alerts.js` | 推播規則（純函式）：用量警告、快重置還有剩、額度重置了、勿擾時段 |
 | `src/time.js` | 時區換算與時間寫法（「明天 10:00」「3 小時」） |
 | `src/webpush.js` | VAPID 簽名與 RFC 8291 內容加密 |
 | `src/sse.js` | SSE 連線、`ping` 事件、廣播、單一連線最長時間與連線數上限 |
-| `src/config.js` | 環境變數設定，含各家端點覆寫與手動設定值（`CLAUDE_PLAN` 等每次直接讀） |
+| `src/config.js` | 環境變數設定（全專案只在這裡讀），含初始憑證（`credsFromEnv`）、各家端點覆寫與手動設定值（`CLAUDE_PLAN` 等每次直接讀） |
 
 **前端模組**（原生 ES modules、不打包）
 

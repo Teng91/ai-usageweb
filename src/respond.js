@@ -41,6 +41,16 @@ export function readBody(req, limit) {
   });
 }
 
+/** 讀 JSON 物件 body；太大、不是 JSON、不是物件（含陣列）都回 null，呼叫端回 400 */
+export async function readJsonBody(req, limit) {
+  try {
+    const v = JSON.parse(await readBody(req, limit));
+    return v && typeof v === 'object' && !Array.isArray(v) ? v : null;
+  } catch {
+    return null;
+  }
+}
+
 /** 固定時間比較，避免從回應時間猜出 token */
 export function safeEqual(a, b) {
   const ha = crypto.createHash('sha256').update(String(a)).digest();

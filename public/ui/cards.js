@@ -249,17 +249,15 @@ function statusLine(p, st, updating, now) {
   return ['', ''];
 }
 
-/** 頂列連線狀態、頂端進度條（每張卡片底下已有資料時間，頁尾不再顯示「最後更新」） */
+/**
+ * 頂列：連線狀態（app.js 算好放在 state.conn）與資料最後更新的時間、離線橫幅、頂端進度條。
+ * 各家的更新時間統一寫在這裡；卡片只有資料超過 2 個更新週期才另外寫。
+ */
 export function renderChrome(now = Date.now()) {
-  const polling = Boolean(state.fallbackTimer) && !state.offline;
-  const connState = state.live ? 'live'
-    : state.offline ? 'offline'
-      : document.visibilityState === 'hidden' ? 'paused'
-        : state.slowWake ? 'waking'
-          : polling ? 'polling' : 'connecting';
+  const connState = state.conn;
   const conn = $('conn');
   if (conn.dataset.state !== connState) conn.dataset.state = connState;
-  $('conn-dot').classList.toggle('live', state.live || polling);
+  $('conn-dot').classList.toggle('live', connState === 'live' || connState === 'polling');
   setText($('conn-text'), CONN_LABELS[connState]);
 
   // 資料最後更新的時間（各家最新一筆）：每張卡片在資料還新時不寫，統一寫在這裡；離線時橫幅也寫，才知道數字是多久前的

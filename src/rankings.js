@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { requestJson } from './http.js';
-import { writeFileAtomic, readFileOrNull } from './fsutil.js';
+import { SerialWriter, readFileOrNull } from './fsutil.js';
 import { logWarn } from './log.js';
 import { endpoints } from './config.js';
 
@@ -85,6 +85,7 @@ export function parseRankings(data, catalog = {}) {
 export class RankingsService {
   constructor({ dataDir, now = Date.now }) {
     this.file = path.join(dataDir, 'rankings.json');
+    this.writer = new SerialWriter(this.file);
     this.now = now;
     this.data = null; // { updatedAt, views: { day: {free, paid}, ... } }
     this.catalog = {};
@@ -122,22 +123,21 @@ export class RankingsService {
   async refresh() {
     this.lastAttemptAt = this.now();
     try {
-      if (this.now() - this.catalogAt > MODELS_REFRESH_MS) {
-        try {
-          const { data } = await requestJson(MODELS_URL, { label: 'OpenRouter 模型列表' });
-          this.catalog = parseModelCatalog(data);
-          this.catalogAt = this.now();
-        } catch {
-          // 模型列表拿不到就用 slug 顯示、不附價格，排行照樣更新
-        }
-      }
-      const views = {};
-      for (const view of VIEWS) {
-        const { data } = await requestJson(`${RANKINGS_URL}?view=${view}`, { label: 'OpenRouter 排行榜' });
-        views[view] = parseRankings(data, this.catalog);
-      }
+      // 模型列表與三個排行同時抓：一個一個抓的話，冷啟動還沒有資料時 /api/rankings 最久要等四次逾時
+      const catalogJob = this.now() - this.catalogAt > MODELS_REFRESH_MS
+        ? requestJson(MODELS_URL, { label: 'OpenRouter 模型列表' }).then(
+          ({ data }) => {
+            this.catalog = parseModelCatalog(data);
+            this.catalogAt = this.now();
+          },
+          () => {}, // 模型列表拿不到就用 slug 顯示、不附價格，排行照樣更新
+        )
+        : null;
+      const raw = await Promise.all(VIEWS.map((view) => requestJson(`${RANKINGS_URL}?view=${view}`, { label: 'OpenRouter 排行榜' })));
+      await catalogJob;
+      const views = Object.fromEntries(VIEWS.map((view, i) => [view, parseRankings(raw[i].data, this.catalog)]));
       this.data = { version: FORMAT_VERSION, updatedAt: new Date(this.now()).toISOString(), views };
-      await writeFileAtomic(this.file, JSON.stringify(this.data)).catch(() => {});
+      await this.writer.write(JSON.stringify(this.data)).catch(() => {});
     } catch (err) {
       logWarn('排行榜更新失敗', { err: err?.message || 'error' });
     }
