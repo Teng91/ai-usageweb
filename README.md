@@ -151,7 +151,7 @@ fly deploy
 
 打開 `https://ai-usageweb.fly.dev`，`fly logs` 會看到每家一行 JSON 抓取紀錄（續期成功會多一行「憑證已續期並寫入」）。關掉網頁等 5–10 分鐘，`fly machine list` 應該是 `suspended`；部署或主機搬移後的第一次喚醒仍是一般冷啟動。
 
-自動部署：`fly tokens create deploy` 產生 token，存成 GitHub repo secret `FLY_API_TOKEN`，之後推到 `main` 會先跑 `npm test` 與前端 smoke test（`npm run test:ui`，用 runner 內建的 Chrome），兩個都過才 `fly deploy`。
+自動部署：`fly tokens create deploy` 產生 token，存成 GitHub repo secret `FLY_API_TOKEN`，之後推到 `main` 會先跑 `npm test` 與前端 smoke test（`npm run test:ui`，用 runner 內建的 Chrome），兩個都過才 `fly deploy`。GitHub Actions 釘在固定的 commit，Dependabot（`.github/dependabot.yml`）每週檢查新版，有的話開 PR，合併後才會用到。
 
 ### 憑證的保存與重設
 
@@ -255,7 +255,7 @@ curl.exe -X PUT https://ai-usageweb.fly.dev/admin/credentials/claude -H "Authori
 
 - 00:00–08:00 不發（時區 `PUSH_TZ`）；「快重置」會落在勿擾時段的提醒，提前到勿擾開始前 2 小時內發。
 - **勿擾時段和週／月門檻可以在網頁上改**：開啟通知後，通知設定對話框會多出「勿擾時段」（開始、結束各選一個整點，或關掉）和「週／月額度提醒」（兩個門檻，可選 50%–90% 或關閉；95% 一定會發，不用設）。設定全站共用、存在 `/data/push.json`；沒改過時勿擾用 `PUSH_QUIET`、門檻是 80%／90%。
-- 網頁開著時先不推播、也不記成已發，關掉網頁後條件還成立就照樣推播（電腦開著分頁、人不在時手機也收得到）；同一類合成一則，新的蓋掉舊的；每家每天最多 4 則（超過上限或送失敗的不算發過，之後還會再判斷）。
+- 網頁開著時先不推播、也不記成已發，關掉網頁後條件還成立就照樣推播（電腦開著分頁、人不在時手機也收得到）。「開著」是 SSE 連著、或最近 90 秒內有輪詢（在公司 SSE 被擋、走輪詢時也算）；同一類合成一則，新的蓋掉舊的；每家每天最多 4 則（超過上限或送失敗的不算發過，之後還會再判斷）。
 - 機器每 15 分鐘被叫醒一次（Apps Script 不保證固定在哪一分鐘）、抓完約幾分鐘後又 suspend，執行時間大約多三分之一，費用每月不到 1 美元。
 
 ## 畫面
@@ -268,9 +268,9 @@ curl.exe -X PUT https://ai-usageweb.fly.dev/admin/credentials/claude -H "Authori
   - Codex：短窗與每週（依方案）
   - 還沒開始計時的額度一律顯示「還沒用，用了才開始計時」：已用 0% 而且服務沒給重置時間（例如 Claude 的 5 小時），或給的重置時間剛好是「現在＋整個週期」、每次更新都往後推（例如 Codex 免費版每月、Gemini 的 5 小時）
   - OpenRouter：剩餘餘額與已用金額
-- 70% 變橘、90% 變紅；超過 3 個更新週期沒有新資料標「資料已過期」
+- **顏色**：90% 以上紅；知道週期長度的額度，用量超過時間線（見下一點）10 個百分點以上才變橘，代表用得比時間快（例如 75% 但這一輪快結束了，不變色）；不知道週期長度的照舊 70% 變橘。超過 3 個更新週期沒有新資料標「資料已過期」（被限流還在等退避的不算）
 - **時間進度**：知道週期長度的額度（5 小時、每週…），進度條上有一條細線標出這個週期已經過了多少時間；用量條沒超過這條線就是還寬裕（滑鼠移上去會寫「時間過了 45%，用了 11%」）
-- **預估用完時間**：照最近 90 分鐘的消耗速度會在重置前用完時，額度底下多一行橘色的「照目前速度約 2 小時 10 分後用完」（伺服器算的，跟推播的速度預警同一套算法）
+- **預估用完時間**：照目前速度會在重置前用完時，額度底下多一行橘色的「照目前速度約 2 小時 10 分後用完」（伺服器算的）。5 小時這種短週期看最近 90 分鐘的速度（跟推播的速度預警同一套算法）；每週、每月看這一輪的平均速度，而且至少過了 1 天才算（寫程式時一小時漲幾 % 很正常，拿來往後推好幾天會一直說快用完）
 - 出錯時在錯誤後面寫下次重試的倒數，例如「503 服務暫時有問題（3 分鐘後重試）」
 - **兩種風格**（右上角旗子按鈕切換，會記住）：
   - 簡約：深藍細線的資料儀表板風格
@@ -278,6 +278,7 @@ curl.exe -X PUT https://ai-usageweb.fly.dev/admin/credentials/claude -H "Authori
 - **亮色／暗色**（太陽／月亮按鈕）：沒選過就跟隨系統；冒險風格裡是白天／夜晚
 - **只看風景**（冒險風格的山形按鈕或 B 鍵）：收起所有卡片只留場景，按「顯示用量」、Esc 或點兩下背景回來
 - **快捷鍵**（冒險風格）：B 只看風景、M 換地圖、T 白天／夜晚、S 換風格
+- **手機的頂列**維持一排（標題、連線狀態、通知、亮暗、⋯）：換風格、只看風景、安裝收在「⋯」選單裡
 - **OpenRouter 熱門模型**：免費／付費前 10 名（每天／每週／每月），付費附每百萬 token 價格
 - **Claude 到期日**：設 `CLAUDE_PLAN_EXPIRES_AT=YYYY-MM-DD`，剩 30 天內變橘色
 
@@ -286,7 +287,7 @@ curl.exe -X PUT https://ai-usageweb.fly.dev/admin/credentials/claude -H "Authori
 ## 加到主畫面
 
 - iPhone／iPad：瀏覽器的「分享」→「加入主畫面」（頁面頂端會提示，按「知道了」就不再出現）
-- Android、電腦的 Chrome／Edge：點頁面右上的「安裝」（瀏覽器支援時才會出現）
+- Android、電腦的 Chrome／Edge：點頁面右上的「安裝」（瀏覽器支援時才會出現；手機在「⋯」選單裡）。安裝畫面會帶截圖（`public/screenshots/`，畫面改了照 AGENTS.md 的說明重新截）
 
 離線時會顯示上次的數字與熱門模型並標示「離線」。部署新版後頁面頂端會出現「有新版本，點此重新載入」（改前端檔案時記得把 `public/sw.js` 的 `CACHE` 版本號 +1）。
 
@@ -295,7 +296,7 @@ curl.exe -X PUT https://ai-usageweb.fly.dev/admin/credentials/claude -H "Authori
 ```
 server.js                 進入點：組裝各元件並啟動 HTTP 伺服器
 src/poller.js             觀看者計數、每家排程、退避、共用 in-flight Promise
-src/forecast.js           預估用完時間（記最近的用量樣本，照目前速度算）
+src/forecast.js           預估用完時間（短週期看最近的速度、長週期看這一輪的平均速度）
 src/snapshot.js           記憶體快照、/data/snapshot.json 原子寫入
 src/routes.js             路由：公開 API、SSE、管理 API、ACCESS_KEY
 src/push-routes.js        推播 API：/api/push/tick 與裝置訂閱、設定、測試
@@ -317,15 +318,18 @@ src/fsutil.js、log.js     原子寫檔、一行一筆 JSON log
 src/providers/*.js        四家 adapter（統一輸出 { plan, planExpiresAt?, windows, balance, note }）；顯示順序在 index.js
 public/                   PWA（index.html、style.css、sw.js、manifest、icons）
 public/app.js             前端進入點：資料與連線（快照、SSE、SSE 被擋時改輪詢）
-public/ui/                前端模組：cards（卡片）、rankings（排行）、effects（冒險效果）、
-                          theme-toggle（亮暗與風格）、pwa（離線與安裝）、push（通知設定）、format、dom（共用狀態）
+public/ui/                前端模組：cards（卡片）、windows（一條額度：進度條、時間進度、顏色、預估用完）、
+                          rankings（排行）、effects（冒險效果）、theme-toggle（亮暗與風格）、menu（手機的「更多」選單）、
+                          pwa（離線與安裝）、push（通知設定）、format、dom（共用狀態）
 public/theme.js           畫面出現前套用亮暗與風格（CSP 不允許內嵌 script）
 public/skin-adventure.css 冒險風格的卡片、按鈕與遊戲介面（只在 data-skin="adventure" 生效）
 public/scene.css          冒險風格的場景（天空、地形、怪物、勇者、傳送點、夜晚）
 public/scene.js           場景邏輯：建立地圖、勇者走到傳送點換季、怪物互動、只看風景、快捷鍵
 public/scene-maps.js      四季地圖資料（加地圖改這裡）
 public/pixel/             原創像素圖（由 scripts/gen-pixel-art.mjs 產生）
-scripts/                  extract-credentials.js、setup-antigravity.ps1、gen-pixel-art.mjs、smoke-ui.mjs、gen-vapid.mjs
+public/icons/             App 圖示；badge-96.png 是推播的小圖示（scripts/gen-badge.mjs 產生）
+public/screenshots/       安裝畫面用的截圖
+scripts/                  extract-credentials.js、setup-antigravity.ps1、gen-pixel-art.mjs、gen-badge.mjs、smoke-ui.mjs、gen-vapid.mjs
 scripts/pixel-art/        像素圖產生器：lib（調色盤、點陣轉 SVG、畫布 DSL）、characters（勇者與怪物）、scenery（場景與四季換色）
 docs/TECHNICAL.md         技術文件（設計細節）
 docs/TODO.md              之後可以做的事
