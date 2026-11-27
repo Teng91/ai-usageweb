@@ -46,7 +46,9 @@ Google Apps Script 每 15 分鐘 ──POST /api/push/tick──▶ 機器沒人
 | `PUT /admin/credentials/:provider` | 替換某一家的憑證（JSON body，只收該家認得的欄位） | `ADMIN_TOKEN` |
 | `GET /admin/status` | 各家錯誤種類、下次抓取、token 到期時間（不含 token） | `ADMIN_TOKEN` |
 
-SSE 被擋時（例如公司 proxy 會卡住串流），前端 6 秒內沒連上就改成每 30 秒輪詢 `/api/usage`，右上角顯示「自動更新」。
+SSE 被擋時（例如公司 proxy 會卡住串流），前端 6 秒內沒連上就改成每 30 秒輪詢 `/api/usage`，右上角顯示「自動更新」；SSE 斷線後重連被拒（例如機器重啟中回 502／503）也馬上改輪詢。
+
+切到別的視窗太久，伺服器會停；切回來時資料比一個更新週期舊，卡片先標「更新中」，前端每隔幾秒再問一次，新數字幾秒內就到，不必按 F5。
 
 同時最多 20 條 SSE 連線（`SSE_MAX_CLIENTS`），滿了回 503，前端一樣改用輪詢。
 

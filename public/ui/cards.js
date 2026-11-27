@@ -1,5 +1,5 @@
 // 卡片、頂列連線狀態、空畫面；每秒重算倒數與「X 分鐘前」
-import { $, WAKE_WINDOW_MS, state, visible } from './dom.js';
+import { $, WAKE_WINDOW_MS, state, visible, behind } from './dom.js';
 import { money, ago, resetText } from './format.js';
 import { gameEffects } from './effects.js';
 import { rankingsEl } from './rankings.js';
@@ -101,17 +101,13 @@ function effectiveStatus(p, now = Date.now()) {
 }
 
 /**
- * 只有「剛打開頁面、資料已經舊到算過期（伺服器停機好一陣子）」才顯示更新中。
- * 平常的例行更新不顯示任何 loading，數字到了直接換掉。
+ * 剛打開頁面（或切回來）時資料比一個更新週期還舊：伺服器停過、正在重抓，先標「更新中」，新數字到了直接換掉
+ * （輪詢模式由 app.js 每隔幾秒再問一次）。平常的例行更新不顯示任何 loading。
  */
 function isUpdating(p, now = Date.now()) {
-  if (p.status === 'error' || p.status === 'auth') return false;
-  if (!state.sessionStart || now - state.sessionStart > WAKE_WINDOW_MS) return false;
-  if (state.offline) return false;
-  if (!p.fetchedAt) return true;
-  if (Date.parse(p.fetchedAt) >= state.sessionStart) return false;
-  const interval = (p.intervalSec || state.pollIntervalSec) * 1000;
-  return state.sessionStart - Date.parse(p.fetchedAt) > state.staleIntervals * interval;
+  if (!state.sessionStart || now - state.sessionStart > WAKE_WINDOW_MS || state.offline) return false;
+  if (p.fetchedAt && Date.parse(p.fetchedAt) >= state.sessionStart) return false;
+  return behind(p, state.sessionStart);
 }
 
 export function renderCard(p) {
@@ -257,8 +253,7 @@ function tickCard(el, p, now = Date.now()) {
   } else {
     status.textContent = '';
   }
-  const mins = Math.round(((p.intervalSec || state.pollIntervalSec) / 60) * 10) / 10;
-  el.querySelector('.card-meta').textContent = p.fetchedAt ? `資料時間 ${ago(p.fetchedAt, now)} · 每 ${mins} 分鐘更新` : '';
+  el.querySelector('.card-meta').textContent = p.fetchedAt ? `資料時間 ${ago(p.fetchedAt, now)}` : '';
 }
 
 /** 頂列連線狀態、頂端進度條（每張卡片底下已有資料時間，頁尾不再顯示「最後更新」） */

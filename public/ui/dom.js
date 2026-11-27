@@ -22,6 +22,9 @@ export const state = {
   waking: false,
   slowWake: false,
   sessionStart: 0,
+  // 切回來後追新數字（app.js）：第幾次、下一次的計時器
+  catchUpStep: 0,
+  catchUpTimer: null,
   offline: !navigator.onLine,
 };
 
@@ -40,6 +43,19 @@ export function keyAccepted() {
 
 /** 沒設定憑證的服務不顯示 */
 export const visible = (p) => Boolean(p) && p.status !== 'disabled';
+
+// 抓一次要幾秒：比一個更新週期再舊這麼多才算「伺服器停過」
+const BEHIND_SLACK_MS = 15_000;
+
+/**
+ * 在 at 這個時間點，這家的資料比一個更新週期還舊：伺服器停過一陣子，被叫醒後正在重抓。
+ * 出錯、要重新登入、被限流放慢的不算（伺服器不會馬上有新的）。
+ */
+export function behind(p, at = Date.now()) {
+  if (!visible(p) || p.status === 'error' || p.status === 'auth' || p.slowed) return false;
+  if (!p.fetchedAt) return true;
+  return at - Date.parse(p.fetchedAt) > (p.intervalSec || state.pollIntervalSec) * 1000 + BEHIND_SLACK_MS;
+}
 
 /** 讀寫 localStorage；私密模式等情況會丟錯，一律吞掉 */
 export function readStore(key) {

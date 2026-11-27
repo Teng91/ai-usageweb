@@ -1,6 +1,6 @@
 // AI 用量 — 前端進入點：資料與連線（fetch 快照 → SSE 即時更新；SSE 被擋時改輪詢）
 // 畫面在 ui/cards.js，其他功能各自在 ui/ 底下的模組
-import { state, withKey, keyAccepted } from './ui/dom.js';
+import { state, withKey, keyAccepted, behind } from './ui/dom.js';
 import { renderAll, renderCard, renderEmpty, renderChrome, startTicker } from './ui/cards.js';
 import { initRankings, refreshRankingsIfStale } from './ui/rankings.js';
 import { initThemeToggle } from './ui/theme-toggle.js';
@@ -15,6 +15,9 @@ const SSE_OPEN_TIMEOUT_MS = 6_000;
 const SSE_RETRY_EVERY = 10;
 // 喚醒超過這麼久才在右上角顯示「喚醒伺服器…」，避免熱機時閃一下
 const SLOW_WAKE_MS = 800;
+// 切到別的視窗太久，伺服器會停；切回來第一次拿到的是停之前的數字，伺服器幾秒後才抓到新的。
+// SSE 連著會自己推過來；輪詢模式（或 SSE 還沒連上）就照這些間隔再問，直到各家都是新的，不必等下一輪或按 F5
+const CATCH_UP_DELAYS_MS = [2000, 3000, 4000, 6000, 10000];
 
 // ---------- 資料 ----------
 async function loadSnapshot() {
@@ -65,10 +68,7 @@ function openStream() {
   // 連線卡住（不成功也不報錯）時改用輪詢，不要一直停在「連線中…」
   state.sseOpenTimer = setTimeout(() => {
     if (state.es !== es || state.live) return;
-    state.sseBlocked = true;
-    closeStream();
-    startFallback();
-    loadSnapshot();
+    fallBackToPolling();
   }, SSE_OPEN_TIMEOUT_MS);
   es.addEventListener('open', () => {
     clearTimeout(state.sseOpenTimer);
@@ -95,13 +95,38 @@ function openStream() {
     state.live = false;
     state.sseFailures += 1;
     renderChrome();
-    // 瀏覽器會自動重連（retry: 5000）；連續失敗 3 次改用輪詢備援
-    if (state.sseFailures >= 3) {
-      state.sseBlocked = true;
-      closeStream();
-      startFallback();
-    }
+    // 瀏覽器會自動重連（retry: 5000），但重連被拒（例如回 502／503）就整個關掉、不再重試，要馬上改輪詢；
+    // 一直重連不上也一樣，連續失敗 3 次改輪詢
+    if (es.readyState === EventSource.CLOSED || state.sseFailures >= 3) fallBackToPolling();
   });
+}
+
+/** SSE 用不了（卡住、被擋、斷線後重連被拒）：改用輪詢，並馬上問一次 */
+function fallBackToPolling() {
+  state.sseBlocked = true;
+  closeStream();
+  startFallback();
+  loadSnapshot().then(scheduleCatchUp);
+}
+
+// ---------- 切回來時追上新數字 ----------
+function scheduleCatchUp() {
+  stopCatchUp();
+  if (state.live || state.offline || document.visibilityState !== 'visible') return;
+  if (state.catchUpStep >= CATCH_UP_DELAYS_MS.length) return;
+  if (![...state.providers.values()].some((p) => behind(p))) return;
+  state.catchUpTimer = setTimeout(async () => {
+    state.catchUpTimer = null;
+    if (state.live || document.visibilityState !== 'visible') return;
+    state.catchUpStep += 1;
+    await loadSnapshot();
+    scheduleCatchUp();
+  }, CATCH_UP_DELAYS_MS[state.catchUpStep]);
+}
+
+function stopCatchUp() {
+  clearTimeout(state.catchUpTimer);
+  state.catchUpTimer = null;
 }
 
 function closeStream() {
@@ -135,6 +160,8 @@ function stopFallback() {
 async function start() {
   refreshRankingsIfStale();
   state.sessionStart = Date.now();
+  state.catchUpStep = 0;
+  stopCatchUp();
   state.waking = true;
   const slowTimer = setTimeout(() => { state.slowWake = true; renderChrome(); }, SLOW_WAKE_MS);
   renderChrome();
@@ -153,6 +180,7 @@ async function start() {
   // 已經在輪詢（SSE 被擋）就繼續輪詢，不必每次回到前景都再等一次 SSE 逾時
   if (state.sseBlocked) startFallback();
   else openStream();
+  scheduleCatchUp();
 }
 
 document.addEventListener('visibilitychange', () => {
@@ -160,6 +188,7 @@ document.addEventListener('visibilitychange', () => {
     // 切走就關掉 SSE，讓 fly.io 可以停機
     closeStream();
     stopFallback();
+    stopCatchUp();
     renderChrome();
   } else {
     start();

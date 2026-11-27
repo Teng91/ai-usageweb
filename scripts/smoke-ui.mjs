@@ -29,14 +29,29 @@ const rankings = { version: 2, updatedAt: iso(-60e3), views: Object.fromEntries(
 
 const sseClients = new Set();
 const seenKey = {}; // 各 API 收到的 ?k=，檢查存取碼只在第一次帶
+// 模擬伺服器的狀況（測試後段用）：
+//  usageMode 'stale-once'：下一次 /api/usage 回 5 分鐘前的資料（伺服器剛被叫醒），之後回剛抓到的
+//  sseMode 'reject'：SSE 回 503（例如機器重啟中）
+let usageMode = null;
+let sseMode = null;
+const aged = (ms) => providers(30).map((p) => ({ ...p, fetchedAt: new Date(Date.now() - ms).toISOString() }));
 const server = http.createServer((req, res) => {
   const u = new URL(req.url, 'http://x');
   if (u.pathname.startsWith('/api/')) (seenKey[u.pathname] ||= []).push(u.searchParams.get('k'));
   const json = (o) => { res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify(o)); };
+  if (u.pathname === '/api/usage' && usageMode) {
+    const ms = usageMode === 'stale-once' ? 5 * 60e3 : 1000;
+    usageMode = 'fresh';
+    return json({ version: 1, pollIntervalSec: 60, providers: aged(ms) });
+  }
   if (u.pathname === '/api/usage') return json({ version: 1, pollIntervalSec: 60, providers: providers(30) });
   if (u.pathname === '/api/rankings') return json(rankings);
   if (u.pathname === '/api/push/config') return json({ enabled: true, publicKey: 'BP4z9KsN6nGRTbVYI_c7VJSPQTBtkgcy27mlmlMoZIIgDll6e3vCYLocInmYWAmS6TlzAC8wEqKK6PBru3jl7A8' });
   if (u.pathname === '/api/push/status') return json({ subscribed: false, prefs: null });
+  if (u.pathname === '/api/stream' && sseMode === 'reject') {
+    res.writeHead(503, { 'content-type': 'application/json' });
+    return res.end('{}');
+  }
   if (u.pathname === '/api/stream') {
     res.writeHead(200, { 'content-type': 'text/event-stream' });
     res.write(`event: snapshot\ndata: ${JSON.stringify({ pollIntervalSec: 60, providers: providers(30) })}\n\n`);
@@ -218,6 +233,25 @@ async function main() {
     // 離線：排行跟用量一樣經 service worker 存一份（離線時給這份；模擬離線管不到 service worker，所以只檢查有存）
     const cached = await send('Runtime.evaluate', { expression: `(async () => { await navigator.serviceWorker.ready; for (let i = 0; i < 50 && !navigator.serviceWorker.controller; i++) await new Promise((r) => setTimeout(r, 200)); if (!navigator.serviceWorker.controller) return 'service worker 沒接管頁面'; await fetch('/api/rankings'); let r; for (let i = 0; i < 20 && !r?.ok; i++) { r = await fetch('/api/rankings', { headers: { 'x-cache-only': '1' } }); if (!r.ok) await new Promise((ok) => setTimeout(ok, 100)); } if (!r.ok) return '沒存到'; return r.headers.get('x-from-cache') === '1' && !!(await r.json()).views; })()`, awaitPromise: true, returnByValue: true });
     check('排行經 service worker 存一份，離線時用得到', cached?.result?.value === true, JSON.stringify(cached?.result));
+
+    // SSE 斷線後重連被拒（503）：瀏覽器不會再重試，要馬上改輪詢，不能停在「連線中…」
+    sseMode = 'reject';
+    for (const c of sseClients) c.end();
+    let conn = '';
+    for (let i = 0; i < 40 && conn !== '自動更新'; i++) { await sleep(250); conn = await ev(`document.getElementById('conn-text').textContent`); }
+    check('SSE 重連被拒時改用輪詢（右上角「自動更新」）', conn === '自動更新', conn);
+
+    // 切到別的視窗再切回來：伺服器停過，第一次拿到舊數字 → 先標「更新中」，幾秒內自動拿到新的（不必等 30 秒的輪詢或按 F5）
+    await ev(`Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' }); document.dispatchEvent(new Event('visibilitychange'))`);
+    usageMode = 'stale-once';
+    await ev(`delete document.visibilityState; document.dispatchEvent(new Event('visibilitychange'))`);
+    await sleep(800);
+    const claudeCard = `(() => { const c = document.querySelector('.card[data-id="claude"]'); return c.querySelector('.card-status').textContent + '|' + c.querySelector('.card-meta').textContent; })()`;
+    const whileWaking = await ev(claudeCard);
+    check('切回來時資料比一個週期舊：先標「更新中」', /^更新中/.test(whileWaking), whileWaking);
+    await sleep(3000);
+    const caughtUp = await ev(claudeCard);
+    check('切回來幾秒內自動換成新數字，卡片只寫資料時間（不寫每幾分鐘更新）', caughtUp === '|資料時間 剛剛', caughtUp);
 
     check('沒有 JS 錯誤', errors.length === 0, errors.join(' | '));
   } finally {
