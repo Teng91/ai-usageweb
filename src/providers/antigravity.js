@@ -137,7 +137,6 @@ async function accessToken(cache, ctx) {
         refresh_token: c.refreshToken,
         grant_type: 'refresh_token',
       },
-      signal: ctx.signal,
       label: 'Antigravity 續期 ',
     });
     // 少數情況 Google 也會給新的 refresh token：先 await 存檔成功才使用這次續期的結果
@@ -156,7 +155,7 @@ async function accessToken(cache, ctx) {
   });
 }
 
-function post(path, token, body, signal) {
+function post(path, token, body) {
   return requestJson(`${BASE}:${path}`, {
     method: 'POST',
     headers: {
@@ -166,7 +165,6 @@ function post(path, token, body, signal) {
       'User-Agent': USER_AGENT,
     },
     body,
-    signal,
     label: 'Antigravity ',
   });
 }
@@ -177,7 +175,7 @@ async function fetchOnce(cache, ctx, token) {
   if (!projectId || !cache.plan || Date.now() - cache.planAt > PLAN_TTL_MS) {
     const { data } = await post('loadCodeAssist', token, {
       metadata: { ideType: 'ANTIGRAVITY', platform: 'PLATFORM_UNSPECIFIED', pluginType: 'GEMINI' },
-    }, ctx.signal);
+    });
     const proj = data?.cloudaicompanionProject;
     projectId = projectId || (typeof proj === 'string' ? proj : proj?.id) || null;
     cache.projectId = projectId;
@@ -187,8 +185,8 @@ async function fetchOnce(cache, ctx, token) {
   if (!projectId) throw new ProviderError('parse', '回傳缺少 project id');
   // 每週額度只在 summary 裡；summary 拿不到（免費方案、端點變了）就只顯示模型清單的
   const [models, summary] = await Promise.all([
-    post('fetchAvailableModels', token, { project: projectId }, ctx.signal),
-    post('retrieveUserQuotaSummary', token, { project: projectId }, ctx.signal).then(
+    post('fetchAvailableModels', token, { project: projectId }),
+    post('retrieveUserQuotaSummary', token, { project: projectId }).then(
       (r) => parseSummary(r.data),
       (err) => {
         if (err instanceof ProviderError && err.kind === 'auth') throw err;

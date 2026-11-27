@@ -13,8 +13,9 @@ const TICK_MS = 1000;
  *  - 每家各自的排程、退避、共用 in-flight Promise；兩次請求至少隔 minIntervalSec
  */
 export class Poller {
-  constructor({ providers, creds, snapshot, broadcast, pollIntervalSec, idleGraceSec, now = Date.now, random = Math.random }) {
+  constructor({ providers, creds, snapshot, broadcast, pollIntervalSec, idleGraceSec, forecaster = null, now = Date.now, random = Math.random }) {
     this.providers = providers;
+    this.forecaster = forecaster; // 選填：幫額度加上預估用完時間（src/forecast.js）
     this.creds = creds;
     this.snapshot = snapshot;
     this.broadcast = broadcast;
@@ -218,11 +219,13 @@ export class Poller {
       s.lastErrorKind = null;
       s.lastHttpStatus = 200;
       s.nextAt = this.now() + interval * 1000;
+      let windows = clearUnstartedResets(result.windows || [], this.now());
+      if (this.forecaster) windows = this.forecaster.annotate(p.id, windows, this.now());
       this.#publish(p.id, {
         status: 'ok',
         plan: result.plan ?? this.snapshot.entry(p.id).plan,
         planExpiresAt: result.planExpiresAt ?? null,
-        windows: clearUnstartedResets(result.windows || [], this.now()),
+        windows,
         balance: result.balance || null,
         note: result.note || null,
         error: null,
@@ -266,10 +269,10 @@ export class Poller {
       case 'rate_limit': {
         delaySec = err.retryAfterSec ?? Math.min(base * 2 ** s.failures, MAX_RATE_LIMIT_BACKOFF);
         delaySec = Math.max(delaySec, this.minInterval(p));
-        const mins = Math.max(1, Math.round(delaySec / 60));
+        // 重試時間由前端依 nextFetchAt 倒數顯示
         patch = hasData
           ? { status: 'ok', slowed: true, error: null }
-          : { status: 'error', error: `429 請求太頻繁，${mins} 分鐘後重試` };
+          : { status: 'error', error: '429 請求太頻繁' };
         break;
       }
       case 'auth':
@@ -295,7 +298,9 @@ export class Poller {
     }
 
     s.nextAt = now + delaySec * 1000;
-    this.#publish(p.id, { ...patch, nextFetchAt: new Date(s.nextAt).toISOString() });
+    // 要重新登入、被擋的不會照時間重試（換憑證、下次有人看或排程喚醒才再試）：不給前端顯示重試時間
+    const retryAt = err.kind === 'auth' || err.kind === 'forbidden' ? null : new Date(s.nextAt).toISOString();
+    this.#publish(p.id, { ...patch, nextFetchAt: retryAt });
   }
 
   #publish(id, patch) {

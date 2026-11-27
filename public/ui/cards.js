@@ -1,6 +1,6 @@
 // 卡片、頂列連線狀態、空畫面；每秒重算倒數與「X 分鐘前」
-import { $, WAKE_WINDOW_MS, state, visible, behind } from './dom.js';
-import { money, ago, resetText } from './format.js';
+import { $, WAKE_WINDOW_MS, state, visible, behind, backingOff } from './dom.js';
+import { money, ago, resetText, retryText, etaText } from './format.js';
 import { gameEffects } from './effects.js';
 import { rankingsEl } from './rankings.js';
 
@@ -95,6 +95,8 @@ function cardFor(p) {
 
 function effectiveStatus(p, now = Date.now()) {
   if (p.status !== 'ok') return p.status;
+  // 被限流、還在等退避：顯示「被限流」與重試時間，不算過期（退避最多 15 分鐘，比 3 個週期長）
+  if (backingOff(p, now)) return 'ok';
   const interval = (p.intervalSec || state.pollIntervalSec) * 1000;
   if (p.fetchedAt && now - Date.parse(p.fetchedAt) > state.staleIntervals * interval) return 'stale';
   return 'ok';
@@ -105,6 +107,7 @@ function effectiveStatus(p, now = Date.now()) {
  * （輪詢模式由 app.js 每隔幾秒再問一次）。平常的例行更新不顯示任何 loading。
  */
 function isUpdating(p, now = Date.now()) {
+  if (p.status === 'error') return false; // 出錯的照樣顯示錯誤（與重試時間）
   if (!state.sessionStart || now - state.sessionStart > WAKE_WINDOW_MS || state.offline) return false;
   if (p.fetchedAt && Date.parse(p.fetchedAt) >= state.sessionStart) return false;
   return behind(p, state.sessionStart);
@@ -208,27 +211,69 @@ function renderWindow(w) {
   bar.setAttribute('aria-valuenow', String(pct));
   const fill = document.createElement('span');
   fill.style.width = `${Math.min(100, Math.max(0, w.usedPct))}%`;
-  bar.append(fill);
+  // 時間進度：這個週期已經過了多少（每秒在 tickWindow 更新位置）；用量條沒超過這條線就是還寬裕
+  const mark = document.createElement('i');
+  mark.className = 'time-mark';
+  mark.hidden = true;
+  bar.append(fill, mark);
 
   const sub = document.createElement('p');
   sub.className = 'win-sub';
-  sub.dataset.resetsAt = w.resetsAt || '';
-  // 沒用過、也沒有重置時間（例如 Antigravity 的額度要用了第一次才開始計時）：講清楚，不要留白
-  if (!w.resetsAt && !(w.usedPct > 0)) sub.dataset.idle = '1';
+  // 預估用完時間（伺服器依最近的消耗速度算，只有會在重置前用完才有）
+  const eta = document.createElement('p');
+  eta.className = 'win-eta';
+  eta.hidden = true;
 
-  wrap.append(row, bar, sub);
+  wrap.dataset.resetsAt = w.resetsAt || '';
+  wrap.dataset.periodSec = w.periodSec || '';
+  wrap.dataset.exhaustsAt = w.exhaustsAt || '';
+  wrap.dataset.pct = String(pct);
+  // 沒用過、也沒有重置時間（例如 Antigravity 的額度要用了第一次才開始計時）：講清楚，不要留白
+  if (!w.resetsAt && !(w.usedPct > 0)) wrap.dataset.idle = '1';
+
+  wrap.append(row, bar, sub, eta);
   return wrap;
+}
+
+/** 這個週期已經過了多少（0–1）；不知道週期長度、沒有重置時間或已經過了就回 null */
+function elapsed(resetsAtIso, periodSec, now) {
+  const r = Date.parse(resetsAtIso);
+  if (!Number.isFinite(r) || !(periodSec > 0) || r <= now) return null;
+  return Math.min(1, Math.max(0, 1 - (r - now) / (periodSec * 1000)));
+}
+
+/** 每秒更新一條額度：重置倒數、時間進度、預估用完 */
+function tickWindow(win, now) {
+  const grid = Boolean(win.closest('.win-grid'));
+  const sub = win.querySelector('.win-sub');
+  const full = resetText(win.dataset.resetsAt, now) || (win.dataset.idle ? '還沒用，用了才開始計時' : '');
+  // 兩欄時寬度不夠，只顯示倒數，完整時間放在提示
+  const short = grid ? full.replace(/（.*）$/, '') : full;
+  sub.textContent = short;
+  if (short !== full) sub.title = full; else sub.removeAttribute('title');
+
+  const frac = elapsed(win.dataset.resetsAt, Number(win.dataset.periodSec), now);
+  const mark = win.querySelector('.time-mark');
+  const bar = win.querySelector('.bar');
+  mark.hidden = frac === null;
+  if (frac === null) {
+    bar.removeAttribute('title');
+  } else {
+    mark.style.left = `${(frac * 100).toFixed(2)}%`;
+    bar.title = `時間過了 ${Math.round(frac * 100)}%，用了 ${win.dataset.pct}%`;
+  }
+
+  const eta = win.querySelector('.win-eta');
+  const etaFull = etaText(win.dataset.exhaustsAt, now);
+  const etaShort = grid ? etaFull.replace('照目前速度', '') : etaFull;
+  eta.hidden = !etaFull;
+  eta.textContent = etaShort;
+  if (etaShort !== etaFull) eta.title = etaFull; else eta.removeAttribute('title');
 }
 
 /** 每秒更新：倒數、X 分鐘前、狀態 */
 function tickCard(el, p, now = Date.now()) {
-  for (const sub of el.querySelectorAll('.win-sub')) {
-    const full = resetText(sub.dataset.resetsAt, now) || (sub.dataset.idle ? '還沒用，用了才開始計時' : '');
-    // 兩欄時寬度不夠，只顯示倒數，完整時間放在提示
-    const short = sub.closest('.win-grid') ? full.replace(/（.*）$/, '') : full;
-    sub.textContent = short;
-    if (short !== full) sub.title = full; else sub.removeAttribute('title');
-  }
+  for (const win of el.querySelectorAll('.win')) tickWindow(win, now);
   const st = effectiveStatus(p, now);
   const updating = isUpdating(p, now);
   el.classList.toggle('stale', st === 'stale' && !updating);
@@ -243,13 +288,15 @@ function tickCard(el, p, now = Date.now()) {
     status.textContent = `資料已過期（${ago(p.fetchedAt, now)}）`;
   } else if (st === 'error') {
     status.classList.add('error');
-    status.textContent = p.error || '更新失敗';
+    const retry = retryText(p.nextFetchAt, now);
+    status.textContent = `${p.error || '更新失敗'}${retry ? `（${retry}）` : ''}`;
   } else if (st === 'auth') {
     status.classList.add('auth');
     status.textContent = '需要重新登入';
   } else if (p.slowed) {
     status.classList.add('info');
-    status.textContent = '被限流，更新放慢';
+    const retry = retryText(p.nextFetchAt, now);
+    status.textContent = `被限流，更新放慢${retry ? `（${retry}）` : ''}`;
   } else {
     status.textContent = '';
   }

@@ -10,6 +10,7 @@ import { SseHub } from './src/sse.js';
 import { Poller } from './src/poller.js';
 import { ALL_PROVIDERS, loadProviders } from './src/providers/index.js';
 import { RankingsService } from './src/rankings.js';
+import { Forecaster } from './src/forecast.js';
 import { PushService } from './src/push.js';
 import { parseQuiet } from './src/alerts.js';
 import { createHandler } from './src/routes.js';
@@ -66,6 +67,7 @@ export async function createApp(opts = {}) {
     },
     pollIntervalSec: cfg.pollIntervalSec,
     idleGraceSec: cfg.idleGraceSec,
+    forecaster: new Forecaster(),
   });
 
   const handle = createHandler({ cfg, poller, hub, snapshot, creds, providers, rankings, push, publicDir: PUBLIC_DIR });

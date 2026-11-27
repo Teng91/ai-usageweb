@@ -21,7 +21,7 @@ const providers = (claude5h) => [
     { id: 'gemini', label: '5 小時', usedPct: 12, resetsAt: iso(4 * 3600e3), periodSec: 18000 },
     { id: 'gemini_week', label: '每週', usedPct: 0, resetsAt: null, periodSec: 604800 },
   ] },
-  { ...base, id: 'codex', name: 'Codex', plan: 'Free', windows: [{ id: 'primary', label: '每月', usedPct: 95, resetsAt: iso(9 * 3600e3) }] },
+  { ...base, id: 'codex', name: 'Codex', plan: 'Free', windows: [{ id: 'primary', label: '每月', usedPct: 95, resetsAt: iso(9 * 3600e3), exhaustsAt: iso(40 * 60e3) }] },
   { ...base, id: 'openrouter', name: 'OpenRouter', plan: '預付', windows: [], balance: { currency: 'USD', remaining: -0.2, total: 10, used: 10.2 } },
 ];
 const rank = (prefix, paid) => Array.from({ length: 10 }, (_, i) => ({ rank: i + 1, slug: `${prefix}/m${i}`, name: `${prefix === 'free' ? '免費' : '付費'}模型 ${'ABCDEFGHIJ'[i]}`, tokens: 1e12 / (i + 1), ...(paid ? { price: { input: 0.5, output: 2 } } : {}) }));
@@ -31,10 +31,15 @@ const sseClients = new Set();
 const seenKey = {}; // 各 API 收到的 ?k=，檢查存取碼只在第一次帶
 // 模擬伺服器的狀況（測試後段用）：
 //  usageMode 'stale-once'：下一次 /api/usage 回 5 分鐘前的資料（伺服器剛被叫醒），之後回剛抓到的
-//  sseMode 'reject'：SSE 回 503（例如機器重啟中）
+//  sseMode 'reject'：SSE 回 503（例如機器重啟中）；'quiet'：連上後只說 ping 間隔 1 秒，之後什麼都不送（半斷線）
 let usageMode = null;
 let sseMode = null;
+let streamCount = 0; // 收到幾次 SSE 連線
+const quietClients = new Set();
+// 資料時間跟著真實時間走（10 秒前抓的），測試跑多久都不會被當成「伺服器停過」
 const aged = (ms) => providers(30).map((p) => ({ ...p, fetchedAt: new Date(Date.now() - ms).toISOString() }));
+// 跟真的伺服器一樣定時送 ping（安靜的連線不送）
+setInterval(() => { for (const c of sseClients) if (!quietClients.has(c)) c.write('event: ping\ndata: {"sec":25}\n\n'); }, 20_000).unref();
 const server = http.createServer((req, res) => {
   const u = new URL(req.url, 'http://x');
   if (u.pathname.startsWith('/api/')) (seenKey[u.pathname] ||= []).push(u.searchParams.get('k'));
@@ -44,7 +49,7 @@ const server = http.createServer((req, res) => {
     usageMode = 'fresh';
     return json({ version: 1, pollIntervalSec: 60, providers: aged(ms) });
   }
-  if (u.pathname === '/api/usage') return json({ version: 1, pollIntervalSec: 60, providers: providers(30) });
+  if (u.pathname === '/api/usage') return json({ version: 1, pollIntervalSec: 60, providers: aged(10_000) });
   if (u.pathname === '/api/rankings') return json(rankings);
   if (u.pathname === '/api/push/config') return json({ enabled: true, publicKey: 'BP4z9KsN6nGRTbVYI_c7VJSPQTBtkgcy27mlmlMoZIIgDll6e3vCYLocInmYWAmS6TlzAC8wEqKK6PBru3jl7A8' });
   if (u.pathname === '/api/push/status') return json({ subscribed: false, prefs: null });
@@ -53,10 +58,13 @@ const server = http.createServer((req, res) => {
     return res.end('{}');
   }
   if (u.pathname === '/api/stream') {
+    streamCount += 1;
     res.writeHead(200, { 'content-type': 'text/event-stream' });
-    res.write(`event: snapshot\ndata: ${JSON.stringify({ pollIntervalSec: 60, providers: providers(30) })}\n\n`);
+    res.write(`event: snapshot\ndata: ${JSON.stringify({ pollIntervalSec: 60, providers: aged(10_000) })}\n\n`);
+    res.write(`event: ping\ndata: ${JSON.stringify({ sec: sseMode === 'quiet' ? 1 : 25 })}\n\n`);
     sseClients.add(res);
-    req.on('close', () => sseClients.delete(res));
+    if (sseMode === 'quiet') quietClients.add(res);
+    req.on('close', () => { sseClients.delete(res); quietClients.delete(res); });
     return;
   }
   const f = path.join(PUBLIC, u.pathname === '/' ? 'index.html' : decodeURIComponent(u.pathname));
@@ -144,6 +152,11 @@ async function main() {
     check('卡片順序：Claude、Gemini、Codex', (await ev(`[...document.querySelectorAll('.card')].slice(0, 3).map((c) => c.querySelector('.card-name').textContent).join(',')`)) === 'Claude,Gemini,Codex');
     const rows = await ev(`(() => { const b = document.querySelector('.card[data-id="claude"] .card-body'); const wins = [...b.querySelectorAll('.win')]; const c = document.querySelector('.card[data-id="antigravity"] .card-body'); const bottom = (el) => Math.max(...[...el.children].map((x) => x.getBoundingClientRect().bottom)) - el.getBoundingClientRect().top; return { rows: new Set(wins.map((w) => w.offsetTop)).size, h: bottom(b), ch: bottom(c), sx: wins.every((w) => w.scrollWidth <= w.clientWidth + 1) }; })()`);
     check('沒用過也沒有重置時間的額度顯示「用了才開始計時」', (await ev(`document.querySelectorAll('.card[data-id="antigravity"] .win-sub')[1]?.textContent`)) === '還沒用，用了才開始計時');
+    // 時間進度：Gemini 5 小時還有 4 小時才重置 → 已過 20%；不知道週期長度（Codex）或沒有重置時間的不畫
+    const marks = await ev(`(() => { const m = (sel) => document.querySelector(sel + ' .time-mark'); const g = m('.card[data-id="antigravity"] .win'); return [g.hidden, Math.round(parseFloat(g.style.left)), document.querySelectorAll('.card[data-id="antigravity"] .time-mark')[1].hidden, m('.card[data-id="codex"] .win').hidden, document.querySelector('.card[data-id="antigravity"] .bar').title].join('|'); })()`);
+    check('進度條上的時間進度標記（Gemini 5 小時已過 20%；沒有週期長度或重置時間的不畫）', marks === 'false|20|true|true|時間過了 20%，用了 12%', marks);
+    const eta = await ev(`(() => { const e = document.querySelector('.card[data-id="codex"] .win-eta'); return (e.hidden ? 'hidden' : '') + e.textContent + '|' + document.querySelector('.card[data-id="claude"] .win-eta').hidden; })()`);
+    check('預估用完時間：照目前速度會在重置前用完才顯示', /^照目前速度約 (39|40) 分鐘後用完\|true$/.test(eta), eta);
     check('分區：四張卡片（OpenRouter 餘額在第四張）一區、熱門模型排行自己一區，都沒有標題', (await ev(`document.querySelectorAll('.group-title').length + '|' + [...document.querySelectorAll('.group')].map((g) => [...g.querySelectorAll('.card')].map((c) => c.dataset.id || 'rank').join('+')).join(' | ')`)) === '0|claude+antigravity+codex+openrouter | rank');
     check('OpenRouter 卡片只放餘額，排行不在卡片裡', (await ev(`(() => { const c = document.querySelector('.card[data-id="openrouter"]'); return !!c.querySelector('.balance') && !c.querySelector('.rank-list'); })()`)) === true);
     check('寬螢幕四張卡片排成一列，排行卡在下面佔滿整列', (await ev(`(() => { const cs = [...document.querySelectorAll('.card[data-id]')].map((c) => c.getBoundingClientRect()); const rk = document.querySelector('.rank-card').getBoundingClientRect(); const top = cs[0].top; return cs.every((r) => Math.abs(r.top - top) < 2) && rk.top > cs[0].bottom && Math.abs(rk.left - cs[0].left) < 2 && Math.abs(rk.right - cs[3].right) < 2; })()`)) === true);
@@ -193,6 +206,16 @@ async function main() {
     await sleep(600);
     check('用量上升時卡片跳出 +N%', (await ev(`document.querySelector('.card[data-id="claude"] .dmg')?.textContent`)) === '+6%');
 
+    // 被限流還在等退避：資料雖然 10 分鐘前，不算過期，顯示「被限流」與重試時間；出錯的也顯示重試時間
+    const real = (ms) => new Date(Date.now() + ms).toISOString();
+    pushProvider({ ...providers(36)[0], slowed: true, fetchedAt: real(-600e3), nextFetchAt: real(270e3) });
+    pushProvider({ ...providers(30)[3], status: 'error', error: '503 服務暫時有問題', nextFetchAt: real(150e3) });
+    await sleep(400);
+    const retries = await ev(`['claude', 'openrouter'].map((id) => { const c = document.querySelector('.card[data-id="' + id + '"]'); return c.querySelector('.card-status').textContent + (c.classList.contains('stale') ? '（stale）' : ''); }).join('|')`);
+    check('被限流等退避時不算過期、出錯時顯示下次重試時間', retries === '被限流，更新放慢（5 分鐘後重試）|503 服務暫時有問題（3 分鐘後重試）', retries);
+    pushProvider(providers(36)[0]);
+    pushProvider(providers(30)[3]);
+
     // 只看風景
     await key('b');
     await sleep(400);
@@ -233,6 +256,15 @@ async function main() {
     // 離線：排行跟用量一樣經 service worker 存一份（離線時給這份；模擬離線管不到 service worker，所以只檢查有存）
     const cached = await send('Runtime.evaluate', { expression: `(async () => { await navigator.serviceWorker.ready; for (let i = 0; i < 50 && !navigator.serviceWorker.controller; i++) await new Promise((r) => setTimeout(r, 200)); if (!navigator.serviceWorker.controller) return 'service worker 沒接管頁面'; await fetch('/api/rankings'); let r; for (let i = 0; i < 20 && !r?.ok; i++) { r = await fetch('/api/rankings', { headers: { 'x-cache-only': '1' } }); if (!r.ok) await new Promise((ok) => setTimeout(ok, 100)); } if (!r.ok) return '沒存到'; return r.headers.get('x-from-cache') === '1' && !!(await r.json()).views; })()`, awaitPromise: true, returnByValue: true });
     check('排行經 service worker 存一份，離線時用得到', cached?.result?.value === true, JSON.stringify(cached?.result));
+
+    // SSE 半斷線：連著但什麼都收不到（連 ping 都沒有）超過 3 個 ping 間隔，就自己重連
+    sseMode = 'quiet';
+    const streamsBefore = streamCount;
+    for (const c of sseClients) c.end();
+    for (let i = 0; i < 60 && streamCount < streamsBefore + 2; i++) await sleep(250);
+    check('SSE 太久沒收到 ping 就自己重連（半斷線偵測）', streamCount >= streamsBefore + 2, `${streamsBefore} → ${streamCount}`);
+    sseMode = null;
+    await sleep(4000); // 等最後一條安靜的連線也被換成正常的
 
     // SSE 斷線後重連被拒（503）：瀏覽器不會再重試，要馬上改輪詢，不能停在「連線中…」
     sseMode = 'reject';

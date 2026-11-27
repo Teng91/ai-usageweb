@@ -385,3 +385,84 @@ test('http: 讀回應內容時出錯（例如逾時）算網路錯誤，不是�
     globalThis.fetch = original;
   }
 });
+
+test('credentials: 換憑證時版本號先換，寫檔途中舊流程的續期結果存不進來', async () => {
+  const store = await new CredentialStore({ dataDir: tmpDir(), keyB64: KEY, env: { CLAUDE_REFRESH_TOKEN: 'r_old' } }).load();
+  const v0 = store.version('claude');
+  const replacing = store.replace('claude', { refreshToken: 'r_new' });
+  await null; await null; // 讓 replace 跑到寫檔
+  assert.equal(store.version('claude'), v0 + 1);
+  await assert.rejects(store.save('claude', { refreshToken: 'r_stale' }, v0));
+  await replacing;
+  assert.equal(store.get('claude').refreshToken, 'r_new');
+});
+
+test('snapshot: 被限流、還在等退避時不算過期；退避時間過了才算', () => {
+  const s = new SnapshotStore({ dataDir: tmpDir(), pollIntervalSec: 60, providers: [{ id: 'p', name: 'P' }] });
+  const t = Date.parse('2026-11-23T08:00:00Z');
+  s.update('p', { status: 'ok', slowed: true, fetchedAt: new Date(t).toISOString(), nextFetchAt: new Date(t + 900_000).toISOString(), intervalSec: 60 });
+  assert.equal(s.view('p', t + 600_000).status, 'ok');
+  assert.equal(s.view('p', t + 901_000).status, 'stale');
+});
+
+test('poller: 沒有舊數字時的 429 不在訊息裡寫分鐘（前端依 nextFetchAt 倒數）；auth／403 不給重試時間', async () => {
+  let t = 1_000_000;
+  let kind = 'rate_limit';
+  const { poller, snapshot } = makePoller({ now: () => t, fetchImpl: async () => { throw new ProviderError(kind, kind === 'forbidden' ? '403 沒有權限' : '429', { httpStatus: 429 }); } });
+  poller.viewerJoined(1);
+  await poller.state.p.inflight;
+  let v = snapshot.view('p', t);
+  assert.equal(v.status, 'error');
+  assert.equal(v.error, '429 請求太頻繁');
+  assert.equal(Date.parse(v.nextFetchAt), poller.state.p.nextAt);
+  for (kind of ['auth', 'forbidden']) {
+    t += 600_000;
+    poller.state.p.nextAt = 0;
+    poller.state.p.forbidden = false;
+    poller.state.p.authBlockedVersion = null;
+    await poller.run(poller.providers[0]);
+    v = snapshot.view('p', t);
+    assert.equal(v.nextFetchAt, null, kind);
+  }
+  poller.stop();
+});
+
+test('poller: 有 forecaster 時成功抓取的額度會經過它（加上預估用完時間）', async () => {
+  let t = 1_000_000;
+  const seen = [];
+  const { poller, snapshot } = makePoller({ now: () => t, fetchImpl: async () => ({ windows: [{ id: 'a', label: 'a', usedPct: 10 }] }) });
+  poller.forecaster = { annotate: (id, wins, now) => { seen.push([id, now]); return wins.map((w) => ({ ...w, exhaustsAt: 'x' })); } };
+  poller.viewerJoined(1);
+  await poller.state.p.inflight;
+  assert.deepEqual(seen, [['p', t]]);
+  assert.equal(snapshot.view('p', t).windows[0].exhaustsAt, 'x');
+  poller.stop();
+});
+
+test('forecast: 照目前速度會在重置前用完才給 exhaustsAt', async () => {
+  const { Forecaster } = await import('../src/forecast.js');
+  const f = new Forecaster();
+  const t0 = Date.parse('2026-11-23T08:00:00Z');
+  const resetsAt = new Date(t0 + 3 * 3600_000).toISOString();
+  const win = (pct) => [{ id: '5h', label: '5 小時', usedPct: pct, resetsAt, periodSec: 18000 }];
+  assert.equal(f.annotate('claude', win(40), t0)[0].exhaustsAt, undefined, '只有一筆樣本，算不出速度');
+  // 20 分鐘漲 10 個百分點 → 剩 50% 還要 100 分鐘，比 3 小時後的重置早
+  const out = f.annotate('claude', win(50), t0 + 20 * 60_000)[0];
+  assert.equal(Date.parse(out.exhaustsAt), t0 + 20 * 60_000 + 100 * 60_000);
+  // 同樣 20 分鐘只漲 2 點 → 照這速度重置前用不完
+  const g = new Forecaster();
+  g.annotate('claude', win(40), t0);
+  assert.equal(g.annotate('claude', win(42), t0 + 20 * 60_000)[0].exhaustsAt, undefined);
+  // 已經 100% 不用預估
+  assert.equal(f.annotate('claude', win(100), t0 + 30 * 60_000)[0].exhaustsAt, undefined);
+});
+
+test('sse: 連上就送一次有名字的 ping（帶間隔秒數），前端才收得到、才知道多久算斷線', async () => {
+  const { SseHub } = await import('../src/sse.js');
+  const hub = new SseHub({ pingSec: 25 });
+  const res = { body: '', writeHead() {}, write(d) { this.body += d; }, end() {}, on() {} };
+  hub.add({ on() {} }, res, { providers: [] });
+  assert.match(res.body, /event: ping\ndata: \{"sec":25\}\n\n/);
+  assert.doesNotMatch(res.body, /^: ping/m, '不再用註解當 ping');
+  hub.closeAll();
+});

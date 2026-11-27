@@ -5,16 +5,15 @@ import { config } from './config.js';
  * 對外部服務發一個請求並解析 JSON。所有錯誤都轉成 ProviderError，
  * 錯誤訊息只含狀態碼與簡短說明，不含 token 或原始回應。
  */
-export async function requestJson(url, { method = 'GET', headers = {}, body, signal, label = '' } = {}) {
+export async function requestJson(url, { method = 'GET', headers = {}, body, label = '' } = {}) {
   const timeout = AbortSignal.timeout(config.requestTimeoutMs);
-  const combined = signal ? AbortSignal.any([signal, timeout]) : timeout;
   let res;
   try {
     res = await fetch(url, {
       method,
       headers,
       body: body === undefined ? undefined : (typeof body === 'string' ? body : JSON.stringify(body)),
-      signal: combined,
+      signal: timeout,
       redirect: 'follow',
     });
   } catch (err) {

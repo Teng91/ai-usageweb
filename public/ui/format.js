@@ -36,21 +36,39 @@ export function ago(iso, now = Date.now()) {
   return `${Math.floor(h / 24)} 天前`;
 }
 
+/** 秒數 →「2 天 3 小時」「3 小時 5 分」「12 分鐘」「不到 1 分鐘」 */
+export function durationText(sec) {
+  const d = Math.floor(sec / 86400);
+  const h = Math.floor((sec % 86400) / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  if (d > 0) return `${d} 天 ${h} 小時`;
+  if (h > 0) return `${h} 小時 ${m} 分`;
+  if (m > 0) return `${m} 分鐘`;
+  return '不到 1 分鐘';
+}
+
 export function resetText(iso, now = Date.now()) {
   if (!iso) return '';
   const t = Date.parse(iso);
   if (!Number.isFinite(t)) return '';
   const diff = Math.round((t - now) / 1000);
   if (diff <= 0) return '應已重置，等待更新';
-  const d = Math.floor(diff / 86400);
-  const h = Math.floor((diff % 86400) / 3600);
-  const m = Math.floor((diff % 3600) / 60);
-  let left;
-  if (d > 0) left = `${d} 天 ${h} 小時`;
-  else if (h > 0) left = `${h} 小時 ${m} 分`;
-  else if (m > 0) left = `${m} 分鐘`;
-  else left = '不到 1 分鐘';
-  return `${left}後重置（${localWhen(t, now)}）`;
+  return `${durationText(diff)}後重置（${localWhen(t, now)}）`;
+}
+
+/** 下次重試：「3 分鐘後重試」；沒有或時間已過回空字串 */
+export function retryText(iso, now = Date.now()) {
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t) || t <= now) return '';
+  const m = Math.ceil((t - now) / 60_000);
+  return m <= 1 ? '1 分鐘內重試' : `${m} 分鐘後重試`;
+}
+
+/** 預估用完：「照目前速度約 1 小時 40 分後用完」；沒有或時間已過回空字串 */
+export function etaText(iso, now = Date.now()) {
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t) || t <= now) return '';
+  return `照目前速度約 ${durationText(Math.round((t - now) / 1000))}後用完`;
 }
 
 function localWhen(t, now) {

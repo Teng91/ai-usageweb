@@ -71,14 +71,14 @@ function doRefresh(ctx, current) {
   });
 }
 
-function callUsage(c, signal) {
+function callUsage(c) {
   const headers = {
     Authorization: `Bearer ${c.accessToken}`,
     Accept: 'application/json',
     'User-Agent': 'codex_cli_rs',
   };
   if (c.accountId) headers['ChatGPT-Account-Id'] = c.accountId;
-  return requestJson(USAGE_URL, { headers, signal, label: 'Codex ' });
+  return requestJson(USAGE_URL, { headers, label: 'Codex ' });
 }
 
 export default {
@@ -94,7 +94,7 @@ export default {
     return callWithRefresh(c0, {
       expiresAt: Number(c0.expiresAt) || jwtExpiryMs(c0.accessToken) || 0,
       refresh: (c) => doRefresh(ctx, c),
-      call: async (c) => parseCodex((await callUsage(c, ctx.signal)).data),
+      call: async (c) => parseCodex((await callUsage(c)).data),
     });
   },
 };

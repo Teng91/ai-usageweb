@@ -1,8 +1,9 @@
-// 推播的存檔（/data/push.json）：裝置訂閱、全站設定，以及判斷用的樣本與已發紀錄（由 push.js 讀寫 state）
+// 推播的存檔（/data/push.json）：裝置訂閱、全站設定，以及判斷用的樣本、已發紀錄與每日次數
+// 存檔格式只有這個檔案知道；push.js 透過下面的方法讀寫，不直接碰 state
 import path from 'node:path';
 import { writeFileAtomic, readFileOrNull } from './fsutil.js';
 import { logWarn } from './log.js';
-import { RULES } from './alerts.js';
+import { RULES, recordSample } from './alerts.js';
 
 // 存檔欄位改了就 +1，舊檔會被丟掉（只新增選填欄位時不要升，升了訂閱會一起丟掉）
 const FORMAT_VERSION = 1;
@@ -43,7 +44,52 @@ export class PushStore {
     return this.writeChain;
   }
 
+  // ---- 判斷用的紀錄 ----
+  /** 判斷規則（alerts.js 的 evaluateAlerts）要讀的樣本與已發紀錄；只讀，要改用下面的方法 */
+  get history() {
+    return this.state.history;
+  }
+
+  get sent() {
+    return this.state.sent;
+  }
+
+  /** 某家抓到新資料：各窗口記一筆樣本並存檔 */
+  recordSamples(id, windows, now) {
+    for (const w of windows || []) recordSample(this.state.history, `${id}:${w.id}`, w, now);
+    this.save();
+  }
+
+  /** 記下這些通知已發（每則通知的 keys 都記；不存檔，呼叫端一輪結束再 save） */
+  markSent(alerts, now) {
+    for (const a of alerts) for (const k of a.keys) this.state.sent[k] = now;
+  }
+
+  /** 某家在 day（當地日期）已經發了幾則 */
+  dailyCount(provider, day) {
+    const d = this.state.daily[provider];
+    return d?.day === day ? d.count : 0;
+  }
+
+  addDaily(provider, day) {
+    this.state.daily[provider] = { day, count: this.dailyCount(provider, day) + 1 };
+  }
+
+  /** 清掉超過 keepMs 的已發紀錄，以及最後一筆樣本超過 keepMs 的窗口 */
+  prune(now, keepMs) {
+    const { sent, history } = this.state;
+    for (const [k, t] of Object.entries(sent)) if (now - t > keepMs) delete sent[k];
+    for (const [k, h] of Object.entries(history)) {
+      const last = h.samples[h.samples.length - 1];
+      if (!last || now - last[0] > keepMs) delete history[k];
+    }
+  }
+
   // ---- 訂閱 ----
+  get subs() {
+    return this.state.subs;
+  }
+
   find(endpoint) {
     return this.state.subs.find((s) => s.endpoint === endpoint) || null;
   }

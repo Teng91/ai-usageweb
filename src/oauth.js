@@ -5,7 +5,7 @@ import { ProviderError } from './errors.js';
  * 通用的 refresh_token 續期。refresh 端點回 400/401（invalid_grant 等）一律視為 auth：
  * 停止輪詢這一家，直到換新憑證。
  */
-export async function refreshToken({ url, body, form = false, signal, label }) {
+export async function refreshToken({ url, body, form = false, label }) {
   const headers = { Accept: 'application/json' };
   let payload;
   if (form) {
@@ -16,7 +16,7 @@ export async function refreshToken({ url, body, form = false, signal, label }) {
     payload = JSON.stringify(body);
   }
   try {
-    const { data } = await requestJson(url, { method: 'POST', headers, body: payload, signal, label });
+    const { data } = await requestJson(url, { method: 'POST', headers, body: payload, label });
     if (!data?.access_token) throw new ProviderError('parse', '續期回傳缺少 access_token');
     return data;
   } catch (err) {
@@ -46,7 +46,7 @@ export const REFRESH_SKEW_MS = 5 * 60 * 1000;
  */
 export function refreshAndSave(ctx, current, { url, body, label, expiresAt }) {
   return ctx.withLock(async () => {
-    const data = await refreshToken({ url, body, signal: ctx.signal, label });
+    const data = await refreshToken({ url, body, label });
     const patch = {
       accessToken: data.access_token,
       refreshToken: data.refresh_token || current.refreshToken,

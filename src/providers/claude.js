@@ -53,7 +53,7 @@ function doRefresh(ctx, current) {
   });
 }
 
-function callUsage(token, signal) {
+function callUsage(token) {
   return requestJson(USAGE_URL, {
     headers: {
       Authorization: `Bearer ${token}`,
@@ -61,7 +61,6 @@ function callUsage(token, signal) {
       Accept: 'application/json',
       'User-Agent': 'ai-usageweb',
     },
-    signal,
     label: 'Claude ',
   });
 }
@@ -69,7 +68,8 @@ function callUsage(token, signal) {
 export default {
   id: 'claude',
   name: 'Claude',
-  minIntervalSec: 60,
+  // 用量 API 實測約每 2 分鐘才給查一次（每分鐘查會交替收到 429）
+  minIntervalSec: 120,
   // 管理 API 換憑證時接受的欄位
   credentialFields: ['accessToken', 'refreshToken', 'expiresAt'],
   isConfigured(creds) {
@@ -85,7 +85,7 @@ export default {
       expiresAt: Number(c0.expiresAt) || 0,
       refresh: (c) => doRefresh(ctx, c),
       call: async (c) => {
-        const { data } = await callUsage(c.accessToken, ctx.signal);
+        const { data } = await callUsage(c.accessToken);
         return { plan, planExpiresAt, windows: parseClaude(data), balance: null };
       },
     });

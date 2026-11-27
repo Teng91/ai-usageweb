@@ -1,7 +1,7 @@
-// 推播服務：累積樣本、依規則（src/alerts.js）判斷、去重與每日上限、發送；訂閱與存檔在 push-store.js
+// 推播服務：依規則（src/alerts.js）判斷、去重與每日上限、發送；訂閱、樣本、已發紀錄與存檔在 push-store.js
 import { logInfo, logWarn } from './log.js';
 import { sendPush } from './webpush.js';
-import { evaluateAlerts, mergeAlerts, recordSample } from './alerts.js';
+import { evaluateAlerts, mergeAlerts } from './alerts.js';
 import { localParts } from './time.js';
 import { PushStore } from './push-store.js';
 
@@ -49,9 +49,7 @@ export class PushService {
     if (!this.enabled || !view || view.status !== 'ok' || !view.fetchedAt) return;
     if (this.lastFetched[view.id] === view.fetchedAt) return;
     this.lastFetched[view.id] = view.fetchedAt;
-    const now = this.now();
-    for (const w of view.windows || []) recordSample(this.store.state.history, `${view.id}:${w.id}`, w, now);
-    this.store.save();
+    this.store.recordSamples(view.id, view.windows, this.now());
     clearTimeout(this.timer);
     this.timer = setTimeout(() => { this.evaluate().catch(() => {}); }, EVAL_DEBOUNCE_MS);
     this.timer.unref?.();
@@ -65,25 +63,23 @@ export class PushService {
   }
 
   async #evaluateOnce() {
-    const state = this.store.state;
-    if (!this.enabled || !state.subs.length) return 0;
+    const store = this.store;
+    if (!this.enabled || !store.subs.length) return 0;
     const now = this.now();
-    this.#prune(now);
+    store.prune(now, SENT_KEEP_MS);
     const providers = this.snapshot.snapshot(now).providers;
-    const { quiet, thresholds } = this.store.settings();
-    const alerts = evaluateAlerts({ providers, history: state.history, sent: state.sent, now, tz: this.tz, quiet, thresholds });
+    const { quiet, thresholds } = store.settings();
+    const alerts = evaluateAlerts({ providers, history: store.history, sent: store.sent, now, tz: this.tz, quiet, thresholds });
     if (!alerts.length) return 0;
 
-    const markSent = (list) => { for (const a of list) for (const k of a.keys) state.sent[k] = now; };
     // 網頁開著時先不推播、也不記下：可能只是分頁開著人沒在看，關掉之後條件還成立就照樣推播
     if (this.viewers() > 0) return 0;
 
     // 超過每日上限的先不送也不記下，明天（或額度還沒重置前）還會再判斷，不會整個週期都漏掉
     const day = localParts(now, this.tz).dateKey;
-    const countOf = (id) => (state.daily[id]?.day === day ? state.daily[id].count : 0);
     const planned = {};
     const toSend = alerts.filter((a) => {
-      if (countOf(a.provider) + (planned[a.provider] || 0) >= DAILY_CAP) return false;
+      if (store.dailyCount(a.provider, day) + (planned[a.provider] || 0) >= DAILY_CAP) return false;
       planned[a.provider] = (planned[a.provider] || 0) + 1;
       return true;
     });
@@ -94,20 +90,20 @@ export class PushService {
       const [msg] = mergeAlerts(group);
       const payload = { title: msg.title, body: msg.body, tag: kind, url: '/' };
       // 送的途中訂閱可能因 410 被刪掉，先複製一份清單
-      const targets = state.subs.filter((sub) => sub.prefs?.[kind] !== false);
+      const targets = store.subs.filter((sub) => sub.prefs?.[kind] !== false);
       let delivered = 0;
       for (const sub of targets) {
         if (await this.#deliver(sub, payload, kind === 'usage' ? 'high' : 'normal')) delivered++;
       }
       sent += delivered;
       // 沒人要這一類：記下但不算次數；全部送失敗：不記，下次再試
-      if (!targets.length) markSent(group);
+      if (!targets.length) store.markSent(group, now);
       else if (delivered) {
-        markSent(group);
-        for (const a of group) state.daily[a.provider] = { day, count: countOf(a.provider) + 1 };
+        store.markSent(group, now);
+        for (const a of group) store.addDaily(a.provider, day);
       }
     }
-    this.store.save();
+    store.save();
     if (sent) logInfo('push sent', { count: sent, kinds: [...new Set(toSend.map((a) => a.kind))] });
     return sent;
   }
@@ -121,14 +117,5 @@ export class PushService {
       logWarn('push failed', { status: r.status });
     }
     return r.ok;
-  }
-
-  #prune(now) {
-    const { sent, history } = this.store.state;
-    for (const [k, t] of Object.entries(sent)) if (now - t > SENT_KEEP_MS) delete sent[k];
-    for (const [k, h] of Object.entries(history)) {
-      const last = h.samples[h.samples.length - 1];
-      if (!last || now - last[0] > SENT_KEEP_MS) delete history[k];
-    }
   }
 }

@@ -33,7 +33,10 @@ export function createHandler({ cfg, poller, hub, snapshot, creds, providers, ra
 
     if (p === '/api/rankings' && req.method === 'GET') {
       // OpenRouter 全站模型排行（公開資料，每小時最多抓一次）
-      return sendJson(res, 200, (await rankings.get()) || { updatedAt: null, views: null }, { 'Cache-Control': 'no-store' });
+      const data = await rankings.get();
+      // 還沒有資料（OpenRouter 暫時連不上）回 503：service worker 不存非 200，上次存下的排行不會被蓋掉
+      if (!data) return sendJson(res, 503, { error: '排行榜暫時拿不到' }, { 'Cache-Control': 'no-store' });
+      return sendJson(res, 200, data, { 'Cache-Control': 'no-store' });
     }
 
     if (p.startsWith('/api/push/')) return pushRoutes.handle(req, res, p);

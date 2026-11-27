@@ -47,7 +47,9 @@ export class SnapshotStore {
     let status = e.status;
     const interval = (e.intervalSec || this.pollIntervalSec) * 1000;
     const age = e.fetchedAt ? now - Date.parse(e.fetchedAt) : Infinity;
-    if (status === 'ok' && e.fetchedAt && age > STALE_INTERVALS * interval) status = 'stale';
+    // 被限流、還在等退避（最多 15 分鐘，比 3 個週期長）：照樣是 ok，前端顯示「被限流」與重試時間，不算過期
+    const backingOff = e.slowed && Date.parse(e.nextFetchAt) > now;
+    if (status === 'ok' && e.fetchedAt && age > STALE_INTERVALS * interval && !backingOff) status = 'stale';
     return {
       id: e.id,
       name: e.name,

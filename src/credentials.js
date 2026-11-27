@@ -160,14 +160,17 @@ export class CredentialStore {
   async replace(id, value) {
     await this.locks.get(id)?.catch(() => {});
     const prev = this.creds[id];
+    const prevVersion = this.version(id);
+    // 版本號先換：寫檔途中舊流程的續期結果（帶著舊版本號）就存不進來，不會蓋掉新憑證
+    this.versions[id] = prevVersion + 1;
     this.creds[id] = { ...value };
     try {
       await this.persist();
     } catch (err) {
       this.creds[id] = prev;
+      this.versions[id] = prevVersion;
       throw err;
     }
-    this.versions[id] = (this.versions[id] || 0) + 1;
   }
 
   /** 同一家同時只會有一個續期在跑；其他呼叫者共用同一個 Promise */

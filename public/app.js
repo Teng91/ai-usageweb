@@ -77,14 +77,22 @@ function openStream() {
     state.sseFailures = 0;
     state.offline = false;
     stopFallback();
+    armWatchdog();
     renderChrome();
   });
   es.addEventListener('snapshot', (e) => {
+    armWatchdog();
     applySnapshot(JSON.parse(e.data));
   });
   es.addEventListener('provider', (e) => {
+    armWatchdog();
     applyProvider(JSON.parse(e.data));
     renderChrome();
+  });
+  es.addEventListener('ping', (e) => {
+    // 伺服器連上時先送一次，告訴我們間隔
+    try { state.pingSec = Number(JSON.parse(e.data).sec) || state.pingSec; } catch { /* 用原本的 */ }
+    armWatchdog();
   });
   es.addEventListener('bye', () => {
     // 伺服器主動斷開（連線太久或停機）：只有看得見時才重連
@@ -129,7 +137,22 @@ function stopCatchUp() {
   state.catchUpTimer = null;
 }
 
+/**
+ * 半斷線偵測：伺服器每 pingSec 秒送一次 ping，連續 3 次的時間沒收到任何事件就當作斷了，重新連線。
+ * 筆電睡醒、proxy 悄悄切斷連線時 EventSource 不一定會報錯，畫面會停在「即時」卻不再更新。
+ */
+function armWatchdog() {
+  clearTimeout(state.sseWatchdog);
+  const es = state.es;
+  state.sseWatchdog = setTimeout(() => {
+    if (state.es !== es || document.visibilityState !== 'visible') return;
+    closeStream();
+    start();
+  }, state.pingSec * 3 * 1000);
+}
+
 function closeStream() {
+  clearTimeout(state.sseWatchdog);
   clearTimeout(state.sseOpenTimer);
   if (state.es) {
     state.es.close();

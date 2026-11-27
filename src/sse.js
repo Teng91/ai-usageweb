@@ -1,4 +1,8 @@
-/** SSE 連線管理：ping、廣播、連線上限時間與連線數上限 */
+/**
+ * SSE 連線管理：ping、廣播、連線上限時間與連線數上限。
+ * ping 用有名字的事件（不是 `: ping` 註解）：瀏覽器的 EventSource 收得到，前端太久沒收到就當作半斷線、自己重連。
+ * 連上時先送一次，前端才知道間隔。
+ */
 export class SseHub {
   constructor({ pingSec = 25, maxAgeSec = 1800, maxClients = 20, onJoin = () => {}, onLeave = () => {} } = {}) {
     this.maxClients = maxClients;
@@ -31,6 +35,7 @@ export class SseHub {
     const client = { res, connectedAt: Date.now() };
     this.clients.add(client);
     this.send(client, 'snapshot', initialSnapshot);
+    this.send(client, 'ping', { sec: this.pingSec });
 
     // 保險：同一條連線開太久就請前端在「看得見」時才重連，避免忘了關的分頁讓機器一直開著
     client.maxAgeTimer = setTimeout(() => {
@@ -68,11 +73,7 @@ export class SseHub {
 
   startPing() {
     if (this.pingTimer) return;
-    this.pingTimer = setInterval(() => {
-      for (const c of this.clients) {
-        try { c.res.write(': ping\n\n'); } catch { /* ignore */ }
-      }
-    }, this.pingSec * 1000);
+    this.pingTimer = setInterval(() => this.broadcast('ping', { sec: this.pingSec }), this.pingSec * 1000);
     this.pingTimer.unref?.();
   }
 

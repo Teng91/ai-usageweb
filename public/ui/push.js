@@ -11,12 +11,29 @@ function b64uToBytes(s) {
   return Uint8Array.from(b, (c) => c.charCodeAt(0));
 }
 
+/** 呼叫推播 API；連不上伺服器時丟中文訊息的錯（瀏覽器原本的訊息是英文） */
 async function api(path, body, key) {
   const headers = { 'Content-Type': 'application/json' };
   if (key) headers.Authorization = `Bearer ${key}`;
-  const res = await fetch(withKey(path), { method: 'POST', headers, body: JSON.stringify(body) });
+  let res;
+  try {
+    res = await fetch(withKey(path), { method: 'POST', headers, body: JSON.stringify(body) });
+  } catch {
+    throw new Error('連不上伺服器，稍後再試');
+  }
   const data = await res.json().catch(() => ({}));
   return { ok: res.ok, status: res.status, data };
+}
+
+// 伺服器上目前的通知種類與設定：儲存失敗時把表單還原成這個，畫面才不會跟實際存的不一樣
+let savedPrefs = null;
+let savedSettings = null;
+
+function showPrefs(p) {
+  savedPrefs = p;
+  $('push-usage').checked = p.usage !== false;
+  $('push-reset').checked = p.reset !== false;
+  $('push-restored').checked = p.restored !== false;
 }
 
 async function currentSub() {
@@ -50,6 +67,7 @@ function buildSettingsForm() {
 
 /** 把伺服器的設定填進表單，也更新說明文字 */
 function showSettings(s) {
+  savedSettings = s;
   const q = s?.quiet || null;
   $('push-quiet-on').checked = Boolean(q);
   $('push-quiet-start').value = String(q ? q.start : 0);
@@ -72,9 +90,16 @@ async function saveSettings() {
     quiet: on ? { start: Number($('push-quiet-start').value), end: Number($('push-quiet-end').value) } : null,
     thresholds: [$('push-t1').value, $('push-t2').value].filter(Boolean).map(Number),
   };
-  const r = await api('/api/push/settings', { endpoint: sub.endpoint, settings });
-  if (r.ok) showSettings(r.data.settings);
-  setMsg(r.ok ? '已儲存' : (r.status === 400 && on && settings.quiet.start === settings.quiet.end ? '勿擾的開始和結束不能一樣' : (r.data.error || '儲存失敗')), !r.ok);
+  try {
+    if (on && settings.quiet.start === settings.quiet.end) throw new Error('勿擾的開始和結束不能一樣');
+    const r = await api('/api/push/settings', { endpoint: sub.endpoint, settings });
+    if (!r.ok) throw new Error(r.data.error || '儲存失敗');
+    showSettings(r.data.settings);
+    setMsg('已儲存');
+  } catch (err) {
+    if (savedSettings) showSettings(savedSettings);
+    setMsg(`沒存到：${err.message}`, true);
+  }
 }
 
 function prefsFromForm() {
@@ -99,14 +124,18 @@ async function refresh() {
   let subscribed = false;
   let subRes = null;
   if (sub) {
-    const r = await api('/api/push/status', { endpoint: sub.endpoint }).catch(() => null);
-    subRes = r;
-    subscribed = Boolean(r?.data?.subscribed);
-    if (subscribed) {
-      $('push-usage').checked = r.data.prefs.usage !== false;
-      $('push-reset').checked = r.data.prefs.reset !== false;
-      $('push-restored').checked = r.data.prefs.restored !== false;
+    try {
+      subRes = await api('/api/push/status', { endpoint: sub.endpoint });
+    } catch (err) {
+      // 連不上伺服器：不知道有沒有訂閱，不要顯示成「尚未開啟」，設定也先不給改
+      $('push-key-row').hidden = true;
+      $('push-settings').hidden = true;
+      $('push-test').disabled = true;
+      setMsg(err.message, true);
+      return;
     }
+    subscribed = Boolean(subRes.data?.subscribed);
+    if (subscribed) showPrefs(subRes.data.prefs);
   }
   on.checked = subscribed;
   // 已經開啟就不必再輸入密碼；勿擾與門檻只有開啟後才能改
@@ -142,7 +171,13 @@ async function enable() {
       throw new Error('瀏覽器拒絕訂閱推播，稍後再試或重新整理頁面'); // 瀏覽器的錯誤訊息是英文，換成中文
     }
   }
-  const r = await api('/api/push/subscribe', { subscription: sub.toJSON(), prefs: prefsFromForm() }, key);
+  let r;
+  try {
+    r = await api('/api/push/subscribe', { subscription: sub.toJSON(), prefs: prefsFromForm() }, key);
+  } catch (err) {
+    await sub.unsubscribe().catch(() => {}); // 伺服器沒收到：瀏覽器這邊也退掉，下次重來
+    throw err;
+  }
   if (!r.ok) {
     await sub.unsubscribe().catch(() => {});
     throw new Error(r.data.error || `訂閱失敗（${r.status}）`);
@@ -160,8 +195,15 @@ async function disable() {
 async function savePrefs() {
   const sub = await currentSub().catch(() => null);
   if (!sub || !$('push-on').checked) return;
-  const r = await api('/api/push/prefs', { endpoint: sub.endpoint, prefs: prefsFromForm() });
-  setMsg(r.ok ? '已儲存' : (r.data.error || '儲存失敗'), !r.ok);
+  try {
+    const r = await api('/api/push/prefs', { endpoint: sub.endpoint, prefs: prefsFromForm() });
+    if (!r.ok) throw new Error(r.data.error || '儲存失敗');
+    showPrefs(r.data.prefs);
+    setMsg('已儲存');
+  } catch (err) {
+    if (savedPrefs) showPrefs(savedPrefs);
+    setMsg(`沒存到：${err.message}`, true);
+  }
 }
 
 /** 顯示狀態時避免連點：執行期間停用開關 */

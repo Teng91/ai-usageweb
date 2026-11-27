@@ -37,15 +37,15 @@ export default {
   isConfigured(creds) {
     return Boolean(creds.openrouter?.apiKey);
   },
-  async fetch({ creds, signal }) {
+  async fetch({ creds }) {
     const headers = { Authorization: `Bearer ${creds.openrouter.apiKey}`, Accept: 'application/json' };
     try {
-      const { data } = await requestJson(`${BASE}/credits`, { headers, signal, label: 'OpenRouter ' });
+      const { data } = await requestJson(`${BASE}/credits`, { headers, label: 'OpenRouter ' });
       return { plan: '預付', windows: [], balance: parseCredits(data) };
     } catch (err) {
       // 一般 key 查 /credits 可能被拒（需要 provisioning key），改查 /key
       if (!(err instanceof ProviderError) || !['auth', 'forbidden'].includes(err.kind)) throw err;
-      const { data } = await requestJson(`${BASE}/key`, { headers, signal, label: 'OpenRouter ' });
+      const { data } = await requestJson(`${BASE}/key`, { headers, label: 'OpenRouter ' });
       const plan = data?.data?.is_free_tier ? '免費' : '預付';
       return { plan, windows: [], balance: parseKey(data) };
     }

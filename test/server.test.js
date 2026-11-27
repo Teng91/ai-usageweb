@@ -129,3 +129,38 @@ test('PUT /admin/credentials/:provider 替換憑證', async () => {
   });
   assert.equal(bad.status, 404);
 });
+
+test('GET /api/rankings 還沒有資料時回 503（service worker 才不會拿它蓋掉上次存下的排行）', async () => {
+  const res = await realFetch(`${base}/api/rankings`);
+  assert.equal(res.status, 503);
+  assert.equal(typeof (await res.json()).error, 'string');
+});
+
+test('靜態檔：依 Accept-Encoding 給 br／gzip，帶 ETag，沒改就回 304', async () => {
+  const http = await import('node:http');
+  const zlib = await import('node:zlib');
+  const fs = await import('node:fs');
+  const get = (headers) => new Promise((resolve, reject) => {
+    http.get(`${base}/style.css`, { headers }, (res) => {
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body: Buffer.concat(chunks) }));
+    }).on('error', reject);
+  });
+  const raw = fs.readFileSync(new URL('../public/style.css', import.meta.url));
+  const br = await get({ 'accept-encoding': 'gzip, br' });
+  assert.equal(br.status, 200);
+  assert.equal(br.headers['content-encoding'], 'br');
+  assert.equal(br.headers.vary, 'Accept-Encoding');
+  assert.ok(zlib.brotliDecompressSync(br.body).equals(raw));
+  const gz = await get({ 'accept-encoding': 'gzip, br;q=0' });
+  assert.equal(gz.headers['content-encoding'], 'gzip');
+  assert.ok(zlib.gunzipSync(gz.body).equals(raw));
+  assert.notEqual(gz.headers.etag, br.headers.etag, '不同壓縮的 ETag 不同');
+  const plain = await get({});
+  assert.equal(plain.headers['content-encoding'], undefined);
+  assert.ok(plain.body.equals(raw));
+  const again = await get({ 'accept-encoding': 'br', 'if-none-match': br.headers.etag });
+  assert.equal(again.status, 304);
+  assert.equal(again.body.length, 0);
+});

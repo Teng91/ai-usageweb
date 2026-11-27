@@ -14,6 +14,9 @@ export const state = {
   staleIntervals: 3,
   es: null,
   live: false,
+  // SSE 太久沒收到事件就當作半斷線：伺服器 ping 的間隔（連上時伺服器會告訴我們）與計時器
+  pingSec: 25,
+  sseWatchdog: null,
   sseFailures: 0,
   fallbackTimer: null,
   fallbackTicks: 0,
@@ -47,12 +50,17 @@ export const visible = (p) => Boolean(p) && p.status !== 'disabled';
 // 抓一次要幾秒：比一個更新週期再舊這麼多才算「伺服器停過」
 const BEHIND_SLACK_MS = 15_000;
 
+/** 被限流或出錯，伺服器還在等退避時間（nextFetchAt 還沒到）才會再抓 */
+export function backingOff(p, at = Date.now()) {
+  return Boolean(p.slowed || p.status === 'error') && Date.parse(p.nextFetchAt) > at;
+}
+
 /**
  * 在 at 這個時間點，這家的資料比一個更新週期還舊：伺服器停過一陣子，被叫醒後正在重抓。
- * 出錯、要重新登入、被限流放慢的不算（伺服器不會馬上有新的）。
+ * 要重新登入的、還在等退避的不算（伺服器不會馬上有新的）。
  */
 export function behind(p, at = Date.now()) {
-  if (!visible(p) || p.status === 'error' || p.status === 'auth' || p.slowed) return false;
+  if (!visible(p) || p.status === 'auth' || backingOff(p, at)) return false;
   if (!p.fetchedAt) return true;
   return at - Date.parse(p.fetchedAt) > (p.intervalSec || state.pollIntervalSec) * 1000 + BEHIND_SLACK_MS;
 }

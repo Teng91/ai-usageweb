@@ -33,9 +33,23 @@ async function loadRankings() {
     if (data?.views) rankings = data;
     failed = !data?.views;
   } catch {
+    // 伺服器暫時拿不到排行（回 503）：畫面上還沒有的話，先用上次存下的
+    if (!rankings) rankings = await cachedRankings();
     failed = !rankings;
   }
   renderRankings();
+}
+
+/** 上次存下的排行（由 service worker 給，快取細節只在 sw.js）；沒有回 null */
+async function cachedRankings() {
+  if (!navigator.serviceWorker?.controller) return null;
+  try {
+    const res = await fetch('/api/rankings', { headers: { 'x-cache-only': '1' } });
+    const data = res.ok ? await res.json() : null;
+    return data?.views ? data : null;
+  } catch {
+    return null;
+  }
 }
 
 /** 排行卡片只建一次（跟額度卡片同樣的標題列／內容／底部），切換的分頁不會被重設 */

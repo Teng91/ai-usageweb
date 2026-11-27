@@ -418,6 +418,17 @@
 [data-skin="adventure"] .bar.danger > span { background: linear-gradient(180deg, #ffb0b0 0%, #ff4d4d 45%, #d11f2a 100%); }
 
 [data-skin="adventure"] .win-sub { color: var(--muted); font-weight: 600; }
+[data-skin="adventure"] .win-eta { font-weight: 700; }
+
+/* 時間進度：能量條上的白色刻度，外框色描邊才看得清楚 */
+[data-skin="adventure"] .bar > .time-mark {
+  top: -5px;
+  bottom: -5px;
+  width: 3px;
+  margin-left: -1.5px;
+  background: #fff;
+  box-shadow: 0 0 0 1px var(--frame);
+}
 
 [data-skin="adventure"] .card-meta {
   border-top: 2px dashed var(--line);

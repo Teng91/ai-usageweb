@@ -490,11 +490,23 @@ button {
 }
 
 .bar {
+  position: relative; /* 時間進度的細線以它定位，上下各凸出一點 */
   height: 4px;
   border-radius: 2px;
   background: var(--track);
-  overflow: hidden;
   margin: 7px 0 5px;
+}
+
+/* 時間進度：這個週期已經過了多少；用量條沒超過這條線就是還寬裕 */
+.bar > .time-mark {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: var(--text-2);
+  pointer-events: none;
 }
 
 .bar > span {
@@ -514,6 +526,15 @@ button {
   margin: 0;
   font-variant-numeric: tabular-nums;
 }
+
+/* 預估用完時間（照目前速度會在重置前用完才出現） */
+.win-eta {
+  font-size: 0.74rem;
+  color: var(--warn);
+  margin: 2px 0 0;
+  font-variant-numeric: tabular-nums;
+}
+.win-grid .win-eta { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .card-status {
   margin: 0 0 12px;
