@@ -79,10 +79,11 @@ function showMap(i, { announce = true } = {}) {
 let walkTimer = null;
 let warping = false;
 
+/** 勇者要走多遠才站到傳送點中間；起點與寬度從 scene.css 讀，不在這裡另外寫一份 */
 function heroTargetX() {
   const p = portal.getBoundingClientRect();
-  const startLeft = -80; // .sc-hero 的 left
-  return p.left + p.width / 2 - 32 - startLeft;
+  const startLeft = parseFloat(getComputedStyle(hero).left) || 0;
+  return p.left + p.width / 2 - hero.offsetWidth / 2 - startLeft;
 }
 
 function startWalk() {

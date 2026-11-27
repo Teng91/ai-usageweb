@@ -178,14 +178,14 @@
   position: absolute;
   right: -5px;
   bottom: -7px;
-  min-width: 14px;
+  min-width: 16px;
   padding: 0 3px;
   border-radius: 4px;
   background: var(--frame);
   color: #fff;
-  font-size: 0.6rem;
+  font-size: 0.75rem; /* 最小 12px（AGENTS.md 的易讀性規則；smoke test 會檢查） */
   font-weight: 900;
-  line-height: 14px;
+  line-height: 16px;
   text-align: center;
 }
 
@@ -422,7 +422,7 @@
   border-radius: 50%;
   border: 2px solid var(--frame);
   color: #4a3426;
-  font-size: 0.68rem;
+  font-size: 0.75rem; /* 最小 12px */
 }
 
 [data-skin="adventure"] .rank-list .rt-row:nth-child(1) .rk { background: radial-gradient(circle at 35% 30%, #fff6b0, #ffcf33 55%, #d99a00); }

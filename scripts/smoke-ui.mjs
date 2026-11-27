@@ -189,6 +189,8 @@ async function main() {
     // ---- 亮暗切換 ----
     // 小字（重置倒數）對卡片底色的對比至少 4.5:1
     const contrastOf = `(() => { const rgb = (c) => c.match(/[0-9.]+/g).slice(0, 3).map(Number); const L = (c) => { const [r, g, b] = rgb(c).map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }); return 0.2126 * r + 0.7152 * g + 0.0722 * b; }; const fg = getComputedStyle(document.querySelector('.win-sub')).color; const bg = getComputedStyle(document.querySelector('.card[data-id]')).backgroundColor; const [a, b] = [L(fg), L(bg)].sort((x, y) => y - x); return Math.round(((a + 0.05) / (b + 0.05)) * 100) / 100; })()`;
+    // 畫面上看得到的文字（含 ::before／::after 的字，例如快捷鍵小標）都不能小於 12px；回傳太小的清單
+    const tinyText = `(() => { const out = []; const seen = (el) => el.getClientRects().length && getComputedStyle(el).visibility !== 'hidden'; for (const el of document.querySelectorAll('body *')) { if (el.closest('svg, script, style, template') || !seen(el)) continue; const own = [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim()); if (own && parseFloat(getComputedStyle(el).fontSize) < 12) out.push((el.id || el.className || el.tagName) + ':' + getComputedStyle(el).fontSize); for (const pe of ['::before', '::after']) { const cs = getComputedStyle(el, pe); if (!/^(none|normal|""|url)/.test(cs.content) && cs.display !== 'none' && parseFloat(cs.fontSize) < 12) out.push((el.id || el.className) + pe + ':' + cs.fontSize); } } return out.slice(0, 5).join(' '); })()`;
     // 還沒選過亮暗：跟著系統切換（data-theme 一律設好，CSS 只看它）
     const follow = [];
     for (const scheme of ['dark', 'light']) {
@@ -198,6 +200,8 @@ async function main() {
     }
     check('沒選過亮暗時跟著系統切換，兩種都設好 data-theme', follow.map((x) => x.split(':')[0]).join() === 'dark,light', follow.join(' '));
     check('簡約風格的小字對比至少 4.5:1（暗色、亮色）', follow.every((x) => Number(x.split(':')[1]) >= 4.5), follow.join(' '));
+    const tinyMinimal = await ev(tinyText);
+    check('簡約風格：所有文字至少 12px', tinyMinimal === '', tinyMinimal);
     const before = await ev(`getComputedStyle(document.body).backgroundColor`);
     await ev(`document.getElementById('theme-btn').click()`);
     await sleep(200);
@@ -232,6 +236,8 @@ async function main() {
       advContrast.push(`${theme}:${await ev(contrastOf)}`);
     }
     check('冒險風格的小字對比至少 4.5:1（白天、夜晚）', advContrast.every((x) => Number(x.split(':')[1]) >= 4.5), advContrast.join(' '));
+    const tinyAdv = await ev(tinyText);
+    check('冒險風格：所有文字（含快捷鍵小標、名次牌）至少 12px', tinyAdv === '', tinyAdv);
     await ev(themeBefore ? `document.documentElement.dataset.theme = '${themeBefore}'` : `delete document.documentElement.dataset.theme`);
     const maps = [];
     for (let i = 0; i < 4; i++) { await key('m'); await sleep(2300); maps.push(await ev(`document.documentElement.dataset.map`)); }

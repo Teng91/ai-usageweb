@@ -124,7 +124,7 @@ powershell -ExecutionPolicy Bypass -File scripts\setup-antigravity.ps1
 全部登入完，產生 `fly secrets set` 指令（含新的 `CREDENTIALS_KEY` 與 `ADMIN_TOKEN`）：
 
 ```powershell
-node scripts/extract-credentials.js --gen-keys --gh
+node scripts/extract-credentials.js --gen-keys
 ```
 
 `server-*` 目錄已在 `.gitignore`，用完就刪掉。
@@ -278,9 +278,9 @@ curl.exe -X PUT https://ai-usageweb.fly.dev/admin/credentials/claude -H "Authori
   - 冒險：原創的像素 RPG 風格，春夏秋冬四張地圖輪流（遠山、遠丘、遠方小鎮、帶樹冠的近丘多層遠景慢慢橫移，四季各一套配色；天上有柔和的雲、漂浮小島，春夏有彩虹；夜晚有月亮，小鎮的窗戶和招牌會亮燈）（小勇者走進右邊的傳送點就換下一季）、會動的原創怪物（點了會跳）、用量上升時卡片跳出「+N%」、額度用到 90% 以上冒「快用完了！」
 - **亮色／暗色**（太陽／月亮按鈕）：沒選過就跟隨系統（系統切換時也跟著變）；冒險風格裡是白天／夜晚
 - **只看風景**（冒險風格的山形按鈕或 B 鍵）：收起所有卡片只留場景，按「顯示用量」、Esc 或點兩下背景回來
-- **快捷鍵**（冒險風格）：B 只看風景、M 換地圖、T 白天／夜晚、S 換風格
+- **快捷鍵**：S 換風格（兩種風格都能用）；冒險風格另外有 B 只看風景、M 換地圖、T 白天／夜晚（按鈕右下角會標出按鍵）
 - **手機的頂列**維持一排（標題、連線狀態、通知、亮暗、⋯）：換風格、只看風景、安裝收在「⋯」選單裡；觸控裝置上頂列按鈕會放大，比較好點
-- **易讀性**：小字對比至少 4.5:1、最小 12px（前端 smoke test 會檢查兩種風格、亮暗都過）；用鍵盤操作時有明顯的焦點框
+- **易讀性**：小字對比至少 4.5:1、所有文字（含快捷鍵小標、名次牌）最小 12px，前端 smoke test 兩種風格、亮暗都會檢查；用鍵盤操作時有明顯的焦點框
 - **OpenRouter 熱門模型**：免費／付費前 10 名（每天／每週／每月），付費附每百萬 token 價格
 - **Claude 到期日**：設 `CLAUDE_PLAN_EXPIRES_AT=YYYY-MM-DD`，剩 30 天內變橘色
 
