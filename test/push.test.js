@@ -244,8 +244,7 @@ test('同一類的通知合成一則', () => {
 
 const SUB = { endpoint: 'https://push.example.test/abc', keys: { p256dh: 'B'.padEnd(87, 'A'), auth: 'A'.repeat(22) } };
 
-function service({ viewers = 0, send } = {}) {
-  const viewersFn = typeof viewers === 'function' ? viewers : () => viewers;
+function service({ watching = () => false, send } = {}) {
   let now = NOON;
   const views = [];
   const snapshot = { snapshot: () => ({ providers: views }) };
@@ -256,7 +255,7 @@ function service({ viewers = 0, send } = {}) {
     tz: TZ,
     quiet: QUIET,
     snapshot,
-    viewers: viewersFn,
+    watching,
     now: () => now,
     send: send || (async (sub, payload) => { calls.push({ sub: sub.endpoint, payload }); return { ok: true, status: 201 }; }),
   });
@@ -284,14 +283,14 @@ test('PushService：送出、去重、prefs 關掉就不送', async () => {
 });
 
 test('PushService：網頁開著時先不推也不記下，關掉後照樣推播', async () => {
-  let viewers = 1;
-  const { svc, calls, feed } = service({ viewers: () => viewers });
+  let open = true;
+  const { svc, calls, feed } = service({ watching: () => open });
   svc.store.subscribe(SUB);
   feed(96);
   assert.equal(await svc.evaluate(), 0);
   assert.equal(calls.length, 0);
   assert.equal(Object.keys(svc.store.state.sent).length, 0);
-  viewers = 0;
+  open = false;
   assert.equal(await svc.evaluate(), 1);
   assert.equal(calls.length, 1);
 });

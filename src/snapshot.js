@@ -2,8 +2,19 @@ import path from 'node:path';
 import { writeFileAtomic, readFileOrNull } from './fsutil.js';
 import { logWarn } from './log.js';
 
-// 超過幾個更新週期沒新資料就算過期；也放進快照給前端用，兩邊不必各寫一份
+// 超過幾個更新週期沒新資料就算過期（快照的每家都附上算好的 staleAt，前端不必再寫一份規則）
 export const STALE_INTERVALS = 3;
+
+/**
+ * 什麼時候算過期（毫秒）：最後一次成功抓取後 3 個週期；被限流還在等退避的，等到退避結束才算
+ * （退避最多 15 分鐘，比 3 個週期長，不然還在等就先被判成過期）。沒有資料回 null。
+ */
+export function staleTime(e, intervalMs) {
+  if (!e.fetchedAt) return null;
+  const at = Date.parse(e.fetchedAt) + STALE_INTERVALS * intervalMs;
+  const retry = Date.parse(e.nextFetchAt);
+  return e.slowed && Number.isFinite(retry) ? Math.max(at, retry) : at;
+}
 
 /** 記憶體快照＋/data/snapshot.json（原子寫入） */
 export class SnapshotStore {
@@ -46,10 +57,8 @@ export class SnapshotStore {
     const e = this.entries[id];
     let status = e.status;
     const interval = (e.intervalSec || this.pollIntervalSec) * 1000;
-    const age = e.fetchedAt ? now - Date.parse(e.fetchedAt) : Infinity;
-    // 被限流、還在等退避（最多 15 分鐘，比 3 個週期長）：照樣是 ok，前端顯示「被限流」與重試時間，不算過期
-    const backingOff = e.slowed && Date.parse(e.nextFetchAt) > now;
-    if (status === 'ok' && e.fetchedAt && age > STALE_INTERVALS * interval && !backingOff) status = 'stale';
+    const staleAt = staleTime(e, interval);
+    if (status === 'ok' && staleAt !== null && now > staleAt) status = 'stale';
     return {
       id: e.id,
       name: e.name,
@@ -57,6 +66,8 @@ export class SnapshotStore {
       planExpiresAt: e.planExpiresAt || null,
       status,
       fetchedAt: e.fetchedAt,
+      // 過了這個時間還沒新資料就算過期；前端只比對時間，規則只寫在這裡
+      staleAt: staleAt === null ? null : new Date(staleAt).toISOString(),
       nextFetchAt: e.nextFetchAt,
       intervalSec: e.intervalSec || this.pollIntervalSec,
       slowed: Boolean(e.slowed),
@@ -72,7 +83,6 @@ export class SnapshotStore {
       version: 1,
       generatedAt: new Date(now).toISOString(),
       pollIntervalSec: this.pollIntervalSec,
-      staleIntervals: STALE_INTERVALS,
       providers: this.order.map((id) => this.view(id, now)),
     };
   }

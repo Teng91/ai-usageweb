@@ -216,6 +216,26 @@ async function main() {
     pushProvider(providers(36)[0]);
     pushProvider(providers(30)[3]);
 
+    // 過期由伺服器算好的 staleAt 決定，前端只比對時間
+    pushProvider({ ...providers(30)[3], staleAt: real(-1000) });
+    await sleep(300);
+    check('過了伺服器給的 staleAt 就標「資料已過期」', /^資料已過期/.test(await ev(`document.querySelector('.card[data-id="openrouter"] .card-status').textContent`)));
+    pushProvider(providers(30)[3]);
+
+    // 依速度變色：用量超過時間線 10 點以上才變橘；用到 75% 但時間已過 90% 是正常的，不變色
+    const gem = (pct, resetIn) => ({ ...providers(30)[1], windows: [{ id: 'gemini', label: '5 小時', usedPct: pct, resetsAt: real(resetIn), periodSec: 18000 }] });
+    const gemBar = `(() => { const b = document.querySelector('.card[data-id="antigravity"] .bar'); return b.classList.contains('warn') + '|' + b.classList.contains('danger'); })()`;
+    pushProvider(gem(60, 4 * 3600e3)); // 時間過了 20%、用了 60%
+    await sleep(300);
+    const fast = await ev(gemBar);
+    pushProvider(gem(75, 30 * 60e3)); // 時間過了 90%、用了 75%
+    await sleep(300);
+    const onPace = await ev(gemBar);
+    check('依速度變色：用得比時間快才變橘，75% 但時間快到了不變色', fast === 'true|false' && onPace === 'false|false', `${fast} / ${onPace}`);
+    pushProvider(providers(30)[1]);
+    check('卡片底部不再有閃爍的 ▼（看起來能點卻沒作用）', (await ev(`getComputedStyle(document.querySelector('.card-meta'), '::after').content`)) === 'none');
+    check('卡片區不加 aria-live（倒數每秒在變，螢幕閱讀器會一直唸）', (await ev(`document.getElementById('cards').hasAttribute('aria-live')`)) === false);
+
     // 只看風景
     await key('b');
     await sleep(400);
@@ -228,6 +248,28 @@ async function main() {
     await viewport(390, 844, true);
     await sleep(400);
     await shot('mobile');
+
+    // 單欄時「快用完了！」泡泡不能壓到上一張卡片
+    const bubbleGap = await ev(`(() => { const b = document.querySelector('.card[data-id="codex"] .alert-bubble').getBoundingClientRect(); const prev = document.querySelector('.card[data-id="antigravity"]').getBoundingClientRect(); return Math.round(b.top - prev.bottom); })()`);
+    check('手機：「快用完了！」泡泡不壓到上一張卡片', bubbleGap >= 0, String(bubbleGap));
+
+    // 手機頂列維持一排；換風格、只看風景、安裝收在「更多」選單
+    const topRow = await ev(`(() => { const tops = [...document.querySelectorAll('.topbar > *')].filter((e) => e.getClientRects().length && getComputedStyle(e).position !== 'absolute').map((e) => e.getBoundingClientRect()); const mid = (r) => r.top + r.height / 2; return [Math.round(Math.max(...tops.map(mid)) - Math.min(...tops.map(mid))), document.getElementById('skin-btn').getClientRects().length, document.getElementById('more-btn').getClientRects().length].join('|'); })()`);
+    check('手機：頂列維持一排，換風格收進「更多」', topRow === '0|0|1', topRow);
+    await ev(`document.getElementById('more-btn').click()`);
+    await sleep(200);
+    const menu = await ev(`(() => { const m = document.getElementById('more-menu'); const s = document.getElementById('skin-btn').getBoundingClientRect(); return [m.hasAttribute('data-open'), document.getElementById('more-btn').getAttribute('aria-expanded'), s.width > 100 && s.left >= 0 && s.right <= innerWidth].join('|'); })()`);
+    check('手機：點「更多」打開選單，換風格按鈕在畫面內', menu === 'true|true|true', menu);
+    const skinWas = await ev(`document.documentElement.dataset.skin || 'minimal'`);
+    await ev(`document.getElementById('skin-btn').click()`);
+    await sleep(300);
+    const afterPick = await ev(`(document.documentElement.dataset.skin || 'minimal') + '|' + document.getElementById('more-menu').hasAttribute('data-open')`);
+    check('手機：在選單裡換風格會切換並收起選單', afterPick === `${skinWas === 'adventure' ? 'minimal' : 'adventure'}|false`, afterPick);
+    await ev(`document.getElementById('more-btn').click()`);
+    await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))`);
+    check('手機：按 Esc 收起選單', (await ev(`document.getElementById('more-menu').hasAttribute('data-open')`)) === false);
+    await ev(`document.getElementById('skin-btn').click()`); // 換回原本的風格
+    await sleep(300);
     await ev(`document.getElementById('bg-btn').click()`);
     await sleep(400);
     const r = await ev(`(() => { const b = document.getElementById('bg-exit').getBoundingClientRect(); return [b.top, b.bottom, innerHeight]; })()`);

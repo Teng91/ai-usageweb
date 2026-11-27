@@ -1,0 +1,10 @@
+# GitHub Actions 釘在固定的 commit（deploy.yml）：有新版時 Dependabot 每週開 PR 更新 SHA 與後面的版本註解。
+# 程式本身沒有相依套件，所以只看 github-actions。PR 會跑 npm test 與 test:ui，合併到 main 才部署。
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "CI"

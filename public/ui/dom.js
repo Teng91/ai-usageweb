@@ -10,8 +10,6 @@ export const state = {
   // 卡片順序就是伺服器快照的順序（src/providers/index.js），前端不另外寫一份
   providers: new Map(),
   pollIntervalSec: 120,
-  // 超過幾個更新週期沒新資料就算過期（伺服器在快照裡給）
-  staleIntervals: 3,
   es: null,
   live: false,
   // SSE 太久沒收到事件就當作半斷線：伺服器 ping 的間隔（連上時伺服器會告訴我們）與計時器
@@ -63,6 +61,17 @@ export function behind(p, at = Date.now()) {
   if (!visible(p) || p.status === 'auth' || backingOff(p, at)) return false;
   if (!p.fetchedAt) return true;
   return at - Date.parse(p.fetchedAt) > (p.intervalSec || state.pollIntervalSec) * 1000 + BEHIND_SLACK_MS;
+}
+
+/** 文字有變才寫：倒數每秒都會算一次，沒變就不動 DOM（螢幕閱讀器不會一直唸，也省重繪） */
+export function setText(el, text) {
+  if (el.textContent !== text) el.textContent = text;
+}
+
+/** 提示文字（title）有變才寫；空字串就拿掉 */
+export function setTitle(el, text) {
+  if (!text) el.removeAttribute('title');
+  else if (el.title !== text) el.title = text;
 }
 
 /** 讀寫 localStorage；私密模式等情況會丟錯，一律吞掉 */

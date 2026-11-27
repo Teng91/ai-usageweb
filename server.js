@@ -48,7 +48,8 @@ export async function createApp(opts = {}) {
     tz: cfg.pushTz,
     quiet: parseQuiet(cfg.pushQuiet),
     snapshot,
-    viewers: () => poller.viewers,
+    // 有人在看：SSE 連著，或最近 90 秒內有輪詢 /api/usage（SSE 被公司 proxy 擋時走輪詢，也要算）
+    watching: () => poller.isActive(),
   }).load();
   const hub = new SseHub({
     pingSec: cfg.ssePingSec,

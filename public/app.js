@@ -6,6 +6,7 @@ import { initRankings, refreshRankingsIfStale } from './ui/rankings.js';
 import { initThemeToggle } from './ui/theme-toggle.js';
 import { initPwa } from './ui/pwa.js';
 import { initPush } from './ui/push.js';
+import { initMenu } from './ui/menu.js';
 
 // 即時連線（SSE）失敗時改用輪詢；伺服器每 2 分鐘抓一次，輪詢 30 秒一次就不會晚太多
 const FALLBACK_POLL_MS = 30_000;
@@ -48,7 +49,6 @@ async function paintCached() {
 
 function applySnapshot(snap) {
   state.pollIntervalSec = snap.pollIntervalSec || 120;
-  state.staleIntervals = snap.staleIntervals || state.staleIntervals;
   state.providers.clear();
   for (const p of snap.providers || []) state.providers.set(p.id, p);
   renderAll();
@@ -225,6 +225,7 @@ window.addEventListener('offline', () => { state.offline = true; renderChrome();
 initThemeToggle();
 initPwa();
 initPush();
+initMenu();
 initRankings();
 startTicker();
 start();

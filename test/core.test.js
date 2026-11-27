@@ -466,3 +466,33 @@ test('sse: 連上就送一次有名字的 ping（帶間隔秒數），前端才�
   assert.doesNotMatch(res.body, /^: ping/m, '不再用註解當 ping');
   hub.closeAll();
 });
+
+test('forecast: 每週這種長週期看這一輪的平均速度，不拿最近 90 分鐘往後推', async () => {
+  const { Forecaster, cycleEta } = await import('../src/forecast.js');
+  const DAY = 86400_000;
+  const t0 = Date.parse('2026-11-23T08:00:00Z');
+  const week = (pct, startedAgoMs) => ({ id: '7d', label: '每週', usedPct: pct, periodSec: 7 * 86400, resetsAt: new Date(t0 - startedAgoMs + 7 * DAY).toISOString() });
+  // 過了 2 天用 40%：平均每天 20%，剩 60% 還要 3 天，比剩下的 5 天早 → 有預估
+  assert.equal(cycleEta(week(40, 2 * DAY), t0), t0 + 3 * DAY);
+  // 過了 3.5 天用 40%：照這速度到重置只會用到 80% → 沒有
+  assert.equal(cycleEta(week(40, 3.5 * DAY), t0), null);
+  // 才過 6 小時（不到 1 天）：太早，不預估
+  assert.equal(cycleEta(week(20, 6 * 3600_000), t0), null);
+  // 寫程式時 90 分鐘漲 3%：以前會算出「1 天多用完」，現在看平均（過了 3 天用 23% → 用不完）就不顯示
+  const f = new Forecaster();
+  f.annotate('claude', [week(20, 3 * DAY)], t0);
+  const out = f.annotate('claude', [week(23, 3 * DAY + 90 * 60_000)], t0 + 90 * 60_000)[0];
+  assert.equal(out.exhaustsAt, undefined);
+});
+
+test('snapshot: 快照附上算好的過期時間 staleAt（被限流等退避的，等到退避結束）', () => {
+  const s = new SnapshotStore({ dataDir: tmpDir(), pollIntervalSec: 60, providers: [{ id: 'p', name: 'P' }] });
+  const t = Date.parse('2026-11-23T08:00:00Z');
+  s.update('p', { status: 'ok', fetchedAt: new Date(t).toISOString(), intervalSec: 60 });
+  assert.equal(s.view('p', t).staleAt, new Date(t + 180_000).toISOString());
+  s.update('p', { slowed: true, nextFetchAt: new Date(t + 900_000).toISOString() });
+  assert.equal(s.view('p', t).staleAt, new Date(t + 900_000).toISOString());
+  assert.equal(s.snapshot(t).staleIntervals, undefined, '規則不再交給前端');
+  s.update('p', { fetchedAt: null });
+  assert.equal(s.view('p', t).staleAt, null);
+});

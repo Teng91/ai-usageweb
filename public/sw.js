@@ -1,5 +1,5 @@
 // 快取名稱帶版本號；改了前端檔案就把版本 +1
-const CACHE = 'app-v54';
+const CACHE = 'app-v55';
 const SHELL = [
   '/',
   '/index.html',
@@ -10,11 +10,13 @@ const SHELL = [
   '/ui/dom.js',
   '/ui/format.js',
   '/ui/cards.js',
+  '/ui/windows.js',
   '/ui/effects.js',
   '/ui/rankings.js',
   '/ui/theme-toggle.js',
   '/ui/pwa.js',
   '/ui/push.js',
+  '/ui/menu.js',
   '/scene.js',
   '/scene-maps.js',
   '/scene.css',
@@ -103,7 +105,7 @@ self.addEventListener('push', (event) => {
     tag: d.tag || 'usage', // 同一類的新通知蓋掉舊的
     renotify: true,
     icon: '/icons/icon-192.png',
-    badge: '/icons/icon-192.png',
+    badge: '/icons/badge-96.png', // Android 通知列只看輪廓：要白色圖形＋透明背景（scripts/gen-badge.mjs 產生）
     data: { url: d.url || '/' },
   }));
 });

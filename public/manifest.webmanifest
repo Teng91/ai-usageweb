@@ -1,4 +1,5 @@
 {
+  "id": "/",
   "name": "AI 用量",
   "short_name": "AI 用量",
   "description": "Claude、Codex、Antigravity 額度、OpenRouter 餘額與熱門模型",
@@ -13,5 +14,9 @@
     { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
     { "src": "/icons/maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
     { "src": "/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "screenshots": [
+    { "src": "/screenshots/wide.png", "sizes": "1916x908", "type": "image/png", "form_factor": "wide", "label": "各家 AI 額度、OpenRouter 餘額與熱門模型" },
+    { "src": "/screenshots/narrow.png", "sizes": "390x844", "type": "image/png", "form_factor": "narrow", "label": "手機上的額度卡片" }
   ]
 }

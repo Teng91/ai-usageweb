@@ -10,12 +10,12 @@ const SENT_KEEP_MS = 40 * 86400_000;
 const EVAL_DEBOUNCE_MS = 3000; // 各家陸續抓完再一起判斷，才能合成一則
 
 export class PushService {
-  constructor({ dataDir, vapid, tz, quiet, snapshot, viewers = () => 0, now = Date.now, send = sendPush }) {
+  constructor({ dataDir, vapid, tz, quiet, snapshot, watching = () => false, now = Date.now, send = sendPush }) {
     this.store = new PushStore({ dataDir, quiet, now });
     this.vapid = vapid;
     this.tz = tz;
     this.snapshot = snapshot;
-    this.viewers = viewers;
+    this.watching = watching; // 有沒有人正在看網頁（SSE 或輪詢）
     this.now = now;
     this.send = send;
     this.lastFetched = {};
@@ -73,7 +73,7 @@ export class PushService {
     if (!alerts.length) return 0;
 
     // 網頁開著時先不推播、也不記下：可能只是分頁開著人沒在看，關掉之後條件還成立就照樣推播
-    if (this.viewers() > 0) return 0;
+    if (this.watching()) return 0;
 
     // 超過每日上限的先不送也不記下，明天（或額度還沒重置前）還會再判斷，不會整個週期都漏掉
     const day = localParts(now, this.tz).dateKey;

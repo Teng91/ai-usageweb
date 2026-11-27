@@ -164,3 +164,16 @@ test('靜態檔：依 Accept-Encoding 給 br／gzip，帶 ETag，沒改就回 30
   assert.equal(again.status, 304);
   assert.equal(again.body.length, 0);
 });
+
+test('安全標頭：HSTS、COOP、Permissions-Policy', async () => {
+  const res = await realFetch(`${base}/healthz`);
+  assert.match(res.headers.get('strict-transport-security'), /max-age=\d+/);
+  assert.equal(res.headers.get('cross-origin-opener-policy'), 'same-origin');
+  assert.match(res.headers.get('permissions-policy'), /camera=\(\)/);
+});
+
+test('推播的「有人在看」也算輪詢 /api/usage（SSE 被擋時走輪詢，網頁開著就先不推播）', async () => {
+  await realFetch(`${base}/api/usage`);
+  assert.equal(app.hub.count, 0, '沒有 SSE 連線');
+  assert.equal(app.push.watching(), true);
+});
