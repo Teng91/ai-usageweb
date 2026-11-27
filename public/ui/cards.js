@@ -115,7 +115,6 @@ export function renderCard(p) {
   if (!visible(p)) {
     cardsEl.querySelector(`.card[data-id="${CSS.escape(p.id)}"]`)?.remove();
     syncGroups();
-    syncLegend();
     return;
   }
   const el = cardFor(p);
@@ -129,10 +128,7 @@ export function renderCard(p) {
   // 超過兩條額度就排成兩欄（左 5 小時、右每週），卡片高度跟只有兩條的一樣
   body.classList.toggle('win-grid', !p.balance && (p.windows?.length || 0) > 2);
   if (p.balance) {
-    const bal = document.createElement('div');
-    bal.className = 'balance';
-    bal.append(renderBalance(p.balance));
-    body.append(bal);
+    body.append(renderBalance(p.balance));
   } else if (p.windows?.length) {
     for (const w of p.windows) body.append(renderWindow(w));
   } else if (p.note) {
@@ -142,30 +138,6 @@ export function renderCard(p) {
   }
   gameEffects(el, p);
   tickCard(el, p);
-  syncLegend();
-}
-
-/**
- * 時間進度線的說明（手機沒有 hover，進度條的提示文字看不到）：有任何一條額度畫了時間線才顯示，
- * 整頁一行，放在額度卡片下面
- */
-function syncLegend() {
-  const ai = cardsEl.querySelector('.group[data-group="ai"]');
-  let lg = $('time-legend');
-  if (!ai?.querySelector('.time-mark:not([hidden])')) {
-    lg?.remove();
-    return;
-  }
-  if (!lg) {
-    lg = document.createElement('p');
-    lg.id = 'time-legend';
-    lg.className = 'legend';
-    const mark = document.createElement('span');
-    mark.className = 'legend-mark';
-    mark.setAttribute('aria-hidden', 'true');
-    lg.append(mark, '進度條上的細線＝這一輪的時間過了多少；用量超過它就是用得比時間快（會變橘）');
-  }
-  if (ai.nextElementSibling !== lg) ai.after(lg);
 }
 
 function note(text) {
@@ -194,19 +166,34 @@ function renderPlanExpiry(span, ymd, now = new Date()) {
   }
 }
 
+/**
+ * 餘額：跟額度卡片同一種排法：一行「餘額（USD）」與金額、「已用／總額」的進度條、「已用 $X / $Y」小字。
+ * 沒有總額（不限額的 key）就不畫進度條；用掉超過總額（餘額是負的）是紅色。
+ * 不用 .win（那是額度，cards.js 每秒會重算它的倒數），顏色另外看 .balance 的 data-level。
+ */
 function renderBalance(b) {
-  const frag = document.createDocumentFragment();
-  const big = document.createElement('p');
-  big.className = Number(b.remaining) < 0 ? 'balance-big negative' : 'balance-big';
-  big.textContent = b.remaining === null || b.remaining === undefined ? '—' : money(b.remaining, b.currency);
-  frag.append(big);
-  // 已用／總額的進度條（跟額度卡片一樣的 .bar）；沒有總額（不限額的 key）就不畫
+  const wrap = document.createElement('div');
+  wrap.className = 'balance';
   const total = Number(b.total);
   const used = Number(b.used);
-  if (b.total !== null && b.total !== undefined && total > 0 && Number.isFinite(used)) {
-    const pct = (used / total) * 100;
+  const hasTotal = b.total !== null && b.total !== undefined && total > 0 && Number.isFinite(used);
+  const pct = hasTotal ? (used / total) * 100 : null;
+  const level = pct !== null ? levelOf(pct, null) : Number(b.remaining) < 0 ? 'danger' : '';
+  if (level) wrap.dataset.level = level;
+
+  const row = document.createElement('div');
+  row.className = 'win-row';
+  const label = document.createElement('span');
+  label.textContent = `餘額（${b.currency || 'USD'}）`;
+  const val = document.createElement('span');
+  val.className = 'win-pct';
+  val.textContent = b.remaining === null || b.remaining === undefined ? '—' : money(b.remaining, b.currency);
+  row.append(label, val);
+  wrap.append(row);
+
+  if (hasTotal) {
     const bar = document.createElement('div');
-    bar.className = `bar ${levelOf(pct, null)}`.trim();
+    bar.className = `bar ${level}`.trim();
     bar.setAttribute('role', 'progressbar');
     bar.setAttribute('aria-label', '餘額已用');
     bar.setAttribute('aria-valuemin', '0');
@@ -215,15 +202,16 @@ function renderBalance(b) {
     const fill = document.createElement('span');
     fill.style.width = `${Math.min(100, Math.max(0, pct))}%`;
     bar.append(fill);
-    frag.append(bar);
+    wrap.append(bar);
   }
+
   const sub = document.createElement('p');
-  sub.className = 'balance-sub';
-  sub.textContent = b.total !== null && b.total !== undefined
+  sub.className = 'win-sub';
+  sub.textContent = hasTotal
     ? `已用 ${money(b.used, b.currency)} / ${money(b.total, b.currency)}`
     : `已用 ${money(b.used, b.currency)}`;
-  frag.append(sub);
-  return frag;
+  wrap.append(sub);
+  return wrap;
 }
 
 /** 每秒更新：倒數、X 分鐘前、狀態 */

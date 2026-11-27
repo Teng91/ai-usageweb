@@ -455,8 +455,8 @@ button {
 }
 
 /* 百分比跟著進度條變色（warn／danger 由 ui/windows.js 依時間進度決定） */
-.win[data-level="warn"] .win-pct { color: var(--warn); }
-.win[data-level="danger"] .win-pct { color: var(--danger); }
+.win[data-level="warn"] .win-pct, .balance[data-level="warn"] .win-pct { color: var(--warn); }
+.win[data-level="danger"] .win-pct, .balance[data-level="danger"] .win-pct { color: var(--danger); }
 
 .bar {
   position: relative; /* 時間進度的細線以它定位，上下各凸出一點 */
@@ -550,28 +550,6 @@ button {
   color: var(--muted);
   font-size: 0.84rem;
   margin: 0;
-}
-
-/* ---------- OpenRouter：餘額＋熱門模型 ---------- */
-.balance-big {
-  font-family: var(--mono);
-  font-size: 1.9rem;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  line-height: 1.1;
-  letter-spacing: -0.02em;
-  margin: 0;
-}
-
-.balance-big.negative { color: var(--danger); }
-
-.balance .bar { margin: 10px 0 6px; }
-
-.balance-sub {
-  font-size: 0.8rem;
-  color: var(--muted);
-  margin: 6px 0 0;
-  font-variant-numeric: tabular-nums;
 }
 
 /* 排行卡片：時間範圍切換放在標題列右邊 */
@@ -757,8 +735,7 @@ button {
 }
 
 /* 剛喚醒、正在抓新資料：舊數字變淡 */
-.card.updating .win-pct,
-.card.updating .balance-big { opacity: 0.6; transition: opacity 0.3s; }
+.card.updating .win-pct { opacity: 0.6; transition: opacity 0.3s; }
 
 @media (prefers-reduced-motion: reduce) {
   .progress::before { animation-duration: 3s; }
@@ -795,25 +772,6 @@ button {
 :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
-}
-
-/* ---- 時間進度線的說明：放在額度卡片下面（手機沒有 hover，看不到進度條的提示文字） ---- */
-.legend {
-  grid-column: 1 / -1;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: -2px 2px 0;
-  font-size: 0.75rem;
-  color: var(--muted);
-}
-
-.legend-mark {
-  flex: none;
-  width: 2px;
-  height: 12px;
-  border-radius: 1px;
-  background: var(--text-2);
 }
 
 /* ---- 觸控裝置：頂列按鈕放大，比較好點 ---- */

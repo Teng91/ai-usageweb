@@ -153,8 +153,10 @@ async function main() {
     const balance = await ev(`(() => { const b = document.querySelector('.card[data-id="openrouter"] .balance .bar'); return b ? b.className + '|' + b.getAttribute('aria-valuenow') : 'none'; })()`);
     check('OpenRouter 餘額卡有「已用／總額」進度條（超過總額是紅的）', balance === 'bar danger|100', balance);
     check('排行的 token 數字不寫多餘的 .0（1T、500B）', (await ev(`[...document.querySelectorAll('.rank-col:not(.paid) .rank-list .tk')].slice(0, 2).map((e) => e.textContent).join(',')`)) === '1T,500B');
-    const legend = await ev(`(() => { const l = document.getElementById('time-legend'); return l ? (l.previousElementSibling?.dataset.group || '') + '|' + l.textContent.slice(0, 6) : 'none'; })()`);
-    check('進度條時間線的圖例放在額度卡片下面', legend === 'ai|進度條上的細', legend);
+    // 餘額卡跟其他卡片同一種排法：一行「餘額（USD）」與金額（負的是紅色），沒有金幣圖示
+    const balRow = await ev(`(() => { const c = document.querySelector('.card[data-id="openrouter"]'); const r = c.querySelector('.balance .win-row'); const pct = r.querySelector('.win-pct'); return [r.firstElementChild.textContent, pct.textContent, c.querySelector('.balance').dataset.level, c.querySelector('.balance .win-sub').textContent].join('|'); })()`);
+    check('餘額卡跟其他卡片一樣：「餘額（USD）」一行、進度條、已用金額', balRow === '餘額（USD）|-$0.20|danger|已用 $10.20 / $10.00', balRow);
+    check('不再有時間線的圖例', (await ev(`!document.querySelector('.legend')`)) === true);
     check('資料還新時卡片不寫「資料時間」', (await ev(`[...document.querySelectorAll('.card[data-id] .card-meta')].every((m) => m.textContent === '' && getComputedStyle(m).display === 'none')`)) === true);
     check('簡約風格不建立場景地圖', (await ev(`document.querySelectorAll('.scene .map').length`)) === 0);
     check('卡片順序：Claude、Gemini、Codex', (await ev(`[...document.querySelectorAll('.card')].slice(0, 3).map((c) => c.querySelector('.card-name').textContent).join(',')`)) === 'Claude,Gemini,Codex');
