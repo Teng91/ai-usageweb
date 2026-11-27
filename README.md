@@ -4,7 +4,7 @@
 
 部署在 fly.io：**有人打開才喚醒機器**，開著時每 2 分鐘更新並用 SSE 推到畫面上；沒人看幾分鐘後機器自動暫停（suspend，下次喚醒只要幾百毫秒），不收 CPU／記憶體費用。
 
-- Node 22、零相依套件（`node:http`、內建 `fetch`、`node:crypto`、`node:test`）
+- Node 22 以上（部署用 Node 24 LTS）、零相依套件（`node:http`、內建 `fetch`、`node:crypto`、`node:zlib`、`node:test`）
 - 前端是純 HTML＋CSS＋原生 JS，沒有打包
 - 只讀不寫：只打各家「查用量」端點，不發模型請求
 
@@ -15,18 +15,20 @@
 ## 架構
 
 ```
-瀏覽器 ──GET /api/usage──▶ server.js ──▶ snapshot.js（記憶體＋/data/snapshot.json）
-       ◀──SSE /api/stream──   │    └─▶ rankings.js（OpenRouter 排行，/data/rankings.json）
-                              ▼
-                          poller.js（觀看者計數、每家排程、退避）
-                              │ 有人看才跑，每 2 分鐘
-                              ▼
-         providers/{claude,codex,antigravity,openrouter}.js
-                              │ 續期時
-                              ▼
-                credentials.js（環境變數＋AES-256-GCM 加密 volume）
+瀏覽器 ──GET /api/usage──▶ server.js（組裝）──▶ routes.js ──▶ snapshot.js（記憶體＋/data/snapshot.json）
+       ◀──SSE /api/stream──   （sse.js）          │  ├─▶ rankings.js（OpenRouter 排行，/data/rankings.json）
+                                                  │  ├─▶ push-routes.js（推播 API）
+                                                  │  └─▶ static.js（public/，br／gzip、ETag）
+                                                  ▼
+                               poller.js（觀看者計數、每家排程、退避）──▶ forecast.js（預估用完時間）
+                                                  │ 有人看才跑，每 2 分鐘
+                                                  ▼
+                         providers/{claude,codex,antigravity,openrouter}.js
+                                                  │ 續期時
+                                                  ▼
+                               credentials.js（環境變數＋AES-256-GCM 加密 volume）
 
-抓到新資料 ──▶ push.js（累積樣本、alerts.js 判斷）──▶ webpush.js ──▶ 手機
+抓到新資料 ──▶ push.js（alerts.js 判斷；樣本與紀錄在 push-store.js）──▶ webpush.js ──▶ 手機
 Google Apps Script 每 15 分鐘 ──POST /api/push/tick──▶ 機器沒人看時也會抓一輪並判斷
 （GitHub Actions 的排程當備援，常延遲好幾小時）
 ```
@@ -35,8 +37,8 @@ Google Apps Script 每 15 分鐘 ──POST /api/push/tick──▶ 機器沒人
 | --- | --- | --- |
 | `GET /` | PWA 頁面 | 公開 |
 | `GET /api/usage` | 目前快照；也算「有人在看」 | 公開（或 `ACCESS_KEY`） |
-| `GET /api/stream` | SSE：先送 `snapshot`，之後每家 `provider`；25 秒 `: ping` | 公開（或 `ACCESS_KEY`） |
-| `GET /api/rankings` | OpenRouter 全站模型排行（每天／每週／每月，免費與付費各前 10 名，依 token 用量；付費附每百萬 token 輸入／輸出價格）；資料來自 OpenRouter 排行榜頁面的非官方端點，每小時最多抓一次 | 公開（或 `ACCESS_KEY`） |
+| `GET /api/stream` | SSE：先送 `snapshot` 與 `ping`（帶間隔秒數），之後每家 `provider`；每 25 秒一次 `ping` 事件，前端連續 3 次沒收到就重連 | 公開（或 `ACCESS_KEY`） |
+| `GET /api/rankings` | OpenRouter 全站模型排行（每天／每週／每月，免費與付費各前 10 名，依 token 用量；付費附每百萬 token 輸入／輸出價格）；資料來自 OpenRouter 排行榜頁面的非官方端點，每小時最多抓一次；還沒有資料時回 503 | 公開（或 `ACCESS_KEY`） |
 | `GET /healthz` | 健康檢查，不觸發輪詢 | 公開 |
 | `GET /api/push/config` | 推播是否啟用與 VAPID 公鑰 | 公開（或 `ACCESS_KEY`） |
 | `POST /api/push/subscribe` | 新增訂閱（body：`subscription`、`prefs`） | `PUSH_KEY` |
@@ -54,7 +56,7 @@ SSE 被擋時（例如公司 proxy 會卡住串流），前端 6 秒內沒連上
 
 Cloudflare 判斷只看 HTML 挑戰頁或 `cf-mitigated` 標頭；一般 JSON 的 403 照「403 沒有權限」處理。
 
-錯誤處理：429 依 `Retry-After` 或 240→480→最多 900 秒退避（卡片保留舊數字並標「更新放慢」）；401 先續期再重試一次；續期失敗標「需要重新登入」並停止那一家；403／Cloudflare 這次觀看期間不再試；網路／5xx 退避最多 300 秒；格式變了每 300 秒試一次。
+錯誤處理：429 依 `Retry-After` 或 240→480→最多 900 秒退避（卡片保留舊數字並標「被限流，更新放慢（N 分鐘後重試）」，等退避的期間不算過期）；401 先續期再重試一次；續期失敗標「需要重新登入」並停止那一家；403／Cloudflare 這次觀看期間不再試；網路／5xx 退避最多 300 秒；格式變了每 300 秒試一次。出錯的卡片會在錯誤後面寫下次重試的倒數（依快照的 `nextFetchAt`；要重新登入、被擋的不會照時間重試，就不寫）。
 
 ## 本機開發
 
@@ -82,7 +84,7 @@ npm test
 npm run test:ui
 ```
 
-`test/fixtures/` 目前是依照規格欄位寫的**假資料**；拿到各家真實回傳（去掉 email、帳號 ID）後請替換掉。
+`test/fixtures/` 是各家回傳的樣本（欄位跟實際回傳一樣，不含 email、帳號 ID、組織名）；端點或欄位改了，把新的回傳去掉帳號資訊後換上，並讓 `npm test` 通過。
 
 ## 各家憑證怎麼拿
 
@@ -177,23 +179,52 @@ curl.exe -X PUT https://ai-usageweb.fly.dev/admin/credentials/claude -H "Authori
 
 設 `ACCESS_KEY`，第一次用 `https://ai-usageweb.fly.dev/?k=<ACCESS_KEY>` 打開，之後記在 cookie（HttpOnly）；載入成功後網址上的 `?k=` 會自動拿掉，不會留在瀏覽紀錄。
 
-### 其他可調的環境變數
+### 環境變數一覽
 
-都有預設值，通常不必設。
+各家的憑證（`OPENROUTER_API_KEY`、`CLAUDE_*`、`CODEX_*`、`ANTIGRAVITY_*`）見上面的「各家憑證怎麼拿」；其他的都列在這裡，全部集中在 `src/config.js` 讀取。
+
+**安全與存取**
 
 | 變數 | 預設 | 說明 |
 | --- | --- | --- |
+| `CREDENTIALS_KEY` | 無 | 32 bytes 的 base64，加密 volume 裡的憑證；沒設的話續期後的 token 只存在記憶體 |
+| `ADMIN_TOKEN` | 無 | 管理 API（`/admin/*`）的 Bearer token；沒設就不開放 |
+| `CREDENTIALS_RESET` | 無 | 用環境變數強制重設某幾家的憑證，例如 `claude,codex`（部署後記得拿掉） |
+| `ACCESS_KEY` | 無 | 設了之後資料 API 要用 `?k=` 開過一次才看得到（見「不想完全公開」） |
+
+**推播**（`VAPID_PUBLIC_KEY`、`VAPID_PRIVATE_KEY`、`PUSH_KEY` 都設才啟用，用 `npm run gen-vapid` 產生）
+
+| 變數 | 預設 | 說明 |
+| --- | --- | --- |
+| `VAPID_PUBLIC_KEY`、`VAPID_PRIVATE_KEY` | 無 | Web Push 的金鑰 |
+| `VAPID_SUBJECT` | `https://ai-usageweb.fly.dev` | 推播服務聯絡用的網址（VAPID 規格要求） |
+| `PUSH_KEY` | 無 | 在網頁上開啟通知時要輸入的密碼 |
+| `PUSH_TICK_TOKEN` | 無 | 排程喚醒 `POST /api/push/tick` 的 token（Apps Script、GitHub Actions 用同一個） |
+| `PUSH_TZ` | `Asia/Taipei` | 推播判斷勿擾與寫時間用的時區 |
+| `PUSH_QUIET` | `00-08` | 勿擾時段（當地整點，`off` 代表不設）；網頁上改過就以網頁的為準 |
+
+**執行**（都有預設值，通常不必設）
+
+| 變數 | 預設 | 說明 |
+| --- | --- | --- |
+| `PORT` | `8080` | HTTP 埠 |
+| `DATA_DIR` | `./data`（fly 上是 `/data`） | 快照、加密憑證、排行、推播的存檔位置 |
 | `POLL_INTERVAL_SEC` | `120` | 有人看時每家多久抓一次（Claude 約每 2 分鐘才給查一次，不建議調低） |
 | `IDLE_GRACE_SEC` | `90` | 觀看者全部離開後再等多久才停止輪詢 |
 | `REQUEST_TIMEOUT_MS` | `10000` | 對各家請求的逾時 |
 | `SSE_MAX_AGE_SEC` | `1800` | 單一 SSE 連線最長多久，到了請前端在看得見時重連 |
-| `SSE_PING_SEC` | `25` | SSE 多久送一次 `: ping` |
+| `SSE_PING_SEC` | `25` | SSE 多久送一次 `ping` 事件 |
 | `SSE_MAX_CLIENTS` | `20` | 同時最多幾條 SSE 連線，滿了回 503（前端改輪詢） |
 | `PROVIDERS` | 全部 | 只開部分服務，例如 `claude,openrouter` |
-| `CLAUDE_PLAN` | `Pro` | Claude 卡片顯示的方案名稱（API 拿不到） |
+
+**手動設定**（API 拿不到）
+
+| 變數 | 預設 | 說明 |
+| --- | --- | --- |
+| `CLAUDE_PLAN` | `Pro` | Claude 卡片顯示的方案名稱 |
 | `CLAUDE_PLAN_EXPIRES_AT` | 無 | Claude 訂閱到期日 `YYYY-MM-DD` |
 
-各家端點與 client id 的覆寫（內部端點常變）列在 `.env.example` 最後面，集中在 `src/config.js` 讀取。`CLAUDE_PLAN`、`CLAUDE_PLAN_EXPIRES_AT` 每次都直接讀環境變數、不會存進憑證，改 fly secrets 就會生效。
+`CLAUDE_PLAN`、`CLAUDE_PLAN_EXPIRES_AT` 每次都直接讀環境變數、不會存進憑證，改 fly secrets 就會生效。各家端點與 client id 的覆寫（內部端點常變）列在 `.env.example` 最後面。
 
 ## 手機通知（Web Push）
 
@@ -238,6 +269,9 @@ curl.exe -X PUT https://ai-usageweb.fly.dev/admin/credentials/claude -H "Authori
   - 還沒開始計時的額度一律顯示「還沒用，用了才開始計時」：已用 0% 而且服務沒給重置時間（例如 Claude 的 5 小時），或給的重置時間剛好是「現在＋整個週期」、每次更新都往後推（例如 Codex 免費版每月、Gemini 的 5 小時）
   - OpenRouter：剩餘餘額與已用金額
 - 70% 變橘、90% 變紅；超過 3 個更新週期沒有新資料標「資料已過期」
+- **時間進度**：知道週期長度的額度（5 小時、每週…），進度條上有一條細線標出這個週期已經過了多少時間；用量條沒超過這條線就是還寬裕（滑鼠移上去會寫「時間過了 45%，用了 11%」）
+- **預估用完時間**：照最近 90 分鐘的消耗速度會在重置前用完時，額度底下多一行橘色的「照目前速度約 2 小時 10 分後用完」（伺服器算的，跟推播的速度預警同一套算法）
+- 出錯時在錯誤後面寫下次重試的倒數，例如「503 服務暫時有問題（3 分鐘後重試）」
 - **兩種風格**（右上角旗子按鈕切換，會記住）：
   - 簡約：深藍細線的資料儀表板風格
   - 冒險：原創的像素 RPG 風格，春夏秋冬四張地圖輪流（遠山、遠丘、遠方小鎮、帶樹冠的近丘多層遠景慢慢橫移，四季各一套配色；天上有柔和的雲、漂浮小島，春夏有彩虹；夜晚有月亮，小鎮的窗戶和招牌會亮燈）（小勇者走進右邊的傳送點就換下一季）、會動的原創怪物（點了會跳）、用量上升時卡片跳出「+N%」、額度用到 90% 以上冒「快用完了！」
@@ -261,19 +295,20 @@ curl.exe -X PUT https://ai-usageweb.fly.dev/admin/credentials/claude -H "Authori
 ```
 server.js                 進入點：組裝各元件並啟動 HTTP 伺服器
 src/poller.js             觀看者計數、每家排程、退避、共用 in-flight Promise
+src/forecast.js           預估用完時間（記最近的用量樣本，照目前速度算）
 src/snapshot.js           記憶體快照、/data/snapshot.json 原子寫入
 src/routes.js             路由：公開 API、SSE、管理 API、ACCESS_KEY
 src/push-routes.js        推播 API：/api/push/tick 與裝置訂閱、設定、測試
-src/static.js             靜態檔（擋路徑穿越、快取標頭）
+src/static.js             靜態檔（擋路徑穿越、br／gzip 預先壓好放記憶體、ETag）
 src/respond.js            回應與驗證的共用小工具（JSON、安全標頭、固定時間比較）
 src/rankings.js           OpenRouter 模型排行（每小時最多抓一次）
 src/alerts.js             推播規則（用量警告、快重置還有剩、額度重置了、勿擾時段；純函式）
 src/time.js               時區換算與時間寫法（推播內容用）
-src/push.js               推播服務：樣本、判斷、去重、每日上限、發送
-src/push-store.js         推播存檔 /data/push.json：裝置訂閱、全站設定
+src/push.js               推播服務：判斷、去重、每日上限、發送
+src/push-store.js         推播存檔 /data/push.json：裝置訂閱、全站設定、樣本、已發紀錄與每日次數
 src/webpush.js            Web Push：VAPID 簽名與 RFC 8291 加密（只用內建 crypto）
 src/credentials.js        環境變數＋加密 volume、每家續期鎖
-src/sse.js                SSE 連線、ping、廣播、單一連線最長 30 分鐘、連線數上限
+src/sse.js                SSE 連線、ping 事件、廣播、單一連線最長 30 分鐘、連線數上限
 src/http.js               對外請求、錯誤分類、Cloudflare 偵測
 src/oauth.js              refresh_token 續期、先存再用、401 續期重試（Claude／Codex 共用）
 src/config.js             環境變數設定（含各家端點覆寫與手動設定值）

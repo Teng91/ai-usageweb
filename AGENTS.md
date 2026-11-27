@@ -4,11 +4,11 @@
 ai-usageweb：顯示 Claude、Codex、Antigravity 額度與 OpenRouter 餘額的 PWA，部署在 fly.io，有人看才輪詢（每 2 分鐘），沒人看機器自動 suspend。另外有 OpenRouter 模型排行（`src/rankings.js`）。
 
 ## 規則
-- **不加相依套件**。只用 Node 22 內建模組；前端是原生 JS（ES modules），不打包、不用框架。
+- **不加相依套件**。只用 Node 內建模組（Node 22 以上都要能跑；部署與 CI 用 Node 24）；前端是原生 JS（ES modules），不打包、不用框架。
 - **絕不在 log、錯誤訊息、API 回應裡出現 token、完整 header 或原始回應。** 錯誤只留服務名、狀態碼、簡短中文說明。
-- 公開 API 只回傳百分比、剩餘量、重置時間；不回傳 email、帳號 ID、組織名。排行也一樣只存公開資料。
+- 公開 API 只回傳百分比、剩餘量、重置時間（與由這些算出的預估用完時間）；不回傳 email、帳號 ID、組織名。排行也一樣只存公開資料。
 - repo 是公開的：不要提交 `.env*`、`server-*`、`*.enc`、`data/`。
-- 每家 adapter 輸出統一格式 `{ plan, planExpiresAt?, windows: [{ id, label, usedPct, resetsAt, periodSec? }], balance, note }`；`usedPct` 一律是「已用」0–100。前端只認這個格式。`periodSec` 是窗口長度（秒），推播靠它分辨週／月額度，知道就要填。
+- 每家 adapter 輸出統一格式 `{ plan, planExpiresAt?, windows: [{ id, label, usedPct, resetsAt, periodSec? }], balance, note }`；`usedPct` 一律是「已用」0–100。前端只認這個格式。`periodSec` 是窗口長度（秒），推播靠它分辨週／月額度、前端靠它畫時間進度，知道就要填。`exhaustsAt`（預估用完時間）不是 adapter 給的，是 poller 經 `src/forecast.js` 加上去的。
 - 每家 adapter 要宣告 `credentialFields`（管理 API 換憑證時接受的欄位）；憑證多了新欄位就加進去。刪掉一家時連同 `credentials.js` 的環境變數、`config.js` 的端點、fixture 與測試一起刪；volume 裡那家的舊憑證會在啟動時自動清掉。
 - 續期拿到新 refresh token 時：**先 `await saveCreds()` 成功才使用**；續期包在 `withLock` 裡。
 - 對各家的請求不論幾個人在看都不超過每家每 `minIntervalSec` 一次；不要新增公開的「立刻重抓」。OpenRouter 排行最多每小時抓一次。
@@ -16,7 +16,7 @@ ai-usageweb：顯示 Claude、Codex、Antigravity 額度與 OpenRouter 餘額的
 - 環境變數只在 `src/config.js` 讀（各家端點覆寫在 `endpoints`），adapter 不直接讀 `process.env`。
 - 卡片順序只在 `src/providers/index.js` 定義，前端照快照順序；不要在前端再寫一份。
 - `/healthz` 與 `/api/push/tick` 不能算「有人在看」。
-- 推播：規則在 `src/alerts.js`（純函式）、判斷與發送在 `src/push.js`、訂閱與設定的存檔在 `src/push-store.js`、API 在 `src/push-routes.js`、加密在 `src/webpush.js`、時間寫法在 `src/time.js`。推播內容只放百分比與重置時間。改規則要更新 `test/push.test.js` 與 README 的規則表。之後要做的事記在 `docs/TODO.md`。
+- 推播：規則在 `src/alerts.js`（純函式）、判斷與發送在 `src/push.js`、訂閱、設定、樣本與已發紀錄的存檔在 `src/push-store.js`（`push.js` 只透過它的方法讀寫，不直接碰 `state`）、API 在 `src/push-routes.js`、加密在 `src/webpush.js`、時間寫法在 `src/time.js`。推播內容只放百分比與重置時間。改規則要更新 `test/push.test.js` 與 README 的規則表。之後要做的事記在 `docs/TODO.md`。
 - 推播的排程喚醒主要靠 Google Apps Script（`google_apps_script/Code.gs`，repo 裡只是副本），GitHub Actions 的 `push-tick.yml` 是備援。前端不保存推播密碼。
 - 存檔格式（例如 `rankings.json`）改了欄位就把該檔的 `FORMAT_VERSION` +1，讓舊檔被丟掉。例外：`push.json`（版本在 `push-store.js`） 只新增選填欄位（例如 `settings`）時不要升版本，升了會把訂閱一起丟掉，手機要重新開啟通知。
 

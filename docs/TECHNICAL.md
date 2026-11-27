@@ -5,7 +5,7 @@
 
 - 網站：https://ai-usageweb.fly.dev
 - 原始碼：https://github.com/Teng91/ai-usageweb
-- 技術：Node.js 22（**零相依套件**）、原生 JavaScript ES modules、Server-Sent Events、Service Worker、fly.io
+- 技術：Node.js 24 LTS（本機 22 以上即可；**零相依套件**）、原生 JavaScript ES modules、Server-Sent Events、Service Worker、fly.io
 
 | 簡約風格（暗色） | 簡約風格（亮色） |
 | --- | --- |
@@ -91,16 +91,18 @@ flowchart LR
 | `src/routes.js` | 公開 API、SSE、管理 API、存取碼 |
 | `src/push-routes.js` | 推播 API：`/api/push/tick` 與裝置訂閱、設定、測試 |
 | `src/poller.js` | 觀看者計數、每家排程、退避、共用 in-flight Promise |
+| `src/forecast.js` | 預估用完時間：記最近的用量樣本，照目前速度算（跟推播共用 `alerts.js` 的算法） |
+| `src/static.js` | 靜態檔：擋路徑穿越、文字檔預先壓成 br／gzip 放記憶體、ETag／304 |
 | `src/providers/*.js` | 四家 adapter |
 | `src/credentials.js` | 環境變數 + 加密 volume、每家續期鎖 |
 | `src/snapshot.js` | 記憶體快照、原子寫檔 |
 | `src/rankings.js` | OpenRouter 排行（每小時最多抓一次、存檔格式版本） |
-| `src/push.js` | 推播服務：樣本、判斷、去重、每日上限、發送 |
-| `src/push-store.js` | 推播存檔 `/data/push.json`：裝置訂閱、全站設定、存檔格式版本 |
+| `src/push.js` | 推播服務：判斷、去重、每日上限、發送 |
+| `src/push-store.js` | 推播存檔 `/data/push.json`：裝置訂閱、全站設定、樣本、已發紀錄、每日次數、存檔格式版本（只有這個檔案知道存檔格式，`push.js` 透過它的方法讀寫） |
 | `src/alerts.js` | 推播規則（純函式）：用量警告、快重置還有剩、額度重置了、勿擾時段 |
 | `src/time.js` | 時區換算與時間寫法（「明天 10:00」「3 小時」） |
 | `src/webpush.js` | VAPID 簽名與 RFC 8291 內容加密 |
-| `src/sse.js` | SSE 連線、ping、廣播、單一連線最長時間與連線數上限 |
+| `src/sse.js` | SSE 連線、`ping` 事件、廣播、單一連線最長時間與連線數上限 |
 | `src/config.js` | 環境變數設定，含各家端點覆寫與手動設定值（`CLAUDE_PLAN` 等每次直接讀） |
 
 **前端模組**（原生 ES modules、不打包）
@@ -108,7 +110,7 @@ flowchart LR
 | 檔案 | 責任 |
 | --- | --- |
 | `app.js` | 資料與連線：快照、SSE、備援輪詢、喚醒流程 |
-| `ui/cards.js` | 卡片、頂列狀態、每秒倒數 |
+| `ui/cards.js` | 卡片、頂列狀態、每秒倒數、時間進度標記、預估用完與重試時間 |
 | `ui/rankings.js` | 熱門模型表格 |
 | `ui/effects.js` | 冒險風格的跳數字、提醒泡泡 |
 | `ui/theme-toggle.js` | 亮暗與風格切換 |
@@ -124,7 +126,7 @@ flowchart LR
 後端只用 Node 22 內建模組（`node:http`、`fetch`、`node:crypto`、`node:test`），前端是原生 JS，沒有打包工具。
 
 - **好處**：沒有供應鏈風險、沒有升級負擔、Docker image 小、啟動快，任何人 `git clone` 就能跑。
-- **代價**：路由、SSE、Web Push 加密、測試替身都要自己寫。整個後端約 2,600 行，仍在好維護的範圍。
+- **代價**：路由、SSE、Web Push 加密、測試替身都要自己寫。整個後端約 2,900 行，仍在好維護的範圍。
 
 ### 有人看才輪詢
 不做背景排程。只在有觀看者時才查各家 API，沒人看就完全靜止。
@@ -142,7 +144,7 @@ flowchart LR
 
 | 錯誤 | 處理 |
 | --- | --- |
-| 429 | 依 `Retry-After`，或 240 → 480 → 最多 900 秒（以 2 分鐘輪詢間隔為基準）；卡片保留舊數字、標「更新放慢」 |
+| 429 | 依 `Retry-After`，或 240 → 480 → 最多 900 秒（以 2 分鐘輪詢間隔為基準）；卡片保留舊數字、標「被限流，更新放慢（N 分鐘後重試）」，等退避的期間不算過期（退避比 3 個週期長，不然會先被判成過期） |
 | 401 | 先續期再重試一次；續期失敗標「需要重新登入」並停止那一家 |
 | 403／Cloudflare | 這次觀看期間不再試 |
 | 網路／5xx／逾時 | 退避最多 300 秒 |
@@ -161,7 +163,9 @@ flowchart LR
 - **不外流**：log、錯誤訊息、API 回應只留服務名、狀態碼與簡短中文說明；log 的路徑會去掉 query（裡面可能有存取碼）。
 
 ### 5.3 即時更新與企業網路
-- 正常情況用 SSE 推送，25 秒送一次 ping，單一連線最長 30 分鐘。
+- 正常情況用 SSE 推送，單一連線最長 30 分鐘。
+- 每 25 秒送一次 `ping` **事件**（不是 `: ping` 註解：EventSource 收不到註解），連上時先送一次並帶間隔秒數。前端連續 3 個間隔沒收到任何事件就當作半斷線、自己重連：筆電睡醒或 proxy 悄悄切斷時，EventSource 不一定會報錯，畫面會停在「即時」卻不再更新。
+- 斷線後重連被拒（502／503）時，瀏覽器會把 EventSource 整個關掉、不再重試；這時馬上改成輪詢。
 - 在企業 proxy 後面，SSE 會被卡住：連線既不成功也不報錯。前端偵測到 6 秒內沒連上，就改成每 30 秒輪詢 `/api/usage`，並且每隔幾輪再試一次 SSE。
 - 切到背景分頁時關閉連線，讓伺服器可以停下來。
 
@@ -213,8 +217,8 @@ flowchart LR
 
 | 層級 | 工具 | 內容 |
 | --- | --- | --- |
-| 單元／整合 | `node:test`（97 項） | 每家 adapter 用 fixture 驗證轉換、輪詢排程與退避、憑證加密與續期鎖、快照、排行解析、HTTP 路由、逾時分類、推播加密（RFC 8291 範例）與規則 |
-| 前端 smoke test | 自寫的 Chrome DevTools Protocol 腳本（46 項） | 用假資料起本機伺服器、開 headless Chrome 實際操作：卡片、排行與價格、亮暗與風格切換、四季地圖輪替、點怪物、跳數字、只看風景、手機版按鈕位置、通知設定對話框、SSE 重連被拒改輪詢、切回來自動追上新數字、冒險場景的多層遠景與日夜（月亮、小鎮燈火、彩虹）、沒有 JS 錯誤 |
+| 單元／整合 | `node:test`（105 項） | 每家 adapter 用 fixture 驗證轉換、輪詢排程與退避、憑證加密與續期鎖、快照、排行解析、HTTP 路由、逾時分類、推播加密（RFC 8291 範例）與規則、預估用完時間、靜態檔壓縮與 ETag |
+| 前端 smoke test | 自寫的 Chrome DevTools Protocol 腳本（50 項） | 用假資料起本機伺服器、開 headless Chrome 實際操作：卡片、排行與價格、亮暗與風格切換、四季地圖輪替、點怪物、跳數字、只看風景、手機版按鈕位置、通知設定對話框、時間進度標記、預估用完時間、限流與出錯的重試時間、SSE 半斷線重連、SSE 重連被拒改輪詢、切回來自動追上新數字、冒險場景的多層遠景與日夜（月亮、小鎮燈火、彩虹）、沒有 JS 錯誤 |
 | CI | GitHub Actions | 推到 `main` 時兩種測試都通過才部署到 fly.io |
 
 前端 smoke test 同樣**不需要任何套件**：直接啟動本機的 Chrome／Edge，透過 Node 22 內建的 `WebSocket` 跟 DevTools Protocol 溝通。
@@ -223,7 +227,7 @@ flowchart LR
 
 - fly.io 單一 `shared-cpu-1x / 256MB` 機器 + 1GB volume，新加坡區域。
 - `auto_stop_machines = "suspend"`：沒有連線時暫停，只收儲存費；喚醒只要幾百毫秒（部署或主機搬移後的第一次仍是冷啟動）。
-- Docker image 基於 `node:22-slim`，以非 root 使用者執行；收到 SIGTERM 時先寫入快照再結束。
+- Docker image 基於 `node:24-bookworm-slim`，以非 root 使用者執行；收到 SIGTERM 時先寫入快照再結束。
 
 ## 8. 遇到的問題與解法
 
@@ -245,6 +249,8 @@ flowchart LR
 | Codex 免費版一直顯示「29 天 23 小時後重置」 | 還沒用時服務照樣回「現在＋30 天」，每次都往後推 | 伺服器統一處理（`clearUnstartedResets`）：0% 而且重置時間剛好一整個週期後，就當成還沒開始計時 |
 | 切到別的視窗再回來，常顯示「4 分鐘前」，要按 F5 才更新 | 切走時連線關掉、伺服器 90 秒後停；切回來第一次拿到的是停之前的數字，伺服器幾秒後才抓到新的，但輪詢模式下一次要等 30 秒；而且資料沒舊到 3 個週期不會顯示「更新中」，看起來像卡住（F5 有用是因為重新載入會先等 SSE 6 秒、失敗後再抓一次） | 切回來時資料比一個週期舊就標「更新中」，並每隔幾秒再問一次直到拿到新數字 |
 | SSE 斷線後停在「連線中…」不再更新 | 重連被拒（502／503）時瀏覽器會整個關掉 EventSource、不再重試，但程式要失敗 3 次才改輪詢 | `readyState` 變成 CLOSED 就馬上改輪詢 |
+| 被限流時卡片顯示「資料已過期」 | 429 退避 480／900 秒，比「3 個週期（360 秒）沒新資料就算過期」長 | 還在等退避（`slowed` 且 `nextFetchAt` 還沒到）就不算過期，改顯示「被限流」與重試倒數 |
+| 排行抓不到時，離線也看不到上次的排行 | 沒資料時 `/api/rankings` 照樣回 200 `{views:null}`，service worker 拿它蓋掉了上次存下的 | 沒資料回 503（service worker 只存 200）；前端拿不到時改讀上次存下的 |
 | 夜晚小鎮的燈火亮不起來，只是灰白色 | 整張地圖被 `brightness(0.55)` 調暗，子元素再怎麼調亮也會被壓回 55% | 改成每個元素各自套用 `--night`，燈火例外 |
 | 卡片上方只露出一個小箭頭 | 「快用完了！」泡泡在卡片上方，但冒險風格的卡片設了 `overflow: hidden`，泡泡本體被切掉只剩尾巴 | 卡片不裁切，圓角改由標題列自己做（`border-radius: 11px 11px 0 0`） |
 | 平台上的怪物被卡片擋住 | 位置用畫面寬度百分比計算 | 改用卡片區兩側剩餘寬度計算，放不下就隱藏 |
@@ -253,10 +259,10 @@ flowchart LR
 
 | 項目 | 數量 |
 | --- | --- |
-| 後端程式 | 約 2,600 行 |
-| 前端 JavaScript | 約 1,500 行 |
+| 後端程式 | 約 2,900 行 |
+| 前端 JavaScript | 約 1,900 行 |
 | CSS | 約 2,000 行（簡約、冒險卡片、場景三個檔） |
-| 測試 | 97 項單元／整合 + 46 項前端 smoke test |
+| 測試 | 105 項單元／整合 + 50 項前端 smoke test |
 | 原創像素圖 | 50 張（全部由產生器產生） |
 | 相依套件 | 0 |
 
