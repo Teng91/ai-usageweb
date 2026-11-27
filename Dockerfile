@@ -1,4 +1,5 @@
-FROM node:22-slim
+# Node 24（LTS）；明確寫 bookworm：entrypoint 用的 setpriv 在 Debian 12 是內建的
+FROM node:24-bookworm-slim
 
 ENV NODE_ENV=production \
     PORT=8080 \

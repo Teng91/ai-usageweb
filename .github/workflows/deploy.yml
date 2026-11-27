@@ -12,7 +12,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: 24
       - run: npm test
 
   # 前端 smoke test：用假資料起本機伺服器、開 runner 內建的 Chrome 實際操作畫面
@@ -22,7 +22,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: 24
       - run: npm run test:ui
 
   deploy:
@@ -32,7 +32,8 @@ jobs:
     concurrency: deploy
     steps:
       - uses: actions/checkout@v7
-      - uses: superfly/flyctl-actions/setup-flyctl@master
+      # 釘在固定的 commit（1.6）：用 @master 等於每次部署都跑對方最新的程式；要升級時換成新版的 commit SHA
+      - uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # 1.6
       - name: fly deploy
         run: |
           if [ -z "$FLY_API_TOKEN" ]; then
