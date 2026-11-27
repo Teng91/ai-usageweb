@@ -114,7 +114,13 @@ button {
   gap: 7px;
   font-size: 0.78rem;
   color: var(--text-2);
+  white-space: nowrap;
 }
+
+/* 資料最後更新的時間：「即時 · 3 分鐘前更新」 */
+.conn-age { color: var(--muted); }
+.conn-age:empty { display: none; }
+.conn-age::before { content: "·"; margin-right: 7px; }
 
 .dot {
   width: 7px;
@@ -747,6 +753,10 @@ button {
 @media (max-width: 560px) {
   .topbar { position: relative; gap: 8px; }
   .more-btn { display: inline-flex; }
+  /* 狀態只留一個重點，頂列才放得下：連著的時候綠點＋「3 分鐘前更新」；其他狀態（離線、喚醒中…）只寫狀態，離線的時間在橫幅裡 */
+  .conn[data-state="live"] #conn-text, .conn[data-state="polling"] #conn-text { display: none; }
+  .conn[data-state="live"] .conn-age::before, .conn[data-state="polling"] .conn-age::before { display: none; }
+  .conn:not([data-state="live"]):not([data-state="polling"]) .conn-age { display: none; }
   .topbar-more {
     display: none;
     position: absolute;

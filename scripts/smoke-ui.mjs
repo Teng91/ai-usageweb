@@ -145,6 +145,8 @@ async function main() {
     check('存取碼：成功後從網址拿掉，SSE 不再帶', (await ev(`location.search`)) === '' && seenKey['/api/stream']?.every((k) => k === null), JSON.stringify(seenKey['/api/stream']));
     check('四張卡片都畫出來，加上排行卡', (await ev(`document.querySelectorAll('.card[data-id]').length + '|' + document.querySelectorAll('.card.rank-card').length`)) === '4|1');
     check('SSE 連上顯示「即時」', (await ev(`document.getElementById('conn-text').textContent`)) === '即時');
+    const connAge = await ev(`document.getElementById('conn-age').textContent + '|' + document.getElementById('conn').title.slice(0, 7) + '|' + document.getElementById('conn').hasAttribute('aria-live')`);
+    check('右上角狀態寫資料最後更新的時間（「即時 · 剛剛更新」，aria-live 不放在會每分鐘變的時間上）', connAge === '剛剛更新|資料最後更新：|false', connAge);
     check('排行榜免費／付費各 10 名', (await ev(`[...document.querySelectorAll('.rank-list')].map((l) => l.children.length).join(',')`)) === '10,10');
     check('付費排行有價格', (await ev(`document.querySelector('.rank-col.paid .rank-list .pr')?.textContent`)) === '$0.5 / $2');
     check('Codex 95% 有「快用完了！」泡泡（元素存在）', (await ev(`!!document.querySelector('.card[data-id="codex"] .alert-bubble:not([hidden])')`)) === true);
@@ -298,6 +300,8 @@ async function main() {
     // 手機頂列維持一排；換風格、只看風景、安裝收在「更多」選單
     const topRow = await ev(`(() => { const tops = [...document.querySelectorAll('.topbar > *')].filter((e) => e.getClientRects().length && getComputedStyle(e).position !== 'absolute').map((e) => e.getBoundingClientRect()); const mid = (r) => r.top + r.height / 2; return [Math.round(Math.max(...tops.map(mid)) - Math.min(...tops.map(mid))), document.getElementById('skin-btn').getClientRects().length, document.getElementById('more-btn').getClientRects().length].join('|'); })()`);
     check('手機：頂列維持一排，換風格收進「更多」', topRow === '0|0|1', topRow);
+    const mobileConn = await ev(`(() => { const t = document.querySelector('.topbar'); return [document.getElementById('conn-text').getClientRects().length, document.getElementById('conn-age').textContent, t.scrollWidth <= t.clientWidth].join('|'); })()`);
+    check('手機：連著時狀態只寫「剛剛更新」（綠點代表已連線），頂列不會超出畫面', mobileConn === '0|剛剛更新|true', mobileConn);
     const touch = await ev(`matchMedia('(pointer: coarse)').matches + '|' + Math.round(document.getElementById('theme-btn').getBoundingClientRect().height)`);
     check('觸控裝置：頂列按鈕放大到至少 36px 高', touch.startsWith('true|') && Number(touch.split('|')[1]) >= 36, touch);
     await ev(`document.getElementById('more-btn').click()`);
@@ -370,6 +374,14 @@ async function main() {
     await sleep(3000);
     const caughtUp = await ev(claudeCard);
     check('切回來幾秒內自動換成新數字（資料還新，狀態列與資料時間都不寫）', caughtUp === '|' && (await ev(`document.querySelector('.card[data-id="claude"]').classList.contains('updating')`)) === false, caughtUp);
+
+    // 離線：右上角寫「離線」，橫幅寫顯示的是多久前的數字、連上網路後會自動更新
+    await ev(`window.dispatchEvent(new Event('offline'))`);
+    await sleep(300);
+    const offline = await ev(`[document.getElementById('conn').dataset.state, document.getElementById('offline-banner').hidden, document.getElementById('offline-banner').textContent].join('|')`);
+    check('離線時橫幅寫顯示的是多久前的數字、連上網路後會自動更新', offline === 'offline|false|離線：顯示的是剛剛的數字，連上網路後會自動更新', offline);
+    await ev(`window.dispatchEvent(new Event('online'))`);
+    await sleep(300);
 
     check('沒有 JS 錯誤', errors.length === 0, errors.join(' | '));
   } finally {

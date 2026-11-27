@@ -25,9 +25,11 @@
 
   <header class="topbar">
     <h1>AI 用量</h1>
-    <div class="conn" id="conn" aria-live="polite">
+    <!-- 連線狀態＋資料最後更新的時間；aria-live 只放在狀態文字上（更新時間每分鐘變，不要一直唸） -->
+    <div class="conn" id="conn">
       <span class="dot" id="conn-dot" aria-hidden="true"></span>
-      <span id="conn-text">連線中…</span>
+      <span id="conn-text" aria-live="polite">連線中…</span>
+      <span class="conn-age" id="conn-age"></span>
     </div>
     <button class="push-btn tb-btn icon-btn" id="push-btn" type="button" hidden aria-label="通知設定" title="通知設定">
       <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M10 20.5a2 2 0 0 0 4 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
@@ -63,7 +65,7 @@
     <span>想像 App 一樣使用：按瀏覽器的「分享」<svg class="share-icon" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M12 3v12M8 7l4-4 4 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 11v8a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>，再選「加入主畫面」</span>
     <button type="button" id="ios-banner-close">知道了</button>
   </div>
-  <div class="banner warn" id="offline-banner" hidden>離線：顯示的是上次的數字</div>
+  <div class="banner warn" id="offline-banner" hidden>離線：顯示的是上次的數字，連上網路後會自動更新</div>
 
   <!-- 不加 aria-live：倒數每秒都在變，螢幕閱讀器會一直唸 -->
   <main id="cards" class="cards">

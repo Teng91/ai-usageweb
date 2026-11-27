@@ -1,5 +1,5 @@
 // 卡片、頂列連線狀態、空畫面；每秒重算倒數與「X 分鐘前」（一條額度的畫面在 windows.js）
-import { $, WAKE_WINDOW_MS, state, visible, behind, setText } from './dom.js';
+import { $, WAKE_WINDOW_MS, state, visible, behind, setText, setTitle } from './dom.js';
 import { money, ago, retryText } from './format.js';
 import { renderWindow, tickWindow, levelOf } from './windows.js';
 import { gameEffects } from './effects.js';
@@ -252,20 +252,45 @@ function statusLine(p, st, updating, now) {
 /** 頂列連線狀態、頂端進度條（每張卡片底下已有資料時間，頁尾不再顯示「最後更新」） */
 export function renderChrome(now = Date.now()) {
   const polling = Boolean(state.fallbackTimer) && !state.offline;
+  const connState = state.live ? 'live'
+    : state.offline ? 'offline'
+      : document.visibilityState === 'hidden' ? 'paused'
+        : state.slowWake ? 'waking'
+          : polling ? 'polling' : 'connecting';
+  const conn = $('conn');
+  if (conn.dataset.state !== connState) conn.dataset.state = connState;
   $('conn-dot').classList.toggle('live', state.live || polling);
-  setText($('conn-text'), state.live
-    ? '即時'
-    : state.offline ? '離線'
-      : document.visibilityState === 'hidden' ? '暫停'
-        : state.slowWake ? '喚醒伺服器…'
-          : polling ? '自動更新' : '連線中…');
-  $('offline-banner').hidden = !state.offline;
+  setText($('conn-text'), CONN_LABELS[connState]);
+
+  // 資料最後更新的時間（各家最新一筆）：每張卡片在資料還新時不寫，統一寫在這裡；離線時橫幅也寫，才知道數字是多久前的
+  const newest = newestFetchedAt();
+  setText($('conn-age'), newest ? `${ago(newest, now)}更新` : '');
+  setTitle(conn, newest ? `資料最後更新：${new Date(Date.parse(newest)).toLocaleString('zh-TW', { hour12: false })}` : '');
+  const banner = $('offline-banner');
+  banner.hidden = !state.offline;
+  if (state.offline) {
+    setText(banner, newest
+      ? `離線：顯示的是${ago(newest, now) === '剛剛' ? '剛剛' : ` ${ago(newest, now)}`}的數字，連上網路後會自動更新`
+      : '離線：連上網路後會自動更新');
+  }
 
   let anyUpdating = false;
   for (const p of state.providers.values()) {
     if (visible(p) && isUpdating(p, now)) { anyUpdating = true; break; }
   }
   $('progress').classList.toggle('on', state.waking || anyUpdating);
+}
+
+const CONN_LABELS = { live: '即時', offline: '離線', paused: '暫停', waking: '喚醒伺服器…', polling: '自動更新', connecting: '連線中…' };
+
+/** 各家（有顯示的）最新一筆資料的時間（ISO 字串）；都還沒有回 null */
+function newestFetchedAt() {
+  let newest = null;
+  for (const p of state.providers.values()) {
+    const t = visible(p) && p.fetchedAt ? Date.parse(p.fetchedAt) : NaN;
+    if (Number.isFinite(t) && (newest === null || t > Date.parse(newest))) newest = p.fetchedAt;
+  }
+  return newest;
 }
 
 export function startTicker() {
