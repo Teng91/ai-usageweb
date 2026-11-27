@@ -1,7 +1,7 @@
 // 卡片、頂列連線狀態、空畫面；每秒重算倒數與「X 分鐘前」（一條額度的畫面在 windows.js）
 import { $, WAKE_WINDOW_MS, state, visible, behind, setText } from './dom.js';
 import { money, ago, retryText } from './format.js';
-import { renderWindow, tickWindow } from './windows.js';
+import { renderWindow, tickWindow, levelOf } from './windows.js';
 import { gameEffects } from './effects.js';
 import { rankingsEl } from './rankings.js';
 
@@ -115,6 +115,7 @@ export function renderCard(p) {
   if (!visible(p)) {
     cardsEl.querySelector(`.card[data-id="${CSS.escape(p.id)}"]`)?.remove();
     syncGroups();
+    syncLegend();
     return;
   }
   const el = cardFor(p);
@@ -141,6 +142,30 @@ export function renderCard(p) {
   }
   gameEffects(el, p);
   tickCard(el, p);
+  syncLegend();
+}
+
+/**
+ * 時間進度線的說明（手機沒有 hover，進度條的提示文字看不到）：有任何一條額度畫了時間線才顯示，
+ * 整頁一行，放在額度卡片下面
+ */
+function syncLegend() {
+  const ai = cardsEl.querySelector('.group[data-group="ai"]');
+  let lg = $('time-legend');
+  if (!ai?.querySelector('.time-mark:not([hidden])')) {
+    lg?.remove();
+    return;
+  }
+  if (!lg) {
+    lg = document.createElement('p');
+    lg.id = 'time-legend';
+    lg.className = 'legend';
+    const mark = document.createElement('span');
+    mark.className = 'legend-mark';
+    mark.setAttribute('aria-hidden', 'true');
+    lg.append(mark, '進度條上的細線＝這一輪的時間過了多少；用量超過它就是用得比時間快（會變橘）');
+  }
+  if (ai.nextElementSibling !== lg) ai.after(lg);
 }
 
 function note(text) {
@@ -175,6 +200,23 @@ function renderBalance(b) {
   big.className = Number(b.remaining) < 0 ? 'balance-big negative' : 'balance-big';
   big.textContent = b.remaining === null || b.remaining === undefined ? '—' : money(b.remaining, b.currency);
   frag.append(big);
+  // 已用／總額的進度條（跟額度卡片一樣的 .bar）；沒有總額（不限額的 key）就不畫
+  const total = Number(b.total);
+  const used = Number(b.used);
+  if (b.total !== null && b.total !== undefined && total > 0 && Number.isFinite(used)) {
+    const pct = (used / total) * 100;
+    const bar = document.createElement('div');
+    bar.className = `bar ${levelOf(pct, null)}`.trim();
+    bar.setAttribute('role', 'progressbar');
+    bar.setAttribute('aria-label', '餘額已用');
+    bar.setAttribute('aria-valuemin', '0');
+    bar.setAttribute('aria-valuemax', '100');
+    bar.setAttribute('aria-valuenow', String(Math.round(Math.min(100, Math.max(0, pct)))));
+    const fill = document.createElement('span');
+    fill.style.width = `${Math.min(100, Math.max(0, pct))}%`;
+    bar.append(fill);
+    frag.append(bar);
+  }
   const sub = document.createElement('p');
   sub.className = 'balance-sub';
   sub.textContent = b.total !== null && b.total !== undefined
@@ -196,7 +238,16 @@ function tickCard(el, p, now = Date.now()) {
   const cls = kind ? `card-status ${kind}` : 'card-status';
   if (status.className !== cls) status.className = cls;
   setText(status, text);
-  setText(el.querySelector('.card-meta'), p.fetchedAt ? `資料時間 ${ago(p.fetchedAt, now)}` : '');
+  // 資料時間：資料還新就不寫（頂列已經有「即時」，五張卡都寫很吵）；超過 2 個更新週期才寫，狀態列已經寫了時間（更新中、過期）就不重複
+  const interval = (p.intervalSec || state.pollIntervalSec) * 1000;
+  const old = p.fetchedAt && now - Date.parse(p.fetchedAt) > 2 * interval;
+  setText(el.querySelector('.card-meta'), old && kind !== 'updating' && st !== 'stale' ? `資料時間 ${ago(p.fetchedAt, now)}` : '');
+  // 卡片左邊的狀態色條：這張卡最嚴重的額度（含餘額）
+  const level = el.querySelector('.card-body .bar.danger') ? 'danger' : el.querySelector('.card-body .bar.warn') ? 'warn' : '';
+  if ((el.dataset.level || '') !== level) {
+    if (level) el.dataset.level = level;
+    else delete el.dataset.level;
+  }
 }
 
 /** 卡片狀態列：[樣式, 文字] */

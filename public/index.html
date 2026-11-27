@@ -29,27 +29,27 @@
       <span class="dot" id="conn-dot" aria-hidden="true"></span>
       <span id="conn-text">連線中…</span>
     </div>
-    <button class="push-btn" id="push-btn" type="button" hidden aria-label="通知設定" title="通知設定">
+    <button class="push-btn tb-btn icon-btn" id="push-btn" type="button" hidden aria-label="通知設定" title="通知設定">
       <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M10 20.5a2 2 0 0 0 4 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
     </button>
-    <button class="theme-btn" id="theme-btn" type="button" data-key="T" aria-label="切換亮色／暗色" title="切換亮色／暗色">
+    <button class="theme-btn tb-btn icon-btn" id="theme-btn" type="button" data-key="T" aria-label="切換亮色／暗色" title="切換亮色／暗色">
       <svg class="icon-sun" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
       <svg class="icon-moon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
     </button>
     <!-- 比較少用的按鈕：寬螢幕時照常排在頂列（CSS 用 order 排回原本的順序）；手機收進「更多」選單（ui/menu.js），頂列維持一排 -->
-    <button class="more-btn" id="more-btn" type="button" aria-label="更多" title="更多" aria-expanded="false" aria-controls="more-menu">
+    <button class="more-btn tb-btn icon-btn" id="more-btn" type="button" aria-label="更多" title="更多" aria-expanded="false" aria-controls="more-menu">
       <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="5" cy="12" r="1.8" fill="currentColor"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/><circle cx="19" cy="12" r="1.8" fill="currentColor"/></svg>
     </button>
     <div class="topbar-more" id="more-menu">
-      <button class="bg-btn" id="bg-btn" type="button" data-key="B" title="只看風景（B）" aria-label="只看風景">
+      <button class="bg-btn tb-btn icon-btn" id="bg-btn" type="button" data-key="B" title="只看風景（B）" aria-label="只看風景">
         <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M3 19l6-9 4 6 3-4 5 7z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="17" cy="6" r="2" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
         <span class="menu-label">只看風景</span>
       </button>
-      <button class="skin-btn" id="skin-btn" type="button" data-key="S">
+      <button class="skin-btn tb-btn" id="skin-btn" type="button" data-key="S">
         <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M5 21V4m0 0h11l-2 4 2 4H5" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <span id="skin-label">冒險風</span>
       </button>
-      <button class="install" id="install-btn" type="button" hidden>安裝</button>
+      <button class="install tb-btn" id="install-btn" type="button" hidden>安裝</button>
     </div>
   </header>
 

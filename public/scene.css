@@ -591,43 +591,6 @@
   animation: adv-twinkle 4s ease-in-out infinite alternate;
 }
 
-@media (prefers-color-scheme: dark) {
-  [data-skin="adventure"]:not([data-theme="light"]) .scene .map { --night: brightness(0.55) saturate(0.8); }
-  [data-skin="adventure"]:not([data-theme="light"]) .scene .sc-hero { filter: brightness(0.55) saturate(0.8); }
-  [data-skin="adventure"]:not([data-theme="light"]) .scene .sc-flies { display: block; }
-  [data-skin="adventure"]:not([data-theme="light"]) .sc-sun { display: none; }
-  [data-skin="adventure"]:not([data-theme="light"]) .sc-moon { display: block; }
-  [data-skin="adventure"]:not([data-theme="light"]) .sc-town-lights { display: block; filter: drop-shadow(0 0 3px #ffc85a) drop-shadow(0 0 8px rgba(255, 180, 70, 0.8)); }
-  [data-skin="adventure"]:not([data-theme="light"]) .sc-rainbow { display: none; }
-
-  [data-skin="adventure"]:not([data-theme="light"]) body {
-    background: linear-gradient(180deg, var(--sky-1) 0%, var(--sky-2) 55%, var(--sky-3) 100%) fixed;
-  }
-
-  [data-skin="adventure"]:not([data-theme="light"]) body::before {
-    content: "";
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 75vh;
-    pointer-events: none;
-    z-index: -1;
-    background:
-      radial-gradient(1.5px 1.5px at 10% 12%, #fff 98%, transparent),
-      radial-gradient(1px 1px at 22% 30%, #fff 98%, transparent),
-      radial-gradient(2px 2px at 35% 8%, #fff7c2 98%, transparent),
-      radial-gradient(1px 1px at 48% 24%, #fff 98%, transparent),
-      radial-gradient(1.5px 1.5px at 63% 15%, #fff 98%, transparent),
-      radial-gradient(1px 1px at 72% 34%, #fff 98%, transparent),
-      radial-gradient(2px 2px at 84% 10%, #fff7c2 98%, transparent),
-      radial-gradient(1px 1px at 93% 28%, #fff 98%, transparent),
-      radial-gradient(1px 1px at 5% 44%, #fff 98%, transparent),
-      radial-gradient(1.5px 1.5px at 55% 46%, #fff 98%, transparent);
-    animation: adv-twinkle 4s ease-in-out infinite alternate;
-  }
-}
-
 @keyframes adv-twinkle {
   from { opacity: 0.75; }
   to { opacity: 1; }

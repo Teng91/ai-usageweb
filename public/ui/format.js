@@ -16,12 +16,14 @@ export function usd(n) {
   return `$${Number(v.toPrecision(2))}`;
 }
 
+/** 1.0T → 1T、576.2B → 576.2B：小數點後是 0 就不寫 */
 export function tokens(n) {
   const v = Number(n);
-  if (v >= 1e12) return `${(v / 1e12).toFixed(1)}T`;
-  if (v >= 1e9) return `${(v / 1e9).toFixed(1)}B`;
-  if (v >= 1e6) return `${(v / 1e6).toFixed(1)}M`;
-  if (v >= 1e3) return `${(v / 1e3).toFixed(1)}K`;
+  const short = (x, unit) => `${x.toFixed(1).replace(/\.0$/, '')}${unit}`;
+  if (v >= 1e12) return short(v / 1e12, 'T');
+  if (v >= 1e9) return short(v / 1e9, 'B');
+  if (v >= 1e6) return short(v / 1e6, 'M');
+  if (v >= 1e3) return short(v / 1e3, 'K');
   return String(v);
 }
 

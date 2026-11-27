@@ -99,6 +99,11 @@ export function tickWindow(win, now) {
   const level = levelOf(Number(win.dataset.used), frac);
   bar.classList.toggle('warn', level === 'warn');
   bar.classList.toggle('danger', level === 'danger');
+  // 百分比數字也跟著變色（CSS 看 data-level）
+  if ((win.dataset.level || '') !== level) {
+    if (level) win.dataset.level = level;
+    else delete win.dataset.level;
+  }
 
   const eta = win.querySelector('.win-eta');
   const etaFull = etaText(win.dataset.exhaustsAt, now);

@@ -12,10 +12,10 @@
   --line-strong: #c9a46a;
   --text: #3b2a1e;
   --text-2: #6b4f3a;
-  --muted: #9a7f66;
+  --muted: #85694f; /* 小字用：對比至少 4.5:1 */
   --accent: #ff9f1c;
   --accent-soft: rgba(255, 159, 28, 0.18);
-  --warn: #c76a00;
+  --warn: #a85800;
   --danger: #d62839;
   --live: #2fbf4a;
   --idle: #b9a58a;
@@ -33,7 +33,7 @@
   color-scheme: light;
 }
 
-/* 夜晚的色票（選了暗色，或沒選但系統是暗色） */
+/* 夜晚的色票（data-theme 由 theme.js 設好：選了暗色，或沒選但系統是暗色） */
 :root[data-skin="adventure"][data-theme="dark"] {
   --bg: #0d1440;
   --panel: #1c2247;
@@ -61,37 +61,6 @@
   --hill-1: #1f4a3a;
   --hill-2: #153829;
   color-scheme: dark;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root[data-skin="adventure"]:not([data-theme="light"]) {
-    --bg: #0d1440;
-    --panel: #1c2247;
-    --panel-2: #252c59;
-    --line: #333c74;
-    --line-soft: #2a3266;
-    --line-strong: #4a55a0;
-    --text: #f6f0dc;
-    --text-2: #d2cab0;
-    --muted: #9a94b8;
-    --accent: #ffb43c;
-    --accent-soft: rgba(255, 180, 60, 0.18);
-    --warn: #ffc24a;
-    --danger: #ff6b7a;
-    --live: #5ee87a;
-    --idle: #5b6290;
-    --frame: #080b1f;
-    --frame-inner: #4b56a3;
-    --head-1: #6b55c9;
-    --head-2: #3f2f8f;
-    --gauge-bg: #070a1c;
-    --sky-1: #070c2e;
-    --sky-2: #16205a;
-    --sky-3: #2a3477;
-    --hill-1: #1f4a3a;
-    --hill-2: #153829;
-    color-scheme: dark;
-  }
 }
 
 /* 冒險風格專用的介面元件：簡約風格時不顯示 */
@@ -161,7 +130,7 @@
 }
 
 /* ---- 只看風景：卡片全部收起來，只留場景（可以點怪物玩） ---- */
-[data-skin="adventure"] .bg-btn { display: inline-flex; align-items: center; justify-content: center; width: 30px; padding: 0; }
+[data-skin="adventure"] .bg-btn { display: inline-flex; }
 
 [data-skin="adventure"][data-bgonly] .topbar,
 [data-skin="adventure"][data-bgonly] .banner,
@@ -257,12 +226,7 @@
 }
 
 [data-skin="adventure"] .conn,
-[data-skin="adventure"] .bg-btn,
-[data-skin="adventure"] .more-btn,
-[data-skin="adventure"] .push-btn,
-[data-skin="adventure"] .theme-btn,
-[data-skin="adventure"] .skin-btn,
-[data-skin="adventure"] .install {
+[data-skin="adventure"] .tb-btn {
   background: var(--panel);
   border: 2px solid var(--frame);
   border-radius: 10px;
@@ -273,26 +237,9 @@
 
 [data-skin="adventure"] .conn { padding: 2px 10px; }
 
-[data-skin="adventure"] .bg-btn,
-[data-skin="adventure"] .more-btn,
-[data-skin="adventure"] .push-btn,
-[data-skin="adventure"] .theme-btn,
-[data-skin="adventure"] .skin-btn,
-[data-skin="adventure"] .install { height: 30px; }
-
-[data-skin="adventure"] .bg-btn:hover,
-[data-skin="adventure"] .push-btn:hover,
-[data-skin="adventure"] .theme-btn:hover,
-[data-skin="adventure"] .skin-btn:hover,
-[data-skin="adventure"] .install:hover { background: #ffe8a8; color: #3b2a1e; }
-
-[data-skin="adventure"] .bg-btn:active,
-[data-skin="adventure"] .push-btn:active,
-[data-skin="adventure"] .theme-btn:active,
-[data-skin="adventure"] .skin-btn:active,
-[data-skin="adventure"] .install:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--frame); }
-
-[data-skin="adventure"] .push-btn[hidden] { display: none; }
+[data-skin="adventure"] .tb-btn { height: 30px; }
+[data-skin="adventure"] .tb-btn:hover { background: #ffe8a8; color: #3b2a1e; }
+[data-skin="adventure"] .tb-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--frame); }
 [data-skin="adventure"] .push-btn.on { background: #ffd23f; color: #3b2a1e; }
 
 /* 通知設定：遊戲對話框 */
@@ -358,7 +305,7 @@
   border-radius: 999px;
   color: #4a3426;
   font-weight: 900;
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   line-height: 16px;
   padding: 0 8px;
 }
@@ -558,7 +505,6 @@
     border-radius: 10px;
     box-shadow: 0 4px 0 var(--frame);
   }
-  [data-skin="adventure"] .topbar-more .bg-btn { width: auto; padding: 0 12px; justify-content: flex-start; gap: 8px; }
   [data-skin="adventure"] .topbar-more > button { height: 34px; }
 }
 
@@ -583,4 +529,28 @@
   [data-skin="adventure"] body::before { animation: none; }
   /* 場景動畫在上面已關掉 */
   [data-skin="adventure"] .card:hover { transform: none; }
+}
+
+/* ---- 焦點框：白天用外框的深咖啡色、夜晚用金色，在天空和卡片上都看得清楚 ---- */
+[data-skin="adventure"] :focus-visible { outline: 3px solid var(--frame); outline-offset: 2px; }
+[data-skin="adventure"][data-theme="dark"] :focus-visible { outline-color: #ffd23f; }
+
+/* ---- 時間進度的圖例：在天空上直接寫小字會糊，做成一塊木框小牌子 ---- */
+[data-skin="adventure"] .legend {
+  justify-self: start;
+  margin: -4px 0 0;
+  padding: 3px 12px;
+  border: 2px solid var(--frame);
+  border-radius: 10px;
+  background: var(--panel);
+  box-shadow: 0 3px 0 var(--frame);
+  color: var(--text-2);
+  font-weight: 700;
+}
+[data-skin="adventure"] .legend-mark { width: 3px; background: #fff; box-shadow: 0 0 0 1px var(--frame); }
+
+/* ---- 觸控裝置：頂列按鈕放大 ---- */
+@media (pointer: coarse) {
+  [data-skin="adventure"] .tb-btn { height: 36px; }
+  [data-skin="adventure"] .topbar-more > button { height: 42px; }
 }

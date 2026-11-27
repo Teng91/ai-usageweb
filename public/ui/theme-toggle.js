@@ -1,6 +1,7 @@
 // 亮色／暗色與簡約／冒險風格的切換鈕
-// 沒選過就跟隨系統；按一下切到另一個並記住（/theme.js 會在下次載入時、畫面出現前套用）
-import { $, writeStore } from './dom.js';
+// data-theme 一律由 /theme.js 在畫面出現前設好（選過的，或沒選就照系統）；沒選過時系統切換亮暗會跟著變
+// 按一下切到另一個並記住（/theme.js 會在下次載入時、畫面出現前套用）
+import { $, readStore, writeStore } from './dom.js';
 
 const THEME_COLORS = {
   minimal: { light: '#f4f6fa', dark: '#070b16' },
@@ -9,10 +10,16 @@ const THEME_COLORS = {
 const root = document.documentElement;
 const systemLight = window.matchMedia('(prefers-color-scheme: light)');
 
+/** 使用者按按鈕選過的亮暗；沒選過回 null（跟隨系統） */
+function chosenTheme() {
+  const t = readStore('theme');
+  return t === 'light' || t === 'dark' ? t : null;
+}
+
+const systemTheme = () => (systemLight.matches ? 'light' : 'dark');
+
 function currentTheme() {
-  const t = root.dataset.theme;
-  if (t === 'light' || t === 'dark') return t;
-  return systemLight.matches ? 'light' : 'dark';
+  return root.dataset.theme === 'light' ? 'light' : 'dark';
 }
 
 function currentSkin() {
@@ -50,6 +57,12 @@ export function initThemeToggle() {
     writeStore('skin', next);
     renderButtons();
   });
-  systemLight.addEventListener('change', renderButtons);
+  // 沒選過就跟著系統切換
+  systemLight.addEventListener('change', () => {
+    if (!chosenTheme()) root.dataset.theme = systemTheme();
+    renderButtons();
+  });
+  // 保險：theme.js 沒跑到（不該發生）時也要有 data-theme，CSS 只看它
+  if (root.dataset.theme !== 'light' && root.dataset.theme !== 'dark') root.dataset.theme = chosenTheme() || systemTheme();
   renderButtons();
 }

@@ -148,6 +148,14 @@ async function main() {
     check('排行榜免費／付費各 10 名', (await ev(`[...document.querySelectorAll('.rank-list')].map((l) => l.children.length).join(',')`)) === '10,10');
     check('付費排行有價格', (await ev(`document.querySelector('.rank-col.paid .rank-list .pr')?.textContent`)) === '$0.5 / $2');
     check('Codex 95% 有「快用完了！」泡泡（元素存在）', (await ev(`!!document.querySelector('.card[data-id="codex"] .alert-bubble:not([hidden])')`)) === true);
+    const danger = await ev(`(() => { const c = document.querySelector('.card[data-id="codex"]'); return [c.dataset.level, !!c.querySelector('.win[data-level="danger"] .win-pct'), getComputedStyle(c).boxShadow.includes('inset')].join('|'); })()`);
+    check('簡約風格：快用完時百分比變紅、卡片左邊有狀態色條', danger === 'danger|true|true', danger);
+    const balance = await ev(`(() => { const b = document.querySelector('.card[data-id="openrouter"] .balance .bar'); return b ? b.className + '|' + b.getAttribute('aria-valuenow') : 'none'; })()`);
+    check('OpenRouter 餘額卡有「已用／總額」進度條（超過總額是紅的）', balance === 'bar danger|100', balance);
+    check('排行的 token 數字不寫多餘的 .0（1T、500B）', (await ev(`[...document.querySelectorAll('.rank-col:not(.paid) .rank-list .tk')].slice(0, 2).map((e) => e.textContent).join(',')`)) === '1T,500B');
+    const legend = await ev(`(() => { const l = document.getElementById('time-legend'); return l ? (l.previousElementSibling?.dataset.group || '') + '|' + l.textContent.slice(0, 6) : 'none'; })()`);
+    check('進度條時間線的圖例放在額度卡片下面', legend === 'ai|進度條上的細', legend);
+    check('資料還新時卡片不寫「資料時間」', (await ev(`[...document.querySelectorAll('.card[data-id] .card-meta')].every((m) => m.textContent === '' && getComputedStyle(m).display === 'none')`)) === true);
     check('簡約風格不建立場景地圖', (await ev(`document.querySelectorAll('.scene .map').length`)) === 0);
     check('卡片順序：Claude、Gemini、Codex', (await ev(`[...document.querySelectorAll('.card')].slice(0, 3).map((c) => c.querySelector('.card-name').textContent).join(',')`)) === 'Claude,Gemini,Codex');
     const rows = await ev(`(() => { const b = document.querySelector('.card[data-id="claude"] .card-body'); const wins = [...b.querySelectorAll('.win')]; const c = document.querySelector('.card[data-id="antigravity"] .card-body'); const bottom = (el) => Math.max(...[...el.children].map((x) => x.getBoundingClientRect().bottom)) - el.getBoundingClientRect().top; return { rows: new Set(wins.map((w) => w.offsetTop)).size, h: bottom(b), ch: bottom(c), sx: wins.every((w) => w.scrollWidth <= w.clientWidth + 1) }; })()`);
@@ -166,8 +174,26 @@ async function main() {
     const themeNow = () => ev(`document.documentElement.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')`);
     await shot(`minimal-${await themeNow()}`);
     check('Claude 到期日', /2027\/11\/4 到期/.test(await ev(`document.querySelector('.card[data-id="claude"] .plan-exp').textContent`)));
+    // 鍵盤焦點框：按 Tab 後，有焦點的元素是實線外框
+    await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 });
+    await send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 });
+    await sleep(100);
+    const focusRing = await ev(`(() => { const a = document.activeElement; return a && a !== document.body ? a.matches(':focus-visible') + '|' + getComputedStyle(a).outlineStyle : 'no focus'; })()`);
+    check('用鍵盤（Tab）移動焦點時有明顯的焦點框', focusRing === 'true|solid', focusRing);
+    await ev(`document.activeElement?.blur()`);
 
     // ---- 亮暗切換 ----
+    // 小字（重置倒數）對卡片底色的對比至少 4.5:1
+    const contrastOf = `(() => { const rgb = (c) => c.match(/[0-9.]+/g).slice(0, 3).map(Number); const L = (c) => { const [r, g, b] = rgb(c).map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }); return 0.2126 * r + 0.7152 * g + 0.0722 * b; }; const fg = getComputedStyle(document.querySelector('.win-sub')).color; const bg = getComputedStyle(document.querySelector('.card[data-id]')).backgroundColor; const [a, b] = [L(fg), L(bg)].sort((x, y) => y - x); return Math.round(((a + 0.05) / (b + 0.05)) * 100) / 100; })()`;
+    // 還沒選過亮暗：跟著系統切換（data-theme 一律設好，CSS 只看它）
+    const follow = [];
+    for (const scheme of ['dark', 'light']) {
+      await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: scheme }] });
+      await sleep(150);
+      follow.push(`${await ev(`document.documentElement.dataset.theme`)}:${await ev(contrastOf)}`);
+    }
+    check('沒選過亮暗時跟著系統切換，兩種都設好 data-theme', follow.map((x) => x.split(':')[0]).join() === 'dark,light', follow.join(' '));
+    check('簡約風格的小字對比至少 4.5:1（暗色、亮色）', follow.every((x) => Number(x.split(':')[1]) >= 4.5), follow.join(' '));
     const before = await ev(`getComputedStyle(document.body).backgroundColor`);
     await ev(`document.getElementById('theme-btn').click()`);
     await sleep(200);
@@ -195,6 +221,13 @@ async function main() {
     await shot('adventure-day');
     check('夜晚：月亮與小鎮燈火亮起、彩虹收起，地圖不整層調暗', (await nightState('dark')) === 'block,block,none,none');
     await shot('adventure-night');
+    const advContrast = [];
+    for (const theme of ['light', 'dark']) {
+      await ev(`document.documentElement.dataset.theme = '${theme}'`);
+      await sleep(150);
+      advContrast.push(`${theme}:${await ev(contrastOf)}`);
+    }
+    check('冒險風格的小字對比至少 4.5:1（白天、夜晚）', advContrast.every((x) => Number(x.split(':')[1]) >= 4.5), advContrast.join(' '));
     await ev(themeBefore ? `document.documentElement.dataset.theme = '${themeBefore}'` : `delete document.documentElement.dataset.theme`);
     const maps = [];
     for (let i = 0; i < 4; i++) { await key('m'); await sleep(2300); maps.push(await ev(`document.documentElement.dataset.map`)); }
@@ -214,6 +247,12 @@ async function main() {
     const retries = await ev(`['claude', 'openrouter'].map((id) => { const c = document.querySelector('.card[data-id="' + id + '"]'); return c.querySelector('.card-status').textContent + (c.classList.contains('stale') ? '（stale）' : ''); }).join('|')`);
     check('被限流等退避時不算過期、出錯時顯示下次重試時間', retries === '被限流，更新放慢（5 分鐘後重試）|503 服務暫時有問題（3 分鐘後重試）', retries);
     pushProvider(providers(36)[0]);
+    pushProvider(providers(30)[3]);
+
+    // 資料舊了（超過 2 個更新週期）而且狀態列沒寫時間（例如出錯）才寫「資料時間」
+    pushProvider({ ...providers(30)[3], status: 'error', error: '503 服務暫時有問題', fetchedAt: real(-5 * 60e3), nextFetchAt: real(150e3) });
+    await sleep(300);
+    check('資料舊了才寫「資料時間」', (await ev(`document.querySelector('.card[data-id="openrouter"] .card-meta').textContent`)) === '資料時間 5 分鐘前');
     pushProvider(providers(30)[3]);
 
     // 過期由伺服器算好的 staleAt 決定，前端只比對時間
@@ -246,6 +285,7 @@ async function main() {
 
     // 手機：「顯示用量」按鈕要在畫面內
     await viewport(390, 844, true);
+    await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
     await sleep(400);
     await shot('mobile');
 
@@ -256,6 +296,8 @@ async function main() {
     // 手機頂列維持一排；換風格、只看風景、安裝收在「更多」選單
     const topRow = await ev(`(() => { const tops = [...document.querySelectorAll('.topbar > *')].filter((e) => e.getClientRects().length && getComputedStyle(e).position !== 'absolute').map((e) => e.getBoundingClientRect()); const mid = (r) => r.top + r.height / 2; return [Math.round(Math.max(...tops.map(mid)) - Math.min(...tops.map(mid))), document.getElementById('skin-btn').getClientRects().length, document.getElementById('more-btn').getClientRects().length].join('|'); })()`);
     check('手機：頂列維持一排，換風格收進「更多」', topRow === '0|0|1', topRow);
+    const touch = await ev(`matchMedia('(pointer: coarse)').matches + '|' + Math.round(document.getElementById('theme-btn').getBoundingClientRect().height)`);
+    check('觸控裝置：頂列按鈕放大到至少 36px 高', touch.startsWith('true|') && Number(touch.split('|')[1]) >= 36, touch);
     await ev(`document.getElementById('more-btn').click()`);
     await sleep(200);
     const menu = await ev(`(() => { const m = document.getElementById('more-menu'); const s = document.getElementById('skin-btn').getBoundingClientRect(); return [m.hasAttribute('data-open'), document.getElementById('more-btn').getAttribute('aria-expanded'), s.width > 100 && s.left >= 0 && s.right <= innerWidth].join('|'); })()`);
@@ -325,7 +367,7 @@ async function main() {
     check('切回來時資料比一個週期舊：先標「更新中」', /^更新中/.test(whileWaking), whileWaking);
     await sleep(3000);
     const caughtUp = await ev(claudeCard);
-    check('切回來幾秒內自動換成新數字，卡片只寫資料時間（不寫每幾分鐘更新）', caughtUp === '|資料時間 剛剛', caughtUp);
+    check('切回來幾秒內自動換成新數字（資料還新，狀態列與資料時間都不寫）', caughtUp === '|' && (await ev(`document.querySelector('.card[data-id="claude"]').classList.contains('updating')`)) === false, caughtUp);
 
     check('沒有 JS 錯誤', errors.length === 0, errors.join(' | '));
   } finally {

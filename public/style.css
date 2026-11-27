@@ -8,7 +8,7 @@
   --line-strong: #283658;
   --text: #e6ebf5;
   --text-2: #a9b3ca;
-  --muted: #6c7896;
+  --muted: #7c88a6; /* 小字用：對比至少 4.5:1 */
   --track: #141d33;
   --accent: #4d8dff;
   --accent-soft: rgba(77, 141, 255, 0.12);
@@ -23,36 +23,12 @@
   --radius: 8px;
   --page-max: 1440px;
   --mono: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Consolas, monospace;
+  --card-shadow: 0 0 #0000; /* 暗色不用陰影 */
+  --card-accent: transparent; /* 卡片左邊的狀態色條（warn／danger 時才有顏色） */
   color-scheme: dark;
 }
 
-/* 亮色：沒選過就跟隨系統；按鈕選過就用 data-theme 固定 */
-@media (prefers-color-scheme: light) {
-  :root:not([data-theme="dark"]) {
-    --bg: #f4f6fa;
-    --panel: #ffffff;
-    --panel-2: #f1f4f9;
-    --line: #e1e6ef;
-    --line-soft: #ecf0f6;
-    --line-strong: #cdd5e3;
-    --text: #0f172a;
-    --text-2: #475569;
-    --muted: #7b879e;
-    --track: #e8edf4;
-    --accent: #2f6fec;
-    --accent-soft: rgba(47, 111, 236, 0.1);
-    --ok: #2f6fec;
-    --warn: #c98a04;
-    --danger: #dc3545;
-    --bar-ok: #3b82f6;
-    --bar-warn: #f59e0b;
-    --bar-danger: #ef4444;
-    --live: #12a26b;
-    --idle: #a6b0c3;
-    color-scheme: light;
-  }
-}
-
+/* 亮色。data-theme 一律由 /theme.js 在畫面出現前設好（選過的，或沒選就照系統），所以色票只寫這一份 */
 :root[data-theme="light"] {
   --bg: #f4f6fa;
   --panel: #ffffff;
@@ -62,18 +38,19 @@
   --line-strong: #cdd5e3;
   --text: #0f172a;
   --text-2: #475569;
-  --muted: #7b879e;
+  --muted: #5f6b85;
   --track: #e8edf4;
   --accent: #2f6fec;
   --accent-soft: rgba(47, 111, 236, 0.1);
   --ok: #2f6fec;
-  --warn: #c98a04;
+  --warn: #a16207; /* 當文字用也要夠深（原本的 #c98a04 只有 2.95:1） */
   --danger: #dc3545;
   --bar-ok: #3b82f6;
   --bar-warn: #f59e0b;
   --bar-danger: #ef4444;
   --live: #12a26b;
   --idle: #a6b0c3;
+  --card-shadow: 0 1px 2px rgba(15, 23, 42, 0.06); /* 淡邊線在淺灰底上看不清楚，補一點陰影 */
   color-scheme: light;
 }
 
@@ -148,56 +125,33 @@ button {
 
 .dot.live { background: var(--live); }
 
-/* 亮暗切換鈕：暗色時顯示太陽（按了變亮），亮色時顯示月亮 */
-.theme-btn {
+/* 頂列按鈕共用的外觀（tb-btn）；只有圖示的方形按鈕再加 icon-btn */
+.tb-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
+  gap: 5px;
   height: 28px;
-  padding: 0;
+  padding: 0 10px;
   border: 1px solid var(--line-strong);
   border-radius: 6px;
   background: var(--panel);
   color: var(--text-2);
+  white-space: nowrap;
 }
 
-.theme-btn:hover { color: var(--text); border-color: var(--accent); }
+.tb-btn:hover { color: var(--text); border-color: var(--accent); }
+.tb-btn[hidden] { display: none; }
+.icon-btn { width: 30px; padding: 0; }
 
 /* 通知鈴鐺：沒啟用推播時隱藏；已訂閱時亮起來 */
-.push-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 28px;
-  padding: 0;
-  border: 1px solid var(--line-strong);
-  border-radius: 6px;
-  background: var(--panel);
-  color: var(--text-2);
-}
-
-.push-btn[hidden] { display: none; }
-.push-btn:hover { color: var(--text); border-color: var(--accent); }
 .push-btn.on { color: var(--accent); border-color: var(--accent); }
 
 /* 「更多」選單：寬螢幕時攤開（display: contents，按鈕照常排在頂列），「更多」按鈕只在手機出現 */
 .topbar-more { display: contents; }
 .menu-label { display: none; }
-.more-btn {
-  display: none;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 28px;
-  padding: 0;
-  border: 1px solid var(--line-strong);
-  border-radius: 6px;
-  background: var(--panel);
-  color: var(--text-2);
-}
-.more-btn:hover, .more-btn[aria-expanded="true"] { color: var(--text); border-color: var(--accent); }
+.more-btn { display: none; }
+.more-btn[aria-expanded="true"] { color: var(--text); border-color: var(--accent); }
 
 /* 攤開時照原本的順序：只看風景、換風格、通知、亮暗、安裝 */
 .topbar .bg-btn, .topbar .skin-btn { order: 1; }
@@ -281,32 +235,16 @@ button {
 .push-actions button:disabled { opacity: 0.5; }
 
 /* 風格切換鈕（簡約／冒險） */
-.skin-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  height: 28px;
-  padding: 0 10px;
-  border: 1px solid var(--line-strong);
-  border-radius: 6px;
-  background: var(--panel);
-  color: var(--text-2);
-  font-size: 0.76rem;
-  white-space: nowrap;
-}
-
-.skin-btn:hover { color: var(--text); border-color: var(--accent); }
+.skin-btn { font-size: 0.76rem; }
 
 .theme-btn .icon-moon { display: none; }
 :root[data-theme="light"] .theme-btn .icon-sun { display: none; }
 :root[data-theme="light"] .theme-btn .icon-moon { display: block; }
 
-@media (prefers-color-scheme: light) {
-  :root:not([data-theme="dark"]) .theme-btn .icon-sun { display: none; }
-  :root:not([data-theme="dark"]) .theme-btn .icon-moon { display: block; }
-}
+.install { font-size: 0.8rem; color: var(--text); padding: 0 12px; }
+.install:hover { background: var(--panel-2); }
 
-.install, .banner button {
+.banner button {
   border: 1px solid var(--line-strong);
   background: var(--panel);
   border-radius: 6px;
@@ -315,7 +253,7 @@ button {
   color: var(--text);
 }
 
-.install:hover, .banner button:hover { background: var(--panel-2); border-color: var(--accent); }
+.banner button:hover { background: var(--panel-2); border-color: var(--accent); }
 
 .banner {
   max-width: var(--page-max);
@@ -336,7 +274,7 @@ button {
 
 .banner button { flex: none; white-space: nowrap; }
 
-.banner[hidden], .install[hidden] { display: none; }
+.banner[hidden] { display: none; }
 
 .share-icon {
   vertical-align: -2px;
@@ -418,10 +356,15 @@ button {
   min-width: 0;
   display: flex;
   flex-direction: column;
+  box-shadow: var(--card-shadow), inset 2px 0 0 var(--card-accent);
   transition: border-color 0.15s, opacity 0.3s;
 }
 
 .card:hover { border-color: var(--line-strong); }
+
+/* 有額度到了 warn／danger：左邊一條狀態色，簡約風格掃一眼也看得出來（冒險風格有「快用完了！」泡泡，卡片外框另外畫） */
+.card[data-level="warn"] { --card-accent: var(--warn); }
+.card[data-level="danger"] { --card-accent: var(--danger); }
 
 .card > * {
   padding-left: 16px;
@@ -447,7 +390,7 @@ button {
 }
 
 .plan {
-  font-size: 0.68rem;
+  font-size: 0.75rem;
   font-weight: 500;
   color: var(--text-2);
   border: 1px solid var(--line-strong);
@@ -461,7 +404,7 @@ button {
 
 .plan-exp {
   margin-left: auto;
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
@@ -511,6 +454,10 @@ button {
   color: var(--text);
 }
 
+/* 百分比跟著進度條變色（warn／danger 由 ui/windows.js 依時間進度決定） */
+.win[data-level="warn"] .win-pct { color: var(--warn); }
+.win[data-level="danger"] .win-pct { color: var(--danger); }
+
 .bar {
   position: relative; /* 時間進度的細線以它定位，上下各凸出一點 */
   height: 4px;
@@ -543,7 +490,7 @@ button {
 .bar.danger > span { background: var(--bar-danger); }
 
 .win-sub {
-  font-size: 0.74rem;
+  font-size: 0.75rem;
   color: var(--muted);
   margin: 0;
   font-variant-numeric: tabular-nums;
@@ -551,7 +498,7 @@ button {
 
 /* 預估用完時間（照目前速度會在重置前用完才出現） */
 .win-eta {
-  font-size: 0.74rem;
+  font-size: 0.75rem;
   color: var(--warn);
   margin: 2px 0 0;
   font-variant-numeric: tabular-nums;
@@ -593,9 +540,11 @@ button {
   padding-top: 8px;
   padding-bottom: 9px;
   border-top: 1px solid var(--line-soft);
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   color: var(--muted);
 }
+
+.card-meta:empty { display: none; }
 
 .note {
   color: var(--muted);
@@ -615,6 +564,8 @@ button {
 }
 
 .balance-big.negative { color: var(--danger); }
+
+.balance .bar { margin: 10px 0 6px; }
 
 .balance-sub {
   font-size: 0.8rem;
@@ -664,19 +615,19 @@ button {
 
 .rt-row {
   display: grid;
-  grid-template-columns: 26px minmax(0, 1fr) minmax(48px, 24%) 58px;
+  grid-template-columns: 26px minmax(0, 1fr) minmax(80px, 36%) 58px;
   align-items: center;
   gap: 10px;
 }
 
 .rank-col.paid .rt-row {
-  grid-template-columns: 26px minmax(0, 1fr) minmax(40px, 18%) 58px 104px;
+  grid-template-columns: 26px minmax(0, 1fr) minmax(64px, 28%) 58px 104px;
 }
 
 .rt-head {
   padding: 0 6px 6px;
   border-bottom: 1px solid var(--line);
-  font-size: 0.68rem;
+  font-size: 0.75rem;
   color: var(--muted);
   letter-spacing: 0.03em;
 }
@@ -700,7 +651,7 @@ button {
 
 .rt-row .rk {
   font-family: var(--mono);
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   color: var(--muted);
 }
 
@@ -734,19 +685,19 @@ button {
 
 .rt-row .tk, .rt-row .pr {
   font-family: var(--mono);
-  font-size: 0.74rem;
+  font-size: 0.75rem;
   font-variant-numeric: tabular-nums;
   text-align: right;
   color: var(--text-2);
   white-space: nowrap;
 }
 
-.rt-head .tk, .rt-head .pr { font-family: inherit; font-size: 0.68rem; color: var(--muted); }
+.rt-head .tk, .rt-head .pr { font-family: inherit; font-size: 0.75rem; color: var(--muted); }
 
 .pr-inline {
   display: none;
   font-family: var(--mono);
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   color: var(--muted);
 }
 
@@ -836,6 +787,38 @@ button {
     box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
   }
   .topbar-more[data-open] { display: flex; }
-  .topbar-more > button { justify-content: flex-start; height: 34px; padding: 0 12px; gap: 8px; text-align: left; font-size: 0.82rem; }
+  .topbar-more > button { justify-content: flex-start; width: auto; height: 34px; padding: 0 12px; gap: 8px; text-align: left; font-size: 0.82rem; }
   .topbar-more .menu-label { display: inline; }
+}
+
+/* ---- 用鍵盤操作時的焦點框（滑鼠點不會出現） ---- */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ---- 時間進度線的說明：放在額度卡片下面（手機沒有 hover，看不到進度條的提示文字） ---- */
+.legend {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: -2px 2px 0;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.legend-mark {
+  flex: none;
+  width: 2px;
+  height: 12px;
+  border-radius: 1px;
+  background: var(--text-2);
+}
+
+/* ---- 觸控裝置：頂列按鈕放大，比較好點 ---- */
+@media (pointer: coarse) {
+  .tb-btn { height: 36px; }
+  .icon-btn { width: 38px; }
+  .topbar-more > button { height: 42px; }
 }
